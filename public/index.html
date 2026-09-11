@@ -2542,6 +2542,21 @@ function buildStaffRow(s){
     });
   });
 
+  var resetPin = document.createElement("button");
+  resetPin.className = "staff-row-del";
+  resetPin.type = "button";
+  resetPin.setAttribute("aria-label", "Reset PIN for " + s.name);
+  resetPin.title = "Reset PIN";
+  resetPin.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
+  resetPin.addEventListener("click", function(){
+    var newPin = prompt("New 4-6 digit PIN for " + s.name + ":");
+    if(newPin === null) return;
+    if(!/^\d{4,6}$/.test(newPin)){ alert("PIN must be 4-6 digits."); return; }
+    apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { pin: newPin }).then(function(){
+      showToast("PIN reset for " + s.name);
+    }).catch(function(){ alert("Couldn't reset that PIN. Try again."); });
+  });
+
   var del = document.createElement("button");
   del.className = "staff-row-del";
   del.type = "button";
@@ -2556,6 +2571,7 @@ function buildStaffRow(s){
 
   row.appendChild(name);
   row.appendChild(select);
+  row.appendChild(resetPin);
   row.appendChild(del);
   return row;
 }
