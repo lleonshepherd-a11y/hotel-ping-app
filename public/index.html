@@ -839,11 +839,27 @@ var PROFANITY_LIST = [
   "piss","pissed","asshole","arse","arsehole","crap","wanker","bollocks","twat","prick",
   "slut","whore","damn","goddamn","douche","douchebag","motherfucker","bloody hell"
 ];
+var PROFANITY_PATTERNS = PROFANITY_LIST.map(function(w){
+  var escaped = w.replace(/[- \/\\^$*+?.()|[\]{}]/g, "\\$&");
+  var exact = new RegExp("[^a-z]" + escaped + "[^a-z]", "i");
+  var obfuscated = null;
+  if(w.indexOf(" ") === -1 && w.length >= 3){
+    var chars = w.split("");
+    var parts = chars.map(function(c, i){
+      return (i === 0 || i === chars.length - 1) ? c : "(?:" + c + "|[^a-z0-9])";
+    });
+    obfuscated = new RegExp("[^a-z]" + parts.join("") + "[^a-z]", "i");
+  }
+  return { exact: exact, obfuscated: obfuscated };
+});
+
 function containsProfanity(text){
   var lower = " " + text.toLowerCase() + " ";
-  return PROFANITY_LIST.some(function(w){
-    var re = new RegExp("[^a-z]" + w.replace(/[- \/\\^$*+?.()|[\]{}]/g, "\\$&") + "[^a-z]", "i");
-    return re.test(lower);
+  var collapsed = " " + text.toLowerCase().replace(/([a-z])\1{2,}/g, "$1") + " ";
+  return PROFANITY_PATTERNS.some(function(p){
+    if(p.exact.test(lower) || p.exact.test(collapsed)) return true;
+    if(p.obfuscated && p.obfuscated.test(lower)) return true;
+    return false;
   });
 }
 
