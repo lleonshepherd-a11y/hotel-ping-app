@@ -98,8 +98,7 @@ input,textarea{font-family:inherit}
 
 .sb-switcher{padding:16px 20px 8px}
 .sb-switcher-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:11px}
-.switcher-row{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-.switcher-row::-webkit-scrollbar{display:none}
+.switcher-row{display:flex;flex-wrap:wrap;gap:9px}
 .sw-chip{flex:none;width:42px;height:42px;border-radius:50%;border:2.5px solid transparent;background:none;padding:0;position:relative;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.3,1.4,.4,1)}
 .sw-chip:hover{transform:translateY(-1px) scale(1.04)}
 .sw-chip.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--active-tint)}
