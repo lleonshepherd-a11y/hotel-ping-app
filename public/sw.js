@@ -41,7 +41,7 @@ self.addEventListener("push", function(event){
   var title = data.title || "Hotel Ping";
   var options = {
     body: data.body || "New message",
-    icon: "/icon-192.png",
+    icon: data.icon || "/icon-192.png",
     badge: "/icon-192.png",
     tag: data.tag || "hotel-ping",
     data: { url: data.url || "/" }

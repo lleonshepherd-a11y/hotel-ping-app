@@ -510,6 +510,7 @@ export default {
           body: notifyBody,
           url: "/",
           tag: "hotel-ping-" + to,
+          icon: "/avatars/" + from + ".png",
         }).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
