@@ -41,12 +41,13 @@
 /* Message Dash is a fixed white/light design — it does not switch to a dark palette. */
 
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{
   background:radial-gradient(ellipse 1100px 700px at 22% -8%, #eceeec 0%, var(--bg) 55%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",Roboto,"Manrope",sans-serif;
-  height:100vh;
+  position:fixed;
+  inset:0;
   overflow:hidden;
   -webkit-font-smoothing:antialiased;
   display:flex;
