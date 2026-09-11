@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS messages (
   transcript TEXT,
   urgent INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'delivered',
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  deleted_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
@@ -55,6 +56,13 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_push_staff ON push_subscriptions(staff_id);
+
+CREATE TABLE IF NOT EXISTS typing_status (
+  from_dept TEXT NOT NULL,
+  to_dept TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (from_dept, to_dept)
+);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),

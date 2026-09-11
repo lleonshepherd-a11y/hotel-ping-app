@@ -41,21 +41,37 @@ function rowToDepartment(row) {
 }
 
 function rowToMessage(row) {
+  const deleted = !!row.deleted_at;
   return {
     id: row.id,
     from: row.from_dept,
     to: row.to_dept,
     type: row.type,
-    body: row.body,
-    fileName: row.file_name,
-    fileUrl: row.file_path ? '/uploads/' + row.file_path : null,
-    fileSize: row.file_size,
-    duration: row.duration,
-    transcript: row.transcript,
+    body: deleted ? null : row.body,
+    fileName: deleted ? null : row.file_name,
+    fileUrl: deleted || !row.file_path ? null : '/uploads/' + row.file_path,
+    fileSize: deleted ? null : row.file_size,
+    duration: deleted ? null : row.duration,
+    transcript: deleted ? null : row.transcript,
     urgent: !!row.urgent,
     status: row.status,
     createdAt: row.created_at,
+    deleted: deleted,
   };
+}
+
+function insertMessage(opts) {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?)
+  `).run(
+    id, opts.from, opts.to, opts.type,
+    opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now
+  );
+  return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
 }
 
 function getDepartments() {
@@ -325,15 +341,59 @@ const server = http.createServer(async (req, res) => {
         fileSize = buf.length;
       }
 
-      const id = crypto.randomUUID();
-      const now = new Date().toISOString();
-      db.prepare(`
-        INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?)
-      `).run(id, from, to, type, text?.trim() || null, fileName || null, filePathOnDisk, fileSize, duration || null, transcript?.trim() || null, urgent ? 1 : 0, now);
-
-      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      const row = insertMessage({
+        from, to, type,
+        body: text?.trim() || null,
+        fileName: fileName || null, filePath: filePathOnDisk, fileSize,
+        duration: duration || null, transcript: transcript?.trim() || null,
+        urgent: !!urgent,
+      });
       return send(res, 201, { message: rowToMessage(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/messages/')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      const requester = staffFromToken(req);
+      if (existing.from_dept !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: "You can only delete your own department's messages" });
+      }
+      db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      return send(res, 200, { message: rowToMessage(row) });
+    }
+
+    if (req.method === 'POST' && p === '/api/broadcast') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim();
+      if (!text) return send(res, 400, { error: 'Message text is required' });
+      const from = requester.department_id;
+      const targets = [...DEPT_IDS].filter((id) => id !== from);
+      const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent }));
+      return send(res, 201, { messages: rows.map(rowToMessage) });
+    }
+
+    if (req.method === 'POST' && p === '/api/typing') {
+      const body = await readJsonBody(req);
+      const requester = staffFromToken(req);
+      const self = requester.department_id;
+      if (!DEPT_IDS.has(body.to)) return send(res, 400, { error: 'Unknown department' });
+      db.prepare(`
+        INSERT INTO typing_status (from_dept, to_dept, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(from_dept, to_dept) DO UPDATE SET updated_at = excluded.updated_at
+      `).run(self, body.to, new Date().toISOString());
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/typing') {
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const cutoff = new Date(Date.now() - 6000).toISOString();
+      const rows = db.prepare('SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?').all(self, cutoff);
+      return send(res, 200, { typing: rows.map((r) => r.from_dept) });
     }
 
     return send(res, 404, { error: 'Not found' });

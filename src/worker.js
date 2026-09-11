@@ -168,24 +168,54 @@ async function notifyDepartment(env, deptId, payloadObj) {
   }
 }
 
+async function insertMessage(env, ctx, opts) {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?)`
+  ).bind(
+    id, opts.from, opts.to, opts.type,
+    opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now
+  ).run();
+
+  const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+
+  const previewMap = { text: opts.body || "", image: "📷 Photo", file: "📎 " + (opts.fileName || "File"), audio: "🎤 Voice message" };
+  const notifyBody = opts.urgent ? "🔴 Urgent: " + (previewMap[opts.type] || "New message") : (previewMap[opts.type] || "New message");
+  const notifyPromise = notifyDepartment(env, opts.to, {
+    title: DEPT_NAMES[opts.from] || opts.from,
+    body: notifyBody,
+    url: "/",
+    tag: "hotel-ping-" + opts.to,
+    icon: "/avatars/" + opts.from + ".png",
+  }).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
+  if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
+  return row;
+}
+
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
 function rowToMessage(row) {
+  const deleted = !!row.deleted_at;
   return {
     id: row.id,
     from: row.from_dept,
     to: row.to_dept,
     type: row.type,
-    body: row.body,
-    fileName: row.file_name,
-    fileUrl: row.file_path ? "/uploads/" + row.file_path : null,
-    fileSize: row.file_size,
-    duration: row.duration,
-    transcript: row.transcript,
+    body: deleted ? null : row.body,
+    fileName: deleted ? null : row.file_name,
+    fileUrl: deleted || !row.file_path ? null : "/uploads/" + row.file_path,
+    fileSize: deleted ? null : row.file_size,
+    duration: deleted ? null : row.duration,
+    transcript: deleted ? null : row.transcript,
     urgent: !!row.urgent,
     status: row.status,
     createdAt: row.created_at,
+    deleted: deleted,
   };
 }
 function rowToStaff(row) {
@@ -489,32 +519,64 @@ export default {
           fileSize = bytes.length;
         }
 
-        const id = crypto.randomUUID();
-        const now = new Date().toISOString();
-        await env.DB.prepare(
-          `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?)`
-        ).bind(
-          id, from, to, type,
-          text && text.trim() ? text.trim() : null,
-          fileName || null, filePathOnDisk, fileSize, duration || null, transcript && transcript.trim() ? transcript.trim() : null,
-          urgent ? 1 : 0, now
-        ).run();
-
-        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-
-        const previewMap = { text: (text && text.trim()) || "", image: "📷 Photo", file: "📎 " + (fileName || "File"), audio: "🎤 Voice message" };
-        const notifyBody = urgent ? "🔴 Urgent: " + (previewMap[type] || "New message") : (previewMap[type] || "New message");
-        const notifyPromise = notifyDepartment(env, to, {
-          title: DEPT_NAMES[from] || from,
-          body: notifyBody,
-          url: "/",
-          tag: "hotel-ping-" + to,
-          icon: "/avatars/" + from + ".png",
-        }).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
-        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+        const row = await insertMessage(env, ctx, {
+          from, to, type,
+          body: text && text.trim() ? text.trim() : null,
+          fileName: fileName || null, filePath: filePathOnDisk, fileSize,
+          duration: duration || null, transcript: transcript && transcript.trim() ? transcript.trim() : null,
+          urgent: !!urgent,
+        });
 
         return json({ message: rowToMessage(row) }, 201);
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/messages/")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        if (existing.from_dept !== requester.department_id && !requester.is_admin) {
+          return json({ error: "You can only delete your own department's messages" }, 403);
+        }
+        await env.DB.prepare("UPDATE messages SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row) });
+      }
+
+      if (method === "POST" && p === "/api/broadcast") {
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const body = await readJsonBody(request);
+        const text = String(body.text || "").trim();
+        if (!text) return json({ error: "Message text is required" }, 400);
+        const from = requester.department_id;
+        const targets = Array.from(DEPT_IDS).filter((id) => id !== from);
+        const rows = [];
+        for (const to of targets) {
+          const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent });
+          rows.push(row);
+        }
+        return json({ messages: rows.map(rowToMessage) }, 201);
+      }
+
+      if (method === "POST" && p === "/api/typing") {
+        const body = await readJsonBody(request);
+        const self = request._staff.department_id;
+        if (!DEPT_IDS.has(body.to)) return json({ error: "Unknown department" }, 400);
+        await env.DB.prepare(
+          "INSERT INTO typing_status (from_dept, to_dept, updated_at) VALUES (?, ?, ?) ON CONFLICT(from_dept, to_dept) DO UPDATE SET updated_at = excluded.updated_at"
+        ).bind(self, body.to, new Date().toISOString()).run();
+        return json({ ok: true });
+      }
+
+      if (method === "GET" && p === "/api/typing") {
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const cutoff = new Date(Date.now() - 6000).toISOString();
+        const rows = await env.DB.prepare(
+          "SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?"
+        ).bind(self, cutoff).all();
+        return json({ typing: rows.results.map((r) => r.from_dept) });
       }
 
       return json({ error: "Not found" }, 404);

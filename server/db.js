@@ -60,6 +60,18 @@ const messageColumns = db.prepare("PRAGMA table_info(messages)").all().map((c) =
 if (!messageColumns.includes('transcript')) {
   db.exec('ALTER TABLE messages ADD COLUMN transcript TEXT');
 }
+if (!messageColumns.includes('deleted_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN deleted_at TEXT');
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS typing_status (
+    from_dept TEXT NOT NULL,
+    to_dept TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (from_dept, to_dept)
+  );
+`);
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
 if (!staffColumns.includes('profile_complete')) {

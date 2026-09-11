@@ -194,6 +194,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .h-avatar svg{width:19px;height:19px}
 .h-name{font-family:Manrope,sans-serif;font-weight:800;font-size:16px;letter-spacing:-.015em}
 .h-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;display:flex;align-items:center;gap:5px}
+#hSub.typing{color:var(--accent);font-weight:700}
 .h-dot{width:6px;height:6px;border-radius:50%;background:#34c759;transition:background .2s ease}
 .h-dot.off{background:var(--text-faint)}
 
@@ -253,6 +254,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-row.in.urgent .urgent-tag{color:var(--urgent)}
 .msg-time{font-size:10.5px;color:var(--text-faint);margin-top:4px;padding:0 4px}
 .msg-status{font-size:10.5px;color:var(--text-faint);margin-top:3px;padding:0 4px;display:flex;align-items:center;gap:3px}
+.msg-delete-btn{border:none;background:none;color:var(--text-faint);padding:0;display:flex;align-items:center;justify-content:center;opacity:.55}
+.msg-delete-btn:hover{color:var(--urgent);opacity:1}
+.msg-delete-btn svg{width:11px;height:11px}
+.deleted-bubble{background:var(--surface-2) !important;color:var(--text-faint) !important;font-style:italic;font-size:13.5px}
 .msg-status .ticks{display:inline-flex;color:var(--text-faint)}
 .msg-status.read .ticks{color:var(--accent)}
 .msg-status .ticks svg{width:15px;height:10px}
@@ -411,6 +416,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* ---------- Admin panel ---------- */
 .sb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 20px 18px}
+.sb-toolbar-left{display:flex;align-items:center;gap:8px}
+#broadcastBtn{width:32px;height:32px;padding:0;justify-content:center}
+#broadcastBtn svg{width:15px;height:15px}
 .admin-btn{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:6px 10px}
 .admin-btn svg{width:13px;height:13px}
 .signed-in-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;font-size:11.5px;color:var(--text-faint);font-weight:600}
@@ -443,6 +451,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-form input[name="pin"]{width:90px}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
+.broadcast-hint{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:0 0 16px}
+#broadcastText{width:100%;min-height:100px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
+.broadcast-urgent-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-dim);margin-top:10px}
+.broadcast-send-btn{width:100%;margin-top:14px;padding:11px}
 
 @media (max-width:720px){
   body{padding:0}
@@ -526,10 +538,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
 
     <div class="sb-toolbar">
-      <button class="admin-btn" id="adminBtn" hidden type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Manage staff
-      </button>
+      <div class="sb-toolbar-left">
+        <button class="admin-btn" id="adminBtn" hidden type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Manage staff
+        </button>
+        <button class="admin-btn" id="broadcastBtn" hidden type="button" aria-label="Broadcast to all departments" title="Broadcast to all departments">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a3 3 0 0 1 0 6"/><path d="M18 6a7 7 0 0 1 0 12"/></svg>
+        </button>
+      </div>
       <div class="duty-row">
         <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
         <div class="duty-track" id="dutyTrack">
@@ -665,6 +682,27 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="admin-overlay" id="broadcastOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Broadcast to all departments</h2>
+      <button class="admin-close" id="broadcastClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Sends the same message to every other department at once. Use it for things like fire drills or hotel-wide announcements.</p>
+    <form id="broadcastForm">
+      <textarea id="broadcastText" placeholder="Message for every department…" required></textarea>
+      <label class="broadcast-urgent-label">
+        <input type="checkbox" id="broadcastUrgent">
+        Mark as urgent
+      </label>
+      <button type="submit" class="admin-add-btn broadcast-send-btn" id="broadcastSendBtn">Send to all departments</button>
+      <div class="admin-add-error" id="broadcastError"></div>
+    </form>
+  </div>
+</div>
+
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
@@ -741,7 +779,8 @@ var STATE = {
   recStream: null,
   synthCleanup: null,
   searchTerm: "",
-  loading: false
+  loading: false,
+  typingFrom: {}
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -786,7 +825,8 @@ function mapServerMessage(row, self){
     fileName: row.fileName || undefined,
     fileSize: row.fileSize || undefined,
     duration: row.duration || undefined,
-    transcript: row.transcript || undefined
+    transcript: row.transcript || undefined,
+    deleted: !!row.deleted
   };
 }
 
@@ -1070,7 +1110,13 @@ function renderHeader(){
   hAvatar.innerHTML = iconSvg(STATE.active);
   hName.textContent = d.name;
   var targetOn = isOnDuty(STATE.active);
-  hSub.textContent = targetOn ? "Active now" : "Off duty";
+  if(STATE.typingFrom[STATE.active]){
+    hSub.textContent = "Typing…";
+    hSub.classList.add("typing");
+  } else {
+    hSub.textContent = targetOn ? "Active now" : "Off duty";
+    hSub.classList.remove("typing");
+  }
   hDot.classList.toggle("off", !targetOn);
   renderContactName();
   renderOffDutyBanner();
@@ -1204,6 +1250,19 @@ function buildMessageRow(m, groupEnd){
   var wrap = document.createElement("div");
   wrap.className = "bubble-wrap";
 
+  if(m.deleted){
+    var delBubble = document.createElement("div");
+    delBubble.className = "bubble deleted-bubble";
+    delBubble.textContent = "This message was deleted";
+    wrap.appendChild(delBubble);
+    var delMeta = document.createElement("div");
+    delMeta.className = out ? "msg-status" : "msg-time";
+    delMeta.textContent = fmtClock(m.t);
+    wrap.appendChild(delMeta);
+    row.appendChild(wrap);
+    return row;
+  }
+
   if(m.urgent){
     var tag = document.createElement("div");
     tag.className = "urgent-tag";
@@ -1281,11 +1340,19 @@ function buildMessageRow(m, groupEnd){
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (m.status === "read" ? " read" : "");
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "msg-delete-btn";
+    delBtn.setAttribute("aria-label", "Delete message");
+    delBtn.title = "Delete";
+    delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+    delBtn.addEventListener("click", function(){ confirmDeleteMessage(m.id); });
     var timeSpan = document.createElement("span");
     timeSpan.textContent = fmtClock(m.t);
     var ticks = document.createElement("span");
     ticks.className = "ticks";
     ticks.innerHTML = TICK_SVG;
+    meta.appendChild(delBtn);
     meta.appendChild(timeSpan);
     meta.appendChild(ticks);
   } else {
@@ -1296,6 +1363,20 @@ function buildMessageRow(m, groupEnd){
 
   row.appendChild(wrap);
   return row;
+}
+
+function confirmDeleteMessage(id){
+  if(!confirm("Delete this message? This can't be undone.")) return;
+  apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(){
+    var deptId = STATE.active;
+    var msgs = STATE.data[deptId] || [];
+    var m = msgs.filter(function(x){ return x.id === id; })[0];
+    if(m){ m.deleted = true; m.text = ""; m.url = undefined; m.dataUrl = undefined; m.transcript = undefined; }
+    renderList();
+    renderThread();
+  }).catch(function(){
+    alert("Couldn't delete that message. Check your connection and try again.");
+  });
 }
 
 /* ---------------- Identity switching ---------------- */
@@ -1439,7 +1520,7 @@ function autoGrow(){
   msgInput.style.height = "auto";
   msgInput.style.height = Math.min(120, msgInput.scrollHeight) + "px";
 }
-msgInput.addEventListener("input", function(){ autoGrow(); refreshSendState(); });
+msgInput.addEventListener("input", function(){ autoGrow(); refreshSendState(); notifyTyping(); });
 msgInput.addEventListener("keydown", function(e){
   if(e.key === "Enter" && !e.shiftKey){
     e.preventDefault();
@@ -1826,6 +1907,30 @@ function startPolling(){
       if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
     }).catch(function(){});
   }, 4000);
+  startTypingPoll();
+}
+
+var typingPollTimer = null;
+function startTypingPoll(){
+  if(typingPollTimer) return;
+  typingPollTimer = setInterval(function(){
+    if(STATE.loading || isViewOnly()) return;
+    apiGet('/api/typing?self=' + encodeURIComponent(STATE.self)).then(function(res){
+      var next = {};
+      (res.typing || []).forEach(function(id){ next[id] = true; });
+      var changed = JSON.stringify(next) !== JSON.stringify(STATE.typingFrom);
+      STATE.typingFrom = next;
+      if(changed && STATE.active) renderHeader();
+    }).catch(function(){});
+  }, 2500);
+}
+
+var typingSendTimer = null;
+function notifyTyping(){
+  if(!STATE.active || isViewOnly()) return;
+  if(typingSendTimer) return;
+  apiSend('/api/typing', 'POST', { to: STATE.active }).catch(function(){});
+  typingSendTimer = setTimeout(function(){ typingSendTimer = null; }, 3000);
 }
 
 /* ---------------- Auth ---------------- */
@@ -1844,6 +1949,7 @@ var setupError = document.getElementById("setupError");
 var sbSub = document.getElementById("sbSub");
 var switcherWrap = document.getElementById("switcherWrap");
 var adminBtn = document.getElementById("adminBtn");
+var broadcastBtn = document.getElementById("broadcastBtn");
 var logoutBtn = document.getElementById("logoutBtn");
 
 var TOKEN_KEY = "mdash_token";
@@ -1857,6 +1963,7 @@ function enterApp(staff){
   sbSub.textContent = "Noir House · " + (DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "Department heads");
   switcherWrap.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
+  broadcastBtn.hidden = !staff.isAdmin;
   boot();
   startPolling();
   checkPushPrompt();
@@ -1920,6 +2027,7 @@ setupForm.addEventListener("submit", function(e){
 logoutBtn.addEventListener("click", function(){
   apiSend('/api/auth/logout', 'POST', {}).catch(function(){}).finally(function(){
     if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+    if(typingPollTimer){ clearInterval(typingPollTimer); typingPollTimer = null; }
     showLogin();
   });
 });
@@ -2067,6 +2175,45 @@ addStaffForm.addEventListener("submit", function(e){
   }).catch(function(err){
     addStaffError.textContent = err.message || "Couldn't add staff.";
   });
+});
+
+/* ---------------- Broadcast ---------------- */
+var broadcastOverlay = document.getElementById("broadcastOverlay");
+var broadcastClose = document.getElementById("broadcastClose");
+var broadcastForm = document.getElementById("broadcastForm");
+var broadcastText = document.getElementById("broadcastText");
+var broadcastUrgent = document.getElementById("broadcastUrgent");
+var broadcastSendBtn = document.getElementById("broadcastSendBtn");
+var broadcastError = document.getElementById("broadcastError");
+
+broadcastBtn.addEventListener("click", function(){
+  broadcastText.value = "";
+  broadcastUrgent.checked = false;
+  broadcastError.textContent = "";
+  broadcastOverlay.hidden = false;
+  setTimeout(function(){ broadcastText.focus(); }, 30);
+});
+broadcastClose.addEventListener("click", function(){ broadcastOverlay.hidden = true; });
+broadcastOverlay.addEventListener("click", function(e){ if(e.target === broadcastOverlay) broadcastOverlay.hidden = true; });
+
+broadcastForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var text = broadcastText.value.trim();
+  if(!text) return;
+  if(containsProfanity(text)){ broadcastError.textContent = "Let's keep it professional. That message can't be sent."; return; }
+  if(!confirm("Send this to every department right now?")) return;
+  broadcastSendBtn.disabled = true;
+  broadcastError.textContent = "";
+  apiSend('/api/broadcast', 'POST', { text: text, urgent: broadcastUrgent.checked }).then(function(){
+    broadcastOverlay.hidden = true;
+    return buildData(STATE.self);
+  }).then(function(data){
+    STATE.data = data;
+    renderList();
+    if(STATE.active) renderThread();
+  }).catch(function(err){
+    broadcastError.textContent = err.message || "Couldn't send broadcast.";
+  }).finally(function(){ broadcastSendBtn.disabled = false; });
 });
 
 if("serviceWorker" in navigator){
