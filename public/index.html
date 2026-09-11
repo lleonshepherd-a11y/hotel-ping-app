@@ -194,6 +194,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .off-duty-banner svg{width:15px;height:15px;flex:none;color:var(--text-faint)}
 .off-duty-banner b{color:var(--text);font-weight:700}
+.composer-locked{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  max-width:640px;margin:0 auto;padding:12px 16px;border-radius:14px;
+  background:var(--surface-2);font-size:12.5px;color:var(--text-dim);text-align:center;
+}
+.composer-locked b{color:var(--text);font-weight:700}
 .h-contact-name{font-weight:700;color:var(--text);cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .12s ease}
 .h-contact-name:hover{border-bottom-color:var(--text-faint)}
 .h-contact-add{font-size:11.5px;font-weight:700;color:var(--accent);cursor:pointer;border:none;background:none;padding:0;display:inline-flex;align-items:center;gap:3px}
@@ -550,6 +556,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
     <div class="composer-wrap">
       <div id="attachPreview"></div>
+
+      <div class="composer-locked" id="composerLocked" hidden></div>
 
       <div class="composer" id="composer">
         <div id="composerIdle" class="rec-row">
@@ -1264,6 +1272,7 @@ function switchSelf(id){
   STATE.self = id;
   STATE.loading = true;
   renderSwitcher();
+  updateComposerLock();
   buildData(id).then(function(data){
     STATE.data = data;
     var order = sortedDeptIds();
@@ -1276,6 +1285,21 @@ function switchSelf(id){
     renderDuty();
     focusInput();
   }).finally(function(){ STATE.loading = false; });
+}
+
+function isViewOnly(){
+  return !!(AUTH.staff && AUTH.staff.isAdmin && STATE.self !== AUTH.staff.departmentId);
+}
+
+function updateComposerLock(){
+  var locked = isViewOnly();
+  composer.hidden = locked;
+  composerLocked.hidden = !locked;
+  if(locked){
+    var viewing = DEPTS[STATE.self] ? DEPTS[STATE.self].name : "this department";
+    var home = DEPTS[AUTH.staff.departmentId] ? DEPTS[AUTH.staff.departmentId].name : "your department";
+    composerLocked.innerHTML = "Viewing <b>" + esc(viewing) + "</b>'s messages — read only. Switch back to <b>" + esc(home) + "</b> to send.";
+  }
 }
 
 /* ---------------- Off duty toggle ---------------- */
@@ -1358,6 +1382,7 @@ var fileInput = document.getElementById("fileInput");
 var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
 var composer = document.getElementById("composer");
+var composerLocked = document.getElementById("composerLocked");
 var composerIdle = document.getElementById("composerIdle");
 var composerRecording = document.getElementById("composerRecording");
 var composerVoicePreview = document.getElementById("composerVoicePreview");
@@ -1726,6 +1751,7 @@ function boot(){
     var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
     STATE.active = order[0];
     renderSwitcher();
+    updateComposerLock();
     markRead(STATE.active);
     renderList();
     renderHeader();
