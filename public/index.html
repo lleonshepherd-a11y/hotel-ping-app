@@ -517,6 +517,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .pin-indicator svg{width:10px;height:10px}
 .done-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#2f9a5c;margin-bottom:2px}
 .done-indicator svg{width:10px;height:10px}
+.msg-row.pending .bubble{opacity:.6}
+.pending-label{font-style:italic;color:var(--text-faint)}
 .broadcast-hint{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:0 0 16px}
 #broadcastText{width:100%;min-height:100px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
 .broadcast-urgent-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-dim);margin-top:10px}
@@ -1677,7 +1679,7 @@ var TICK_SVG = '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" strok
 function buildMessageRow(m, groupEnd, msgsById){
   var row = document.createElement("div");
   var out = m.from === "self";
-  row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "");
+  row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "") + (m.pending ? " pending" : "");
   row.setAttribute("data-msg-id", m.id);
 
   var wrap = document.createElement("div");
@@ -1786,7 +1788,7 @@ function buildMessageRow(m, groupEnd, msgsById){
   } else if(m.type === "audio"){
     bubble = buildAudioNode(m);
   }
-  if(!m.deleted) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
+  if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
   wrap.appendChild(bubble);
   if(m.type === "audio" && m.transcript){
     var transcriptWrap = document.createElement("div");
@@ -1818,13 +1820,20 @@ function buildMessageRow(m, groupEnd, msgsById){
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (m.status === "read" ? " read" : "");
-    var timeSpan = document.createElement("span");
-    timeSpan.textContent = fmtClock(m.t);
-    var ticks = document.createElement("span");
-    ticks.className = "ticks";
-    ticks.innerHTML = TICK_SVG;
-    meta.appendChild(timeSpan);
-    meta.appendChild(ticks);
+    if(m.pending){
+      var pendingLabel = document.createElement("span");
+      pendingLabel.className = "pending-label";
+      pendingLabel.textContent = "Sending…";
+      meta.appendChild(pendingLabel);
+    } else {
+      var timeSpan = document.createElement("span");
+      timeSpan.textContent = fmtClock(m.t);
+      var ticks = document.createElement("span");
+      ticks.className = "ticks";
+      ticks.innerHTML = TICK_SVG;
+      meta.appendChild(timeSpan);
+      meta.appendChild(ticks);
+    }
   } else {
     meta.className = "msg-time";
     var timeSpan2 = document.createElement("span");
@@ -2104,6 +2113,68 @@ function blockForLanguage(){
   }, 2800);
 }
 
+/* ---------------- Offline queue ---------------- */
+function offlineQueueKey(){ return "hp_offline_queue_" + (AUTH.staff ? AUTH.staff.id : "anon"); }
+function loadOfflineQueue(){
+  try{ return JSON.parse(localStorage.getItem(offlineQueueKey()) || "[]"); }catch(e){ return []; }
+}
+function saveOfflineQueue(q){
+  try{ localStorage.setItem(offlineQueueKey(), JSON.stringify(q)); }catch(e){}
+}
+function pendingMessageFromQueueItem(item){
+  return {
+    id: item.localId, from: "self", type: "text", text: item.payload.text,
+    urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
+    replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
+    deleted: false, pending: true
+  };
+}
+function queueOfflineMessage(deptId, payload){
+  var q = loadOfflineQueue();
+  var localId = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  var item = { localId: localId, deptId: deptId, payload: payload, queuedAt: Date.now() };
+  q.push(item);
+  saveOfflineQueue(q);
+  STATE.data[deptId] = STATE.data[deptId] || [];
+  STATE.data[deptId].push(pendingMessageFromQueueItem(item));
+  renderList();
+  if(STATE.active === deptId) renderThread();
+  showToast("No connection. That'll send automatically once you're back online.");
+}
+function mergePendingIntoData(data){
+  loadOfflineQueue().forEach(function(item){
+    data[item.deptId] = data[item.deptId] || [];
+    var exists = data[item.deptId].some(function(x){ return x.id === item.localId; });
+    if(!exists) data[item.deptId].push(pendingMessageFromQueueItem(item));
+  });
+  return data;
+}
+var offlineFlushInFlight = false;
+function flushOfflineQueue(){
+  if(offlineFlushInFlight) return Promise.resolve();
+  var q = loadOfflineQueue();
+  if(!q.length) return Promise.resolve();
+  offlineFlushInFlight = true;
+  function next(i){
+    if(i >= q.length){ offlineFlushInFlight = false; return Promise.resolve(); }
+    var item = q[i];
+    return apiSend('/api/messages', 'POST', item.payload).then(function(res){
+      saveOfflineQueue(loadOfflineQueue().filter(function(x){ return x.localId !== item.localId; }));
+      var msgs = STATE.data[item.deptId] || [];
+      var idx = msgs.findIndex(function(x){ return x.id === item.localId; });
+      var real = mapServerMessage(res.message, STATE.self);
+      if(idx !== -1) msgs[idx] = real; else msgs.push(real);
+      renderList();
+      if(STATE.active === item.deptId) renderThread();
+      return next(i + 1);
+    }).catch(function(){
+      offlineFlushInFlight = false;
+    });
+  }
+  return next(0);
+}
+window.addEventListener("online", flushOfflineQueue);
+
 function doSend(){
   var text = msgInput.value.trim();
   if(!text && !STATE.attachment) return;
@@ -2147,7 +2218,11 @@ function doSend(){
     STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
     renderList();
     if(STATE.active === deptId) renderThread();
-  }).catch(function(){
+  }).catch(function(err){
+    if(!attachment && (err instanceof TypeError || !navigator.onLine)){
+      queueOfflineMessage(deptId, payload);
+      return;
+    }
     blockForLanguage();
     composerHint.textContent = "That message didn't send. Check your connection and try again.";
   });
@@ -2337,7 +2412,8 @@ document.getElementById("backBtn").addEventListener("click", function(){
 function boot(){
   STATE.loading = true;
   Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self)]).then(function(results){
-    STATE.data = results[2];
+    STATE.data = mergePendingIntoData(results[2]);
+    flushOfflineQueue();
     var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
     STATE.active = order[0];
     renderSwitcher();
@@ -2376,11 +2452,11 @@ function refreshNow(){
       });
     });
     if(!changed) return;
-    STATE.data = data;
+    STATE.data = mergePendingIntoData(data);
     renderList();
     if(STATE.active) renderThread();
     if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
-  });
+  }).finally(function(){ flushOfflineQueue(); });
 }
 
 function startPolling(){
