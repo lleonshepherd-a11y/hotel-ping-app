@@ -199,9 +199,14 @@ async function insertMessage(env, ctx, opts) {
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
-function rowToMessage(row, revealDeleted) {
+function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
-  const hide = deleted && !revealDeleted;
+  if (deleted && !isAdmin && viewerDeptId !== row.from_dept) {
+    // A department that didn't send it and isn't reviewing as management sees nothing at all.
+    return null;
+  }
+  const reveal = deleted && isAdmin;
+  const hide = deleted && !reveal;
   return {
     id: row.id,
     from: row.from_dept,
@@ -217,8 +222,9 @@ function rowToMessage(row, revealDeleted) {
     status: row.status,
     createdAt: row.created_at,
     deleted: deleted,
-    deletedAt: deleted && revealDeleted ? row.deleted_at : undefined,
+    deletedAt: reveal ? row.deleted_at : undefined,
     replyTo: row.reply_to_id || undefined,
+    pinned: !!row.pinned_at,
   };
 }
 function rowToStaff(row) {
@@ -475,7 +481,7 @@ export default {
           ).bind(self, other).first();
           conversations.push({
             departmentId: other,
-            lastMessage: last ? rowToMessage(last, request._staff.is_admin) : null,
+            lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: unread.n,
             hasUrgentUnread: urgentUnread.n > 0,
           });
@@ -491,7 +497,7 @@ export default {
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
         ).bind(self, other, other, self).all();
-        return json({ messages: rows.results.map((r) => rowToMessage(r, request._staff.is_admin)) });
+        return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }
 
       if (method === "POST" && p === "/api/messages/read") {
@@ -531,7 +537,7 @@ export default {
           replyToId: replyToId || null,
         });
 
-        return json({ message: rowToMessage(row) }, 201);
+        return json({ message: rowToMessage(row, from, false) }, 201);
       }
 
       if (method === "DELETE" && p.startsWith("/api/messages/")) {
@@ -544,7 +550,39 @@ export default {
         }
         await env.DB.prepare("UPDATE messages SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-        return json({ message: rowToMessage(row) });
+        return json({ message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/pin")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/pin".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const nextPinned = !existing.pinned_at;
+        await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/forward")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/forward".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        if (existing.deleted_at) return json({ error: "Can't forward a deleted message" }, 400);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const body = await readJsonBody(request);
+        const to = body.to;
+        if (!DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
+        const row = await insertMessage(env, ctx, {
+          from: requester.department_id, to, type: existing.type,
+          body: existing.body, fileName: existing.file_name, filePath: existing.file_path, fileSize: existing.file_size,
+          duration: existing.duration, transcript: existing.transcript, urgent: false,
+        });
+        return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
       }
 
       if (method === "POST" && p === "/api/broadcast") {
@@ -560,7 +598,7 @@ export default {
           const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent });
           rows.push(row);
         }
-        return json({ messages: rows.map(rowToMessage) }, 201);
+        return json({ messages: rows.map((r) => rowToMessage(r, from, false)) }, 201);
       }
 
       if (method === "POST" && p === "/api/typing") {

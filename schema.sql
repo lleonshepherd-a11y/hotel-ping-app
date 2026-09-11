@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS messages (
   status TEXT NOT NULL DEFAULT 'delivered',
   created_at TEXT NOT NULL,
   deleted_at TEXT,
-  reply_to_id TEXT
+  reply_to_id TEXT,
+  pinned_at TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);

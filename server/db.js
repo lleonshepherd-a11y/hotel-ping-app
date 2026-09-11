@@ -66,6 +66,9 @@ if (!messageColumns.includes('deleted_at')) {
 if (!messageColumns.includes('reply_to_id')) {
   db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT');
 }
+if (!messageColumns.includes('pinned_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN pinned_at TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (

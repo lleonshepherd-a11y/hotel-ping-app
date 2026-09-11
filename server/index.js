@@ -40,9 +40,13 @@ function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
 
-function rowToMessage(row, revealDeleted) {
+function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
-  const hide = deleted && !revealDeleted;
+  if (deleted && !isAdmin && viewerDeptId !== row.from_dept) {
+    return null;
+  }
+  const reveal = deleted && isAdmin;
+  const hide = deleted && !reveal;
   return {
     id: row.id,
     from: row.from_dept,
@@ -58,8 +62,9 @@ function rowToMessage(row, revealDeleted) {
     status: row.status,
     createdAt: row.created_at,
     deleted: deleted,
-    deletedAt: deleted && revealDeleted ? row.deleted_at : undefined,
+    deletedAt: reveal ? row.deleted_at : undefined,
     replyTo: row.reply_to_id || undefined,
+    pinned: !!row.pinned_at,
   };
 }
 
@@ -82,7 +87,7 @@ function getDepartments() {
   return rows.map(rowToDepartment);
 }
 
-function getConversations(self, revealDeleted) {
+function getConversations(self, isAdmin) {
   const others = DEPARTMENTS.filter((d) => d.id !== self);
   const lastMsgStmt = db.prepare(`
     SELECT * FROM messages
@@ -101,7 +106,7 @@ function getConversations(self, revealDeleted) {
     const urgentUnread = urgentUnreadStmt.get(self, d.id).n;
     return {
       departmentId: d.id,
-      lastMessage: last ? rowToMessage(last, revealDeleted) : null,
+      lastMessage: last ? rowToMessage(last, self, isAdmin) : null,
       unreadCount: unread,
       hasUrgentUnread: urgentUnread > 0,
     };
@@ -317,7 +322,7 @@ const server = http.createServer(async (req, res) => {
         WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?)
         ORDER BY created_at ASC
       `).all(self, other, other, self);
-      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, requester.is_admin)) });
+      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
     }
 
     if (req.method === 'POST' && p === '/api/messages/read') {
@@ -354,7 +359,7 @@ const server = http.createServer(async (req, res) => {
         urgent: !!urgent,
         replyToId: replyToId || null,
       });
-      return send(res, 201, { message: rowToMessage(row) });
+      return send(res, 201, { message: rowToMessage(row, from, false) });
     }
 
     if (req.method === 'DELETE' && p.startsWith('/api/messages/')) {
@@ -367,7 +372,39 @@ const server = http.createServer(async (req, res) => {
       }
       db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-      return send(res, 200, { message: rowToMessage(row) });
+      return send(res, 200, { message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/pin')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/pin'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const nextPinned = !existing.pinned_at;
+      db.prepare('UPDATE messages SET pinned_at = ? WHERE id = ?').run(nextPinned ? new Date().toISOString() : null, id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/forward')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/forward'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      if (existing.deleted_at) return send(res, 400, { error: "Can't forward a deleted message" });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const body = await readJsonBody(req);
+      const to = body.to;
+      if (!DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
+      const row = insertMessage({
+        from: requester.department_id, to, type: existing.type,
+        body: existing.body, fileName: existing.file_name, filePath: existing.file_path, fileSize: existing.file_size,
+        duration: existing.duration, transcript: existing.transcript, urgent: false,
+      });
+      return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
     }
 
     if (req.method === 'POST' && p === '/api/broadcast') {
@@ -379,7 +416,7 @@ const server = http.createServer(async (req, res) => {
       const from = requester.department_id;
       const targets = [...DEPT_IDS].filter((id) => id !== from);
       const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent }));
-      return send(res, 201, { messages: rows.map(rowToMessage) });
+      return send(res, 201, { messages: rows.map((r) => rowToMessage(r, from, false)) });
     }
 
     if (req.method === 'POST' && p === '/api/typing') {

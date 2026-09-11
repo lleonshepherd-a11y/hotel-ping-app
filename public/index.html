@@ -258,9 +258,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-row.in.urgent .urgent-tag{color:var(--urgent)}
 .msg-time{font-size:10.5px;color:var(--text-faint);margin-top:4px;padding:0 4px}
 .msg-status{font-size:10.5px;color:var(--text-faint);margin-top:3px;padding:0 4px;display:flex;align-items:center;gap:3px}
-.msg-delete-btn{border:none;background:none;color:var(--text-faint);padding:0;display:flex;align-items:center;justify-content:center;opacity:.55}
-.msg-delete-btn:hover{color:var(--urgent);opacity:1}
-.msg-delete-btn svg{width:11px;height:11px}
 .deleted-bubble{background:var(--surface-2) !important;color:var(--text-faint) !important;font-style:italic;font-size:13.5px}
 .audit-deleted-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--urgent);margin-bottom:3px}
 .msg-status .ticks{display:inline-flex;color:var(--text-faint)}
@@ -323,9 +320,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .reply-quote-body{min-width:0}
 .reply-quote-name{font-size:11.5px;font-weight:700;opacity:.85}
 .reply-quote-text{font-size:12.5px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.msg-reply-btn{opacity:.55;background:none;border:none;cursor:pointer;color:inherit;display:inline-flex;padding:2px;margin-right:2px}
-.msg-reply-btn:hover{opacity:1}
-.msg-reply-btn svg{width:12px;height:12px}
+.bubble.long-press-active{transform:scale(.96);filter:brightness(.94);transition:transform .15s ease,filter .15s ease}
 .flash-highlight .bubble{animation:flashHighlight 1.2s ease}
 @keyframes flashHighlight{0%,100%{filter:none}30%{filter:brightness(1.25) saturate(1.3)}}
 .composer-pill{
@@ -480,6 +475,35 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-form input[name="pin"]{width:90px}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
+.forward-dept-list{display:flex;flex-direction:column;gap:2px}
+.forward-dept-opt{display:flex;align-items:center;gap:12px;border:none;background:none;padding:10px 6px;border-radius:12px;text-align:left;font-size:14.5px;font-weight:600;color:var(--text)}
+.forward-dept-opt:hover{background:var(--surface-2)}
+.forward-dept-opt .fwd-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.forward-dept-opt .fwd-avatar svg{width:15px;height:15px}
+
+.msg-action-backdrop{position:fixed;inset:0;z-index:45;background:transparent}
+.msg-action-menu{
+  position:fixed;z-index:46;min-width:190px;background:var(--surface);border-radius:16px;
+  box-shadow:var(--shadow-pop);padding:6px;display:flex;flex-direction:column;
+  transform:scale(.9);opacity:0;pointer-events:none;transition:transform .14s cubic-bezier(.3,1.4,.4,1),opacity .12s ease;
+}
+.msg-action-menu.open{transform:scale(1);opacity:1;pointer-events:auto}
+.msg-action-row{display:flex;align-items:center;gap:10px;border:none;background:none;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--text);text-align:left}
+.msg-action-row:hover{background:var(--surface-2)}
+.msg-action-row svg{width:17px;height:17px;color:var(--text-dim);flex:none}
+.msg-action-row.danger{color:var(--urgent)}
+.msg-action-row.danger svg{color:var(--urgent)}
+.msg-action-divider{height:1px;background:var(--border);margin:4px 6px}
+
+.toast{
+  position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);z-index:60;
+  background:#242420;color:#fff;font-size:13px;font-weight:600;padding:10px 18px;border-radius:20px;
+  box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.pin-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--text-dim);margin-bottom:2px}
+.pin-indicator svg{width:10px;height:10px}
 .broadcast-hint{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:0 0 16px}
 #broadcastText{width:100%;min-height:100px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
 .broadcast-urgent-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-dim);margin-top:10px}
@@ -744,6 +768,24 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="admin-overlay" id="forwardOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Forward to…</h2>
+      <button class="admin-close" id="forwardClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="forward-dept-list" id="forwardDeptList"></div>
+    <div class="admin-add-error" id="forwardError"></div>
+  </div>
+</div>
+
+<div class="msg-action-backdrop" id="msgActionBackdrop" hidden></div>
+<div class="msg-action-menu" id="msgActionMenu" hidden></div>
+
+<div class="toast" id="appToast" hidden></div>
+
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
@@ -870,7 +912,8 @@ function mapServerMessage(row, self){
     transcript: row.transcript || undefined,
     deleted: !!row.deleted,
     deletedAt: row.deletedAt ? new Date(row.deletedAt).getTime() : undefined,
-    replyTo: row.replyTo || undefined
+    replyTo: row.replyTo || undefined,
+    pinned: !!row.pinned
   };
 }
 
@@ -1320,6 +1363,170 @@ function clearReplyBar(){
 }
 replyPreviewClose.addEventListener("click", clearReplyBar);
 
+var appToast = document.getElementById("appToast");
+var toastTimer = null;
+function showToast(text){
+  appToast.textContent = text;
+  appToast.hidden = false;
+  void appToast.offsetWidth;
+  appToast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){
+    appToast.classList.remove("show");
+    setTimeout(function(){ appToast.hidden = true; }, 200);
+  }, 1600);
+}
+
+var msgActionMenu = document.getElementById("msgActionMenu");
+var msgActionBackdrop = document.getElementById("msgActionBackdrop");
+var ACTION_ICONS = {
+  reply: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>',
+  forward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"/><path d="M20 12H10a5 5 0 0 0-5 5v1"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'
+};
+
+function hideMessageActionMenu(){
+  msgActionMenu.classList.remove("open");
+  msgActionBackdrop.hidden = true;
+  setTimeout(function(){ msgActionMenu.hidden = true; }, 140);
+}
+
+function showMessageActionMenu(m, x, y){
+  var canDelete = !m.deleted && (m.from === "self" || (AUTH.staff && AUTH.staff.isAdmin));
+  var rows = [];
+  rows.push({ key:"reply", label:"Reply", icon:ACTION_ICONS.reply });
+  rows.push({ key:"forward", label:"Forward", icon:ACTION_ICONS.forward });
+  rows.push({ key:"copy", label:"Copy", icon:ACTION_ICONS.copy });
+  rows.push({ key:"pin", label: m.pinned ? "Unpin" : "Pin", icon:ACTION_ICONS.pin });
+
+  var html = rows.map(function(r){
+    return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
+  }).join("");
+  if(canDelete){
+    html += '<div class="msg-action-divider"></div>' +
+      '<button type="button" class="msg-action-row danger" data-action="delete">'+ACTION_ICONS.trash+'<span>Delete</span></button>';
+  }
+  msgActionMenu.innerHTML = html;
+
+  msgActionMenu.hidden = false;
+  msgActionBackdrop.hidden = false;
+  var menuW = 200, menuH = msgActionMenu.getBoundingClientRect().height || 220;
+  var left = Math.min(Math.max(8, x - menuW/2), window.innerWidth - menuW - 8);
+  var top = y + 12;
+  if(top + menuH > window.innerHeight - 8) top = Math.max(8, y - menuH - 12);
+  msgActionMenu.style.left = left + "px";
+  msgActionMenu.style.top = top + "px";
+  requestAnimationFrame(function(){ msgActionMenu.classList.add("open"); });
+
+  msgActionMenu.querySelectorAll(".msg-action-row").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var action = btn.getAttribute("data-action");
+      hideMessageActionMenu();
+      if(action === "reply") showReplyBar(m);
+      else if(action === "forward") openForwardPicker(m);
+      else if(action === "copy") copyMessageContent(m);
+      else if(action === "pin") togglePinMessage(m);
+      else if(action === "delete") confirmDeleteMessage(m.id);
+    });
+  });
+}
+msgActionBackdrop.addEventListener("click", hideMessageActionMenu);
+
+function copyMessageContent(m){
+  var text = m.type === "text" ? m.text : messagePreviewLabel(m);
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ showToast("Copied"); }).catch(function(){ showToast("Couldn't copy"); });
+  }
+}
+
+function togglePinMessage(m){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/pin', 'POST', {}).then(function(res){
+    var deptId = STATE.active;
+    var msgs = STATE.data[deptId] || [];
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    if(STATE.active === deptId) renderThread();
+    showToast(res.message.pinned ? "Pinned" : "Unpinned");
+  }).catch(function(){ showToast("Couldn't update pin"); });
+}
+
+var forwardOverlay = document.getElementById("forwardOverlay");
+var forwardClose = document.getElementById("forwardClose");
+var forwardDeptList = document.getElementById("forwardDeptList");
+var forwardError = document.getElementById("forwardError");
+function openForwardPicker(m){
+  forwardError.textContent = "";
+  var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self && id !== STATE.active; });
+  forwardDeptList.innerHTML = targets.map(function(id){
+    return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
+      '<span class="fwd-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</span>'+
+      DEPTS[id].name+'</button>';
+  }).join("");
+  forwardDeptList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var to = btn.getAttribute("data-dept");
+      apiSend('/api/messages/' + encodeURIComponent(m.id) + '/forward', 'POST', { to: to }).then(function(res){
+        STATE.data[to] = STATE.data[to] || [];
+        STATE.data[to].push(mapServerMessage(res.message, STATE.self));
+        renderList();
+        if(STATE.active === to) renderThread();
+        forwardOverlay.hidden = true;
+        showToast("Forwarded to " + DEPTS[to].name);
+      }).catch(function(e){ forwardError.textContent = e.message || "Couldn't forward that message."; });
+    });
+  });
+  forwardOverlay.hidden = false;
+}
+forwardClose.addEventListener("click", function(){ forwardOverlay.hidden = true; });
+forwardOverlay.addEventListener("click", function(e){ if(e.target === forwardOverlay) forwardOverlay.hidden = true; });
+
+function attachLongPress(el, onLongPress){
+  var LONG_PRESS_MS = 420, MOVE_TOLERANCE = 12;
+  var timer = null, startX = 0, startY = 0, fired = false, suppressClick = false;
+  function start(x, y){
+    fired = false;
+    startX = x; startY = y;
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      fired = true;
+      suppressClick = true;
+      el.classList.remove("long-press-active");
+      if(navigator.vibrate) navigator.vibrate(12);
+      onLongPress(startX, startY);
+    }, LONG_PRESS_MS);
+    el.classList.add("long-press-active");
+  }
+  function cancel(){
+    clearTimeout(timer);
+    el.classList.remove("long-press-active");
+  }
+  el.addEventListener("touchstart", function(e){
+    var t = e.touches[0];
+    start(t.clientX, t.clientY);
+  }, { passive: true });
+  el.addEventListener("touchmove", function(e){
+    var t = e.touches[0];
+    if(Math.abs(t.clientX - startX) > MOVE_TOLERANCE || Math.abs(t.clientY - startY) > MOVE_TOLERANCE) cancel();
+  }, { passive: true });
+  el.addEventListener("touchend", cancel);
+  el.addEventListener("touchcancel", cancel);
+  el.addEventListener("mousedown", function(e){ start(e.clientX, e.clientY); });
+  el.addEventListener("mousemove", function(e){
+    if(Math.abs(e.clientX - startX) > MOVE_TOLERANCE || Math.abs(e.clientY - startY) > MOVE_TOLERANCE) cancel();
+  });
+  el.addEventListener("mouseup", cancel);
+  el.addEventListener("mouseleave", cancel);
+  el.addEventListener("click", function(e){
+    if(suppressClick){
+      suppressClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+}
+
 var pullRefresh = document.getElementById("pullRefresh");
 (function(){
   var PULL_THRESHOLD = 60, PULL_MAX = 100;
@@ -1406,6 +1613,13 @@ function buildMessageRow(m, groupEnd, msgsById){
     wrap.appendChild(tag);
   }
 
+  if(m.pinned){
+    var pinTag = document.createElement("div");
+    pinTag.className = "pin-indicator";
+    pinTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> Pinned';
+    wrap.appendChild(pinTag);
+  }
+
   if(m.replyTo && msgsById && msgsById[m.replyTo]){
     var origMsg = msgsById[m.replyTo];
     var quote = document.createElement("div");
@@ -1466,6 +1680,7 @@ function buildMessageRow(m, groupEnd, msgsById){
   } else if(m.type === "audio"){
     bubble = buildAudioNode(m);
   }
+  if(!m.deleted) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
   wrap.appendChild(bubble);
   if(m.type === "audio" && m.transcript){
     var transcriptWrap = document.createElement("div");
@@ -1497,24 +1712,6 @@ function buildMessageRow(m, groupEnd, msgsById){
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (m.status === "read" ? " read" : "");
-    if(!m.deleted){
-      var replyBtn1 = document.createElement("button");
-      replyBtn1.type = "button";
-      replyBtn1.className = "msg-reply-btn";
-      replyBtn1.setAttribute("aria-label", "Reply to this message");
-      replyBtn1.title = "Reply";
-      replyBtn1.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>';
-      replyBtn1.addEventListener("click", function(){ showReplyBar(m); });
-      meta.appendChild(replyBtn1);
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "msg-delete-btn";
-      delBtn.setAttribute("aria-label", "Delete message");
-      delBtn.title = "Delete";
-      delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
-      delBtn.addEventListener("click", function(){ confirmDeleteMessage(m.id); });
-      meta.appendChild(delBtn);
-    }
     var timeSpan = document.createElement("span");
     timeSpan.textContent = fmtClock(m.t);
     var ticks = document.createElement("span");
@@ -1524,16 +1721,6 @@ function buildMessageRow(m, groupEnd, msgsById){
     meta.appendChild(ticks);
   } else {
     meta.className = "msg-time";
-    if(!m.deleted){
-      var replyBtn2 = document.createElement("button");
-      replyBtn2.type = "button";
-      replyBtn2.className = "msg-reply-btn";
-      replyBtn2.setAttribute("aria-label", "Reply to this message");
-      replyBtn2.title = "Reply";
-      replyBtn2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>';
-      replyBtn2.addEventListener("click", function(){ showReplyBar(m); });
-      meta.appendChild(replyBtn2);
-    }
     var timeSpan2 = document.createElement("span");
     timeSpan2.textContent = fmtClock(m.t);
     meta.appendChild(timeSpan2);
@@ -1545,12 +1732,12 @@ function buildMessageRow(m, groupEnd, msgsById){
 }
 
 function confirmDeleteMessage(id){
-  if(!confirm("Delete this message? This can't be undone.")) return;
-  apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(){
+  if(!confirm("Delete this message?\n\nIt will be hidden from this conversation, but it is not erased — management can still see the original message.")) return;
+  apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
     var deptId = STATE.active;
     var msgs = STATE.data[deptId] || [];
-    var m = msgs.filter(function(x){ return x.id === id; })[0];
-    if(m){ m.deleted = true; m.text = ""; m.url = undefined; m.dataUrl = undefined; m.transcript = undefined; }
+    var idx = msgs.findIndex(function(x){ return x.id === id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
     renderList();
     renderThread();
   }).catch(function(){
