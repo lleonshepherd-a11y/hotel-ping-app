@@ -225,6 +225,9 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     deletedAt: reveal ? row.deleted_at : undefined,
     replyTo: row.reply_to_id || undefined,
     pinned: !!row.pinned_at,
+    completed: !!row.completed_at,
+    completedAt: row.completed_at || undefined,
+    completedBy: row.completed_by || undefined,
   };
 }
 function rowToStaff(row) {
@@ -562,6 +565,20 @@ export default {
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextPinned = !existing.pinned_at;
         await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/complete")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/complete".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const nextCompleted = !existing.completed_at;
+        await env.DB.prepare("UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?")
+          .bind(nextCompleted ? new Date().toISOString() : null, nextCompleted ? requester.department_id : null, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }

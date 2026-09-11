@@ -65,6 +65,9 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     deletedAt: reveal ? row.deleted_at : undefined,
     replyTo: row.reply_to_id || undefined,
     pinned: !!row.pinned_at,
+    completed: !!row.completed_at,
+    completedAt: row.completed_at || undefined,
+    completedBy: row.completed_by || undefined,
   };
 }
 
@@ -384,6 +387,21 @@ const server = http.createServer(async (req, res) => {
       if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
       const nextPinned = !existing.pinned_at;
       db.prepare('UPDATE messages SET pinned_at = ? WHERE id = ?').run(nextPinned ? new Date().toISOString() : null, id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/complete')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/complete'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const nextCompleted = !existing.completed_at;
+      db.prepare('UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?').run(
+        nextCompleted ? new Date().toISOString() : null, nextCompleted ? requester.department_id : null, id
+      );
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }

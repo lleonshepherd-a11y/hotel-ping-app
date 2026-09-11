@@ -505,6 +505,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .pin-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--text-dim);margin-bottom:2px}
 .pin-indicator svg{width:10px;height:10px}
+.done-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#2f9a5c;margin-bottom:2px}
+.done-indicator svg{width:10px;height:10px}
 .broadcast-hint{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:0 0 16px}
 #broadcastText{width:100%;min-height:100px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
 .broadcast-urgent-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-dim);margin-top:10px}
@@ -930,7 +932,10 @@ function mapServerMessage(row, self){
     deleted: !!row.deleted,
     deletedAt: row.deletedAt ? new Date(row.deletedAt).getTime() : undefined,
     replyTo: row.replyTo || undefined,
-    pinned: !!row.pinned
+    pinned: !!row.pinned,
+    completed: !!row.completed,
+    completedAt: row.completedAt ? new Date(row.completedAt).getTime() : undefined,
+    completedBy: row.completedBy || undefined
   };
 }
 
@@ -1431,7 +1436,8 @@ var ACTION_ICONS = {
   forward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"/><path d="M20 12H10a5 5 0 0 0-5 5v1"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
 };
 
 function hideMessageActionMenu(){
@@ -1447,6 +1453,7 @@ function showMessageActionMenu(m, x, y){
   rows.push({ key:"forward", label:"Forward", icon:ACTION_ICONS.forward });
   rows.push({ key:"copy", label:"Copy", icon:ACTION_ICONS.copy });
   rows.push({ key:"pin", label: m.pinned ? "Unpin" : "Pin", icon:ACTION_ICONS.pin });
+  if(!m.deleted) rows.push({ key:"complete", label: m.completed ? "Mark as not done" : "Mark as done", icon:ACTION_ICONS.check });
 
   var html = rows.map(function(r){
     return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
@@ -1475,6 +1482,7 @@ function showMessageActionMenu(m, x, y){
       else if(action === "forward") openForwardPicker(m);
       else if(action === "copy") copyMessageContent(m);
       else if(action === "pin") togglePinMessage(m);
+      else if(action === "complete") toggleCompleteMessage(m);
       else if(action === "delete") confirmDeleteMessage(m.id);
     });
   });
@@ -1497,6 +1505,17 @@ function togglePinMessage(m){
     if(STATE.active === deptId) renderThread();
     showToast(res.message.pinned ? "Pinned" : "Unpinned");
   }).catch(function(){ showToast("Couldn't update pin"); });
+}
+
+function toggleCompleteMessage(m){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/complete', 'POST', {}).then(function(res){
+    var deptId = STATE.active;
+    var msgs = STATE.data[deptId] || [];
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    if(STATE.active === deptId) renderThread();
+    showToast(res.message.completed ? "Marked as done" : "Marked as not done");
+  }).catch(function(){ showToast("Couldn't update that"); });
 }
 
 var forwardOverlay = document.getElementById("forwardOverlay");
@@ -1665,6 +1684,14 @@ function buildMessageRow(m, groupEnd, msgsById){
     pinTag.className = "pin-indicator";
     pinTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> Pinned';
     wrap.appendChild(pinTag);
+  }
+
+  if(m.completed){
+    var doneTag = document.createElement("div");
+    doneTag.className = "done-indicator";
+    var doneByName = m.completedBy ? (DEPTS[m.completedBy] ? DEPTS[m.completedBy].name : m.completedBy) : "";
+    doneTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Done' + (doneByName ? " · " + esc(doneByName) : "");
+    wrap.appendChild(doneTag);
   }
 
   if(m.replyTo && msgsById && msgsById[m.replyTo]){

@@ -69,6 +69,12 @@ if (!messageColumns.includes('reply_to_id')) {
 if (!messageColumns.includes('pinned_at')) {
   db.exec('ALTER TABLE messages ADD COLUMN pinned_at TEXT');
 }
+if (!messageColumns.includes('completed_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN completed_at TEXT');
+}
+if (!messageColumns.includes('completed_by')) {
+  db.exec('ALTER TABLE messages ADD COLUMN completed_by TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (
