@@ -151,6 +151,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .push-prompt-dismiss{flex:none;border:none;background:none;color:var(--text-faint);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .push-prompt-dismiss svg{width:13px;height:13px}
 .push-prompt-dismiss:hover{background:rgba(0,0,0,.06)}
+.inline-share-ic{width:13px;height:13px;vertical-align:-2px;color:var(--accent)}
 .thread-list{flex:1;overflow-y:auto;padding:0 10px 14px;scrollbar-width:none}
 .thread-list::-webkit-scrollbar{display:none}
 .thread-item{
@@ -534,6 +535,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div class="push-prompt" id="installPrompt" hidden>
+      <div class="push-prompt-text">
+        To get notifications on iPhone, add Hotel Ping to your Home Screen first:
+        <br>tap <svg class="inline-share-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg> Share, then <b>Add to Home Screen</b>.
+      </div>
+      <div class="push-prompt-actions">
+        <button type="button" class="push-prompt-dismiss" id="installDismissBtn" aria-label="Dismiss">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
     </div>
 
@@ -2064,6 +2077,8 @@ if("serviceWorker" in navigator){
 var pushPrompt = document.getElementById("pushPrompt");
 var pushEnableBtn = document.getElementById("pushEnableBtn");
 var pushDismissBtn = document.getElementById("pushDismissBtn");
+var installPrompt = document.getElementById("installPrompt");
+var installDismissBtn = document.getElementById("installDismissBtn");
 var PUSH_DISMISS_KEY = "mdash_push_dismissed";
 
 function urlBase64ToUint8Array(base64String){
@@ -2079,7 +2094,23 @@ function pushSupported(){
   return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }
 
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+function isStandalone(){
+  return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+}
+
+var INSTALL_DISMISS_KEY = "mdash_install_dismissed";
+
 function checkPushPrompt(){
+  if(isIOS() && !isStandalone()){
+    var installDismissed;
+    try{ installDismissed = localStorage.getItem(INSTALL_DISMISS_KEY); }catch(e){ installDismissed = null; }
+    if(!installDismissed) installPrompt.hidden = false;
+    return;
+  }
   if(!pushSupported()) return;
   if(Notification.permission === "denied") return;
   var dismissed;
@@ -2123,6 +2154,13 @@ if(pushDismissBtn){
   pushDismissBtn.addEventListener("click", function(){
     pushPrompt.hidden = true;
     try{ localStorage.setItem(PUSH_DISMISS_KEY, "1"); }catch(e){}
+  });
+}
+
+if(installDismissBtn){
+  installDismissBtn.addEventListener("click", function(){
+    installPrompt.hidden = true;
+    try{ localStorage.setItem(INSTALL_DISMISS_KEY, "1"); }catch(e){}
   });
 }
 
