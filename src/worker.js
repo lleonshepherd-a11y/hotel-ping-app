@@ -161,15 +161,16 @@ export default {
         return json({ staff: rowToStaff(request._staff) });
       }
 
-      // ---- Staff management (admin only) ----
+      // ---- Staff directory: any signed-in user can read names/departments ----
+      if (method === "GET" && p === "/api/staff") {
+        const rows = await env.DB.prepare("SELECT * FROM staff ORDER BY name").all();
+        return json({ staff: rows.results.map(rowToStaff) });
+      }
+
+      // ---- Staff management (admin only beyond this point) ----
       if (p === "/api/staff" || p.startsWith("/api/staff/")) {
         const requester = request._staff;
         if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
-
-        if (method === "GET" && p === "/api/staff") {
-          const rows = await env.DB.prepare("SELECT * FROM staff ORDER BY name").all();
-          return json({ staff: rows.results.map(rowToStaff) });
-        }
 
         if (method === "POST" && p === "/api/staff") {
           const body = await readJsonBody(request);

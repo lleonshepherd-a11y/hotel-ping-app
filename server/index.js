@@ -184,16 +184,17 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { staff: rowToStaff(staff) });
     }
 
-    // ---- Staff management (admin only) ----
+    // ---- Staff directory: any signed-in user can read names/departments ----
+    if (req.method === 'GET' && p === '/api/staff') {
+      const rows = db.prepare('SELECT * FROM staff ORDER BY name').all();
+      return send(res, 200, { staff: rows.map(rowToStaff) });
+    }
+
+    // ---- Staff management (admin only beyond this point) ----
     if (p === '/api/staff' || p.startsWith('/api/staff/')) {
       const requester = staffFromToken(req);
       if (!requester) return send(res, 401, { error: 'Not signed in' });
       if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
-
-      if (req.method === 'GET' && p === '/api/staff') {
-        const rows = db.prepare('SELECT * FROM staff ORDER BY name').all();
-        return send(res, 200, { staff: rows.map(rowToStaff) });
-      }
 
       if (req.method === 'POST' && p === '/api/staff') {
         const body = await readJsonBody(req);

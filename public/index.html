@@ -177,7 +177,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   flex:none;
   position:relative;
   z-index:2;
-  box-shadow:0 1px 0 var(--border), 0 10px 20px -16px rgba(20,20,16,.4);
 }
 .back-btn{display:none;border:none;background:none;color:var(--text);padding:4px;border-radius:8px}
 .h-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 12px -3px rgba(15,15,20,.35)}
@@ -403,6 +402,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-close svg{width:14px;height:14px}
 .staff-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .staff-row-name{font-weight:700;font-size:13.5px;flex:1}
+.staff-row-name-text{cursor:pointer;border-bottom:1px dashed var(--border)}
+.staff-row-name-text:hover{color:var(--accent)}
+.staff-row-name-input{font-size:16px;font-weight:700;font-family:inherit;border:1.5px solid var(--accent);border-radius:6px;padding:1px 5px;width:140px}
 .staff-row-name span{display:block;font-weight:600;font-size:11.5px;color:var(--text-faint)}
 .staff-row select{font-size:12.5px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface-2);transition:border-color .15s ease}
 .staff-row select:focus{outline:none}
@@ -732,6 +734,17 @@ function loadDepartmentMeta(){
   });
 }
 
+var STAFF_BY_DEPT = {};
+function loadStaffMeta(){
+  return apiGet('/api/staff').then(function(res){
+    STAFF_BY_DEPT = {};
+    res.staff.forEach(function(s){
+      if(!STAFF_BY_DEPT[s.departmentId]) STAFF_BY_DEPT[s.departmentId] = [];
+      STAFF_BY_DEPT[s.departmentId].push(s);
+    });
+  }).catch(function(){});
+}
+
 function buildData(self){
   var others = DEPT_ORDER.filter(function(id){ return id !== self; });
   return Promise.all(others.map(function(id){
@@ -902,8 +915,10 @@ function previewText(m){
 }
 
 function contactNameFor(id){
-  var meta = DEPT_META[id];
-  return meta && meta.contactName ? meta.contactName : null;
+  var staff = STAFF_BY_DEPT[id];
+  if(!staff || !staff.length) return null;
+  if(staff.length === 1) return staff[0].name;
+  return staff.map(function(s){ return s.name; }).join(", ");
 }
 
 function matchesSearch(id, term){
@@ -1015,54 +1030,17 @@ function renderOffDutyBanner(){
 function renderContactName(){
   var deptId = STATE.active;
   var name = contactNameFor(deptId);
-  var canEdit = !!(AUTH.staff && AUTH.staff.isAdmin);
   hContactWrap.innerHTML = "";
   if(name){
     var span = document.createElement("span");
     span.className = "h-contact-name";
     span.textContent = name;
-    if(canEdit){
-      span.title = "Click to edit name";
-      span.addEventListener("click", function(){ startEditContactName(deptId); });
-    }
     hContactWrap.appendChild(span);
     var sep = document.createElement("span");
     sep.textContent = " ·";
     sep.style.color = "var(--text-faint)";
     hContactWrap.appendChild(sep);
-  } else if(canEdit){
-    var btn = document.createElement("button");
-    btn.className = "h-contact-add";
-    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add name';
-    btn.addEventListener("click", function(){ startEditContactName(deptId); });
-    hContactWrap.appendChild(btn);
   }
-}
-
-function startEditContactName(deptId){
-  hContactWrap.innerHTML = "";
-  var input = document.createElement("input");
-  input.className = "h-contact-input";
-  input.type = "text";
-  input.placeholder = "Name";
-  input.maxLength = 40;
-  input.value = contactNameFor(deptId) || "";
-  hContactWrap.appendChild(input);
-  input.focus();
-  input.select();
-  function commit(){
-    var val = input.value.trim();
-    if(!DEPT_META[deptId]) DEPT_META[deptId] = { id: deptId };
-    DEPT_META[deptId].contactName = val || null;
-    renderContactName();
-    if(STATE.active === deptId){ renderList(); renderOffDutyBanner(); }
-    apiSend('/api/departments/' + encodeURIComponent(deptId), 'PATCH', { contactName: val }).catch(function(){});
-  }
-  input.addEventListener("blur", commit);
-  input.addEventListener("keydown", function(e){
-    if(e.key === "Enter"){ e.preventDefault(); input.blur(); }
-    if(e.key === "Escape"){ e.preventDefault(); renderContactName(); }
-  });
 }
 
 function sameDay(a,b){
@@ -1721,8 +1699,8 @@ document.getElementById("backBtn").addEventListener("click", function(){
 /* ---------------- Boot ---------------- */
 function boot(){
   STATE.loading = true;
-  Promise.all([loadDepartmentMeta(), buildData(STATE.self)]).then(function(results){
-    STATE.data = results[1];
+  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self)]).then(function(results){
+    STATE.data = results[2];
     var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
     STATE.active = order[0];
     renderSwitcher();
@@ -1871,6 +1849,10 @@ function loadStaffList(){
   apiGet('/api/staff').then(function(res){
     staffListEl.innerHTML = "";
     res.staff.forEach(function(s){ staffListEl.appendChild(buildStaffRow(s)); });
+    loadStaffMeta().then(function(){
+      renderList();
+      renderHeader();
+    });
   }).catch(function(){
     staffListEl.innerHTML = '<div style="padding:14px 0;color:var(--urgent);font-size:12.5px">Couldn\'t load staff.</div>';
   });
@@ -1882,7 +1864,41 @@ function buildStaffRow(s){
 
   var name = document.createElement("div");
   name.className = "staff-row-name";
-  name.innerHTML = s.name + (s.isAdmin ? ' <span class="staff-row-admin">Admin</span>' : "");
+
+  var nameText = document.createElement("span");
+  nameText.className = "staff-row-name-text";
+  nameText.textContent = s.name;
+  nameText.title = "Click to rename";
+  nameText.addEventListener("click", function(){
+    var input = document.createElement("input");
+    input.type = "text";
+    input.className = "staff-row-name-input";
+    input.maxLength = 40;
+    input.value = s.name;
+    nameText.replaceWith(input);
+    input.focus();
+    input.select();
+    function commit(){
+      var val = input.value.trim();
+      if(!val || val === s.name){ loadStaffList(); return; }
+      apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { name: val }).then(loadStaffList).catch(loadStaffList);
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", function(e){
+      if(e.key === "Enter"){ e.preventDefault(); input.blur(); }
+      if(e.key === "Escape"){ e.preventDefault(); loadStaffList(); }
+    });
+  });
+  name.appendChild(nameText);
+
+  if(s.isAdmin){
+    var adminTag = document.createElement("span");
+    adminTag.className = "staff-row-admin";
+    adminTag.textContent = "Admin";
+    name.appendChild(document.createTextNode(" "));
+    name.appendChild(adminTag);
+  }
+
   var sub = document.createElement("span");
   sub.textContent = "Added " + new Date(s.createdAt).toLocaleDateString();
   name.appendChild(sub);
