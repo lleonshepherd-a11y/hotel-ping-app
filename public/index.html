@@ -24,8 +24,8 @@
   --text:#242420;
   --text-dim:#726f68;
   --text-faint:#9d9a92;
-  --accent:#3474c4;
-  --accent-2:#2a5ea3;
+  --accent:#1877f2;
+  --accent-2:#166fe0;
   --urgent:#d6493c;
   --urgent-2:#b93a2f;
   --urgent-tint:#f7e9e6;
@@ -178,7 +178,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-badge.urgent{background:var(--urgent)}
 
 /* ---------- Main ---------- */
-.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface)}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);position:relative}
+.pull-refresh{position:absolute;left:50%;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow-soft);display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:none;opacity:0}
+.pull-refresh svg{width:16px;height:16px;color:var(--accent)}
+.pull-refresh.spinning svg{animation:pullSpin .7s linear infinite}
+@keyframes pullSpin{to{transform:rotate(360deg)}}
 .thread-head{
   display:flex;align-items:center;justify-content:center;gap:13px;
   padding:16px 24px;
@@ -300,6 +304,30 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   display:flex;align-items:flex-end;gap:8px;
   max-width:640px;margin:0 auto;
 }
+.reply-preview-bar{
+  display:flex;align-items:stretch;gap:9px;max-width:640px;margin:0 auto 8px;
+  background:var(--surface-2);border-radius:10px;padding:7px 8px 7px 0;overflow:hidden;
+}
+.reply-preview-bar-accent{width:3px;flex:none;background:var(--accent);border-radius:2px}
+.reply-preview-bar-body{flex:1;min-width:0}
+.reply-preview-bar-name{font-size:12.5px;font-weight:700;color:var(--accent)}
+.reply-preview-bar-text{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reply-preview-bar-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:4px;display:flex;align-items:center}
+.reply-preview-bar-close svg{width:16px;height:16px}
+.reply-quote{
+  display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
+  background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
+}
+.bubble.out ~ .reply-quote, .msg-row.out .reply-quote{background:rgba(255,255,255,.16)}
+.reply-quote-accent{width:2.5px;flex:none;background:currentColor;border-radius:2px;opacity:.7}
+.reply-quote-body{min-width:0}
+.reply-quote-name{font-size:11.5px;font-weight:700;opacity:.85}
+.reply-quote-text{font-size:12.5px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.msg-reply-btn{opacity:.55;background:none;border:none;cursor:pointer;color:inherit;display:inline-flex;padding:2px;margin-right:2px}
+.msg-reply-btn:hover{opacity:1}
+.msg-reply-btn svg{width:12px;height:12px}
+.flash-highlight .bubble{animation:flashHighlight 1.2s ease}
+@keyframes flashHighlight{0%,100%{filter:none}30%{filter:brightness(1.25) saturate(1.3)}}
 .composer-pill{
   flex:1;display:flex;align-items:flex-end;gap:4px;min-width:0;
   background:var(--surface-2);
@@ -418,7 +446,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* ---------- Admin panel ---------- */
 .sb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 20px 18px}
 .sb-toolbar-left{display:flex;align-items:center;gap:8px}
-#broadcastBtn{width:32px;height:32px;padding:0;justify-content:center}
+#broadcastBtn{width:32px;height:32px;padding:0;justify-content:center;background:var(--accent);border-color:var(--accent);color:#fff}
 #broadcastBtn svg{width:15px;height:15px}
 .admin-btn{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:6px 10px}
 .admin-btn svg{width:13px;height:13px}
@@ -602,10 +630,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
     <div class="off-duty-banner" id="offDutyBanner" hidden></div>
 
+    <div class="pull-refresh" id="pullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></div>
     <div class="thread-scroll" id="threadScroll"></div>
 
     <div class="composer-wrap">
       <div id="attachPreview"></div>
+
+      <div class="reply-preview-bar" id="replyPreviewBar" hidden>
+        <div class="reply-preview-bar-accent"></div>
+        <div class="reply-preview-bar-body">
+          <div class="reply-preview-bar-name" id="replyPreviewName"></div>
+          <div class="reply-preview-bar-text" id="replyPreviewText"></div>
+        </div>
+        <button type="button" class="reply-preview-bar-close" id="replyPreviewClose" aria-label="Cancel reply">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
 
       <div class="composer-locked" id="composerLocked" hidden></div>
 
@@ -781,7 +821,8 @@ var STATE = {
   synthCleanup: null,
   searchTerm: "",
   loading: false,
-  typingFrom: {}
+  typingFrom: {},
+  replyingTo: null
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -828,7 +869,8 @@ function mapServerMessage(row, self){
     duration: row.duration || undefined,
     transcript: row.transcript || undefined,
     deleted: !!row.deleted,
-    deletedAt: row.deletedAt ? new Date(row.deletedAt).getTime() : undefined
+    deletedAt: row.deletedAt ? new Date(row.deletedAt).getTime() : undefined,
+    replyTo: row.replyTo || undefined
   };
 }
 
@@ -1075,6 +1117,7 @@ function markRead(deptId){
 }
 
 function openThread(deptId){
+  if(STATE.active !== deptId) clearReplyBar();
   STATE.active = deptId;
   markRead(deptId);
   renderList();
@@ -1226,6 +1269,8 @@ function renderThread(){
   threadScroll.innerHTML = "";
   var msgs = STATE.data[STATE.active];
   var prevDay = null;
+  var msgsById = {};
+  msgs.forEach(function(m){ msgsById[m.id] = m; });
 
   msgs.forEach(function(m, i){
     if(!prevDay || !sameDay(prevDay, m.t)){
@@ -1237,17 +1282,97 @@ function renderThread(){
     }
     var next = msgs[i+1];
     var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
-    threadScroll.appendChild(buildMessageRow(m, groupEnd));
+    threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById));
   });
   threadScroll.scrollTop = threadScroll.scrollHeight;
 }
 
+function messagePreviewLabel(m){
+  if(!m) return "";
+  if(m.deleted && !m.text && !m.url && !m.transcript) return "Deleted message";
+  if(m.type === "image") return "📷 Photo" + (m.text ? ": " + m.text : "");
+  if(m.type === "file") return "📎 " + (m.fileName || "File");
+  if(m.type === "audio") return "🎤 Voice message";
+  return m.text || "";
+}
+
+function replySenderName(m){
+  if(!m) return "";
+  if(m.from === "self") return "You";
+  return DEPTS[m.from] ? DEPTS[m.from].name : m.from;
+}
+
+var replyPreviewBar = document.getElementById("replyPreviewBar");
+var replyPreviewName = document.getElementById("replyPreviewName");
+var replyPreviewText = document.getElementById("replyPreviewText");
+var replyPreviewClose = document.getElementById("replyPreviewClose");
+
+function showReplyBar(m){
+  STATE.replyingTo = { id: m.id, from: m.from, preview: messagePreviewLabel(m) };
+  replyPreviewName.textContent = replySenderName(m);
+  replyPreviewText.textContent = STATE.replyingTo.preview;
+  replyPreviewBar.hidden = false;
+  msgInput.focus();
+}
+function clearReplyBar(){
+  STATE.replyingTo = null;
+  replyPreviewBar.hidden = true;
+}
+replyPreviewClose.addEventListener("click", clearReplyBar);
+
+var pullRefresh = document.getElementById("pullRefresh");
+(function(){
+  var PULL_THRESHOLD = 60, PULL_MAX = 100;
+  var startY = null, pulling = false, refreshing = false;
+  threadScroll.addEventListener("touchstart", function(e){
+    if(threadScroll.scrollTop <= 0 && !refreshing){
+      startY = e.touches[0].clientY;
+      pulling = true;
+    } else {
+      startY = null; pulling = false;
+    }
+  }, { passive: true });
+  threadScroll.addEventListener("touchmove", function(e){
+    if(!pulling || startY === null) return;
+    var dy = e.touches[0].clientY - startY;
+    if(dy <= 0){ return; }
+    if(threadScroll.scrollTop > 0){ pulling = false; return; }
+    e.preventDefault();
+    var dist = Math.min(dy * 0.5, PULL_MAX);
+    pullRefresh.style.top = (threadScroll.offsetTop - 34 + dist) + "px";
+    pullRefresh.style.opacity = Math.min(dist / PULL_THRESHOLD, 1);
+    pullRefresh.style.transform = "rotate(" + (dist * 3) + "deg)";
+  }, { passive: false });
+  threadScroll.addEventListener("touchend", function(e){
+    if(!pulling || startY === null) return;
+    var finalTop = parseFloat(pullRefresh.style.top || "0");
+    var dist = finalTop - (threadScroll.offsetTop - 34);
+    pulling = false; startY = null;
+    if(dist >= PULL_THRESHOLD){
+      refreshing = true;
+      pullRefresh.style.top = (threadScroll.offsetTop + 14) + "px";
+      pullRefresh.style.opacity = "1";
+      pullRefresh.classList.add("spinning");
+      refreshNow().catch(function(){}).then(function(){
+        refreshing = false;
+        pullRefresh.classList.remove("spinning");
+        pullRefresh.style.opacity = "0";
+        pullRefresh.style.transform = "";
+      });
+    } else {
+      pullRefresh.style.opacity = "0";
+      pullRefresh.style.transform = "";
+    }
+  });
+})();
+
 var TICK_SVG = '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5L5 10.5L11 2.5"/><path d="M7 6.5L11 10.5L17 2.5"/></svg>';
 
-function buildMessageRow(m, groupEnd){
+function buildMessageRow(m, groupEnd, msgsById){
   var row = document.createElement("div");
   var out = m.from === "self";
   row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "");
+  row.setAttribute("data-msg-id", m.id);
 
   var wrap = document.createElement("div");
   wrap.className = "bubble-wrap";
@@ -1279,6 +1404,27 @@ function buildMessageRow(m, groupEnd){
     tag.className = "urgent-tag";
     tag.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg> Urgent';
     wrap.appendChild(tag);
+  }
+
+  if(m.replyTo && msgsById && msgsById[m.replyTo]){
+    var origMsg = msgsById[m.replyTo];
+    var quote = document.createElement("div");
+    quote.className = "reply-quote";
+    quote.innerHTML =
+      '<div class="reply-quote-accent"></div>'+
+      '<div class="reply-quote-body">'+
+        '<div class="reply-quote-name">'+esc(replySenderName(origMsg))+'</div>'+
+        '<div class="reply-quote-text">'+esc(messagePreviewLabel(origMsg))+'</div>'+
+      '</div>';
+    quote.addEventListener("click", function(){
+      var target = threadScroll.querySelector('[data-msg-id="'+origMsg.id+'"]');
+      if(target){
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("flash-highlight");
+        setTimeout(function(){ target.classList.remove("flash-highlight"); }, 1200);
+      }
+    });
+    wrap.appendChild(quote);
   }
 
   var bubble;
@@ -1352,6 +1498,14 @@ function buildMessageRow(m, groupEnd){
   if(out){
     meta.className = "msg-status" + (m.status === "read" ? " read" : "");
     if(!m.deleted){
+      var replyBtn1 = document.createElement("button");
+      replyBtn1.type = "button";
+      replyBtn1.className = "msg-reply-btn";
+      replyBtn1.setAttribute("aria-label", "Reply to this message");
+      replyBtn1.title = "Reply";
+      replyBtn1.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>';
+      replyBtn1.addEventListener("click", function(){ showReplyBar(m); });
+      meta.appendChild(replyBtn1);
       var delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "msg-delete-btn";
@@ -1370,7 +1524,19 @@ function buildMessageRow(m, groupEnd){
     meta.appendChild(ticks);
   } else {
     meta.className = "msg-time";
-    meta.textContent = fmtClock(m.t);
+    if(!m.deleted){
+      var replyBtn2 = document.createElement("button");
+      replyBtn2.type = "button";
+      replyBtn2.className = "msg-reply-btn";
+      replyBtn2.setAttribute("aria-label", "Reply to this message");
+      replyBtn2.title = "Reply";
+      replyBtn2.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>';
+      replyBtn2.addEventListener("click", function(){ showReplyBar(m); });
+      meta.appendChild(replyBtn2);
+    }
+    var timeSpan2 = document.createElement("span");
+    timeSpan2.textContent = fmtClock(m.t);
+    meta.appendChild(timeSpan2);
   }
   wrap.appendChild(meta);
 
@@ -1663,6 +1829,8 @@ function doSend(){
   refreshSendState();
 
   var payload = { from: STATE.self, to: deptId, urgent: wasUrgent };
+  if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
+  clearReplyBar();
   var sendPromise;
   if(attachment && attachment.type === "image"){
     payload.type = "image"; payload.text = text; payload.fileName = attachment.name;
@@ -1838,6 +2006,8 @@ vpSend.addEventListener("click", function(){
   if(!STATE.voice) return;
   var deptId = STATE.active;
   var voice = STATE.voice;
+  var replyToId = STATE.replyingTo ? STATE.replyingTo.id : null;
+  clearReplyBar();
   STATE.voice = null;
   setComposerState("idle");
 
@@ -1848,6 +2018,7 @@ vpSend.addEventListener("click", function(){
         fileBase64: b64, fileMime: blob.type || "audio/webm",
         duration: voice.duration, transcript: voice.transcript || null
       };
+      if(replyToId) payload.replyToId = replyToId;
       return apiSend('/api/messages', 'POST', payload);
     });
   }).then(function(res){
@@ -1891,35 +2062,37 @@ function boot(){
 }
 
 var pollTimer = null;
+function refreshNow(){
+  if(STATE.loading) return Promise.resolve();
+  var prevIds = {};
+  Object.keys(STATE.data).forEach(function(id){
+    prevIds[id] = {};
+    (STATE.data[id] || []).forEach(function(m){ prevIds[id][m.id] = true; });
+  });
+  return buildData(STATE.self).then(function(data){
+    var hasNew = false, hasUrgent = false, changed = false;
+    Object.keys(data).forEach(function(id){
+      var oldMsgs = STATE.data[id] || [];
+      var newMsgs = data[id] || [];
+      if(oldMsgs.length !== newMsgs.length) changed = true;
+      newMsgs.forEach(function(m){
+        if(m.from !== "self" && (!prevIds[id] || !prevIds[id][m.id])){
+          hasNew = true;
+          if(m.urgent) hasUrgent = true;
+        }
+      });
+    });
+    if(!changed) return;
+    STATE.data = data;
+    renderList();
+    if(STATE.active) renderThread();
+    if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
+  });
+}
+
 function startPolling(){
   if(pollTimer) return;
-  pollTimer = setInterval(function(){
-    if(STATE.loading) return;
-    var prevIds = {};
-    Object.keys(STATE.data).forEach(function(id){
-      prevIds[id] = {};
-      (STATE.data[id] || []).forEach(function(m){ prevIds[id][m.id] = true; });
-    });
-    buildData(STATE.self).then(function(data){
-      var hasNew = false, hasUrgent = false, changed = false;
-      Object.keys(data).forEach(function(id){
-        var oldMsgs = STATE.data[id] || [];
-        var newMsgs = data[id] || [];
-        if(oldMsgs.length !== newMsgs.length) changed = true;
-        newMsgs.forEach(function(m){
-          if(m.from !== "self" && (!prevIds[id] || !prevIds[id][m.id])){
-            hasNew = true;
-            if(m.urgent) hasUrgent = true;
-          }
-        });
-      });
-      if(!changed) return;
-      STATE.data = data;
-      renderList();
-      if(STATE.active) renderThread();
-      if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
-    }).catch(function(){});
-  }, 4000);
+  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); }, 4000);
   startTypingPoll();
 }
 

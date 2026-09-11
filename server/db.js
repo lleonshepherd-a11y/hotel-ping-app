@@ -63,6 +63,9 @@ if (!messageColumns.includes('transcript')) {
 if (!messageColumns.includes('deleted_at')) {
   db.exec('ALTER TABLE messages ADD COLUMN deleted_at TEXT');
 }
+if (!messageColumns.includes('reply_to_id')) {
+  db.exec('ALTER TABLE messages ADD COLUMN reply_to_id TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (

@@ -172,12 +172,12 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)`
   ).bind(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -218,6 +218,7 @@ function rowToMessage(row, revealDeleted) {
     createdAt: row.created_at,
     deleted: deleted,
     deletedAt: deleted && revealDeleted ? row.deleted_at : undefined,
+    replyTo: row.reply_to_id || undefined,
   };
 }
 function rowToStaff(row) {
@@ -502,7 +503,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript } = body;
+        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId } = body;
         if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
@@ -527,6 +528,7 @@ export default {
           fileName: fileName || null, filePath: filePathOnDisk, fileSize,
           duration: duration || null, transcript: transcript && transcript.trim() ? transcript.trim() : null,
           urgent: !!urgent,
+          replyToId: replyToId || null,
         });
 
         return json({ message: rowToMessage(row) }, 201);
