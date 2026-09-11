@@ -234,6 +234,7 @@ export default {
           await env.DB.prepare("UPDATE departments SET on_duty = ? WHERE id = ?").bind(body.onDuty ? 1 : 0, id).run();
         }
         if (typeof body.contactName === "string") {
+          if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
           await env.DB.prepare("UPDATE departments SET contact_name = ? WHERE id = ?").bind(body.contactName.trim() || null, id).run();
         }
         const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();

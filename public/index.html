@@ -1016,19 +1016,22 @@ function renderOffDutyBanner(){
 function renderContactName(){
   var deptId = STATE.active;
   var name = contactNameFor(deptId);
+  var canEdit = !!(AUTH.staff && AUTH.staff.isAdmin);
   hContactWrap.innerHTML = "";
   if(name){
     var span = document.createElement("span");
     span.className = "h-contact-name";
     span.textContent = name;
-    span.title = "Click to edit name";
-    span.addEventListener("click", function(){ startEditContactName(deptId); });
+    if(canEdit){
+      span.title = "Click to edit name";
+      span.addEventListener("click", function(){ startEditContactName(deptId); });
+    }
     hContactWrap.appendChild(span);
     var sep = document.createElement("span");
     sep.textContent = " ·";
     sep.style.color = "var(--text-faint)";
     hContactWrap.appendChild(sep);
-  } else {
+  } else if(canEdit){
     var btn = document.createElement("button");
     btn.className = "h-contact-add";
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add name';
