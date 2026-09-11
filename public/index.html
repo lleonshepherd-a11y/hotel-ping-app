@@ -966,6 +966,36 @@ function fmtBytes(n){
 function lastOf(arr){ return arr && arr.length ? arr[arr.length-1] : null; }
 function esc(s){ return (s||"").replace(/[&<>]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
 
+var cachedVoice = null;
+function pickBestVoice(){
+  if(!window.speechSynthesis) return null;
+  var voices = window.speechSynthesis.getVoices();
+  if(!voices.length) return null;
+  var preferred = [
+    /Google UK English Female/i, /Google US English/i, /Samantha/i, /Karen/i, /Daniel/i,
+    /Enhanced/i, /Premium/i, /Natural/i
+  ];
+  for(var i=0;i<preferred.length;i++){
+    var match = voices.filter(function(v){ return preferred[i].test(v.name) && v.lang.indexOf("en") === 0; })[0];
+    if(match) return match;
+  }
+  var enVoice = voices.filter(function(v){ return v.lang.indexOf("en") === 0; })[0];
+  return enVoice || voices[0];
+}
+function speakText(text){
+  if(!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  var utter = new SpeechSynthesisUtterance(text);
+  var voice = cachedVoice || pickBestVoice();
+  if(voice){ utter.voice = voice; cachedVoice = voice; }
+  utter.rate = 0.98;
+  utter.pitch = 1;
+  window.speechSynthesis.speak(utter);
+}
+if(window.speechSynthesis){
+  window.speechSynthesis.addEventListener("voiceschanged", function(){ cachedVoice = pickBestVoice(); });
+}
+
 /* ---------------- Audio helpers ---------------- */
 function floatTo16BitPCM(view, offset, input){
   for(var i=0;i<input.length;i++,offset+=2){
@@ -1654,10 +1684,7 @@ function buildMessageRow(m, groupEnd, msgsById){
       speakBtn.setAttribute("aria-label", "Read this message aloud");
       speakBtn.title = "Read aloud";
       speakBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-      speakBtn.addEventListener("click", function(){
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(m.text));
-      });
+      speakBtn.addEventListener("click", function(){ speakText(m.text); });
       bubble.appendChild(speakBtn);
     }
   } else if(m.type === "image"){
