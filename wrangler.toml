@@ -16,6 +16,10 @@ database_id = "018a4539-a04b-4ada-841d-1962bcde934d"
 binding = "UPLOADS"
 bucket_name = "hotel-ping-uploads"
 
+[vars]
+VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19ZghGh4evavlwqbAzP-CsuJ-xLBkU"
+VAPID_SUBJECT = "mailto:admin@hotelping.co.uk"
+
 [[routes]]
 pattern = "hotelping.co.uk"
 custom_domain = true

@@ -1,4 +1,8 @@
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
+const DEPT_NAMES = {
+  gm: "General Manager", foh: "Front of House", concierge: "Concierge", restaurant: "Restaurant",
+  kitchen: "Kitchen", bar: "Bar", housekeeping: "Housekeeping", maintenance: "Maintenance",
+};
 const PIN_RE = /^\d{4,6}$/;
 
 function json(data, status, headers) {
@@ -32,6 +36,136 @@ function randomSaltHex() {
 }
 function newToken() {
   return crypto.randomUUID() + crypto.randomUUID();
+}
+
+/* ---------------- base64url helpers ---------------- */
+function b64urlToBytes(str) {
+  let s = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function bytesToB64url(bytes) {
+  let bin = "";
+  const arr = new Uint8Array(bytes);
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function concatBytes(...arrs) {
+  const total = arrs.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrs) { out.set(a, off); off += a.length; }
+  return out;
+}
+
+/* ---------------- Web Push (VAPID + aes128gcm) ---------------- */
+async function vapidAuthHeader(env, endpointUrl) {
+  const aud = new URL(endpointUrl).origin;
+  const header = { typ: "JWT", alg: "ES256" };
+  const claims = { aud, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, sub: env.VAPID_SUBJECT };
+  const enc = new TextEncoder();
+  const signingInput =
+    bytesToB64url(enc.encode(JSON.stringify(header))) + "." + bytesToB64url(enc.encode(JSON.stringify(claims)));
+
+  const jwk = JSON.parse(env.VAPID_PRIVATE_JWK);
+  const privateKey = await crypto.subtle.importKey(
+    "jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" }, privateKey, enc.encode(signingInput)
+  );
+  const jwt = signingInput + "." + bytesToB64url(new Uint8Array(sig));
+  return `vapid t=${jwt}, k=${env.VAPID_PUBLIC_KEY}`;
+}
+
+async function hmacSha256(keyBytes, dataBytes) {
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, dataBytes);
+  return new Uint8Array(sig);
+}
+async function hkdfExpand(prk, info, length) {
+  const out = await hmacSha256(prk, concatBytes(info, new Uint8Array([1])));
+  return out.slice(0, length);
+}
+
+async function encryptPushPayload(payloadObj, p256dhB64, authB64) {
+  const enc = new TextEncoder();
+  const plaintext = enc.encode(JSON.stringify(payloadObj));
+
+  const uaPublicBytes = b64urlToBytes(p256dhB64);
+  const authSecret = b64urlToBytes(authB64);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+
+  const uaPublicKey = await crypto.subtle.importKey(
+    "raw", uaPublicBytes, { name: "ECDH", namedCurve: "P-256" }, false, []
+  );
+  const asKeyPair = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]
+  );
+  const asPublicBytes = new Uint8Array(await crypto.subtle.exportKey("raw", asKeyPair.publicKey));
+
+  const ecdhSecret = new Uint8Array(
+    await crypto.subtle.deriveBits({ name: "ECDH", public: uaPublicKey }, asKeyPair.privateKey, 256)
+  );
+
+  const prk = await hmacSha256(authSecret, ecdhSecret);
+  const keyInfo = concatBytes(enc.encode("WebPush: info\0"), uaPublicBytes, asPublicBytes);
+  const ikm = await hkdfExpand(prk, keyInfo, 32);
+
+  const prk2 = await hmacSha256(salt, ikm);
+  const cekInfo = enc.encode("Content-Encoding: aes128gcm\0");
+  const nonceInfo = enc.encode("Content-Encoding: nonce\0");
+  const cekBytes = await hkdfExpand(prk2, cekInfo, 16);
+  const nonce = await hkdfExpand(prk2, nonceInfo, 12);
+
+  const cekKey = await crypto.subtle.importKey("raw", cekBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+  const recordPlaintext = concatBytes(plaintext, new Uint8Array([2]));
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, cekKey, recordPlaintext)
+  );
+
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096);
+  const header = concatBytes(salt, rs, new Uint8Array([asPublicBytes.length]), asPublicBytes);
+  return concatBytes(header, ciphertext);
+}
+
+async function sendWebPush(env, subscription, payloadObj) {
+  const body = await encryptPushPayload(payloadObj, subscription.p256dh, subscription.auth);
+  const auth = await vapidAuthHeader(env, subscription.endpoint);
+  const res = await fetch(subscription.endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      "TTL": "86400",
+      "Authorization": auth,
+    },
+    body,
+  });
+  return res;
+}
+
+async function notifyDepartment(env, deptId, payloadObj) {
+  const dept = await env.DB.prepare("SELECT on_duty FROM departments WHERE id = ?").bind(deptId).first();
+  if (!dept || !dept.on_duty) return;
+  const staffRows = await env.DB.prepare("SELECT id FROM staff WHERE department_id = ?").bind(deptId).all();
+  for (const s of staffRows.results) {
+    const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(s.id).all();
+    for (const sub of subs.results) {
+      try {
+        const res = await sendWebPush(env, sub, payloadObj);
+        if (res.status === 404 || res.status === 410) {
+          await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
+        }
+      } catch (e) {
+        // best-effort - don't fail the message send if a push fails
+      }
+    }
+  }
 }
 
 function rowToDepartment(row) {
@@ -89,7 +223,7 @@ async function ensureSeeded(env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const p = url.pathname;
     const method = request.method;
@@ -159,6 +293,37 @@ export default {
 
       if (method === "GET" && p === "/api/auth/me") {
         return json({ staff: rowToStaff(request._staff) });
+      }
+
+      // ---- Push notifications ----
+      if (method === "GET" && p === "/api/push/vapid-public-key") {
+        return json({ key: env.VAPID_PUBLIC_KEY });
+      }
+
+      if (method === "POST" && p === "/api/push/subscribe") {
+        const body = await readJsonBody(request);
+        const sub = body.subscription;
+        if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) {
+          return json({ error: "Invalid subscription" }, 400);
+        }
+        const existing = await env.DB.prepare("SELECT id FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).first();
+        if (existing) {
+          await env.DB.prepare("UPDATE push_subscriptions SET staff_id = ?, p256dh = ?, auth = ? WHERE id = ?")
+            .bind(request._staff.id, sub.keys.p256dh, sub.keys.auth, existing.id).run();
+        } else {
+          await env.DB.prepare(
+            "INSERT INTO push_subscriptions (id, staff_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+          ).bind(crypto.randomUUID(), request._staff.id, sub.endpoint, sub.keys.p256dh, sub.keys.auth, new Date().toISOString()).run();
+        }
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p === "/api/push/unsubscribe") {
+        const body = await readJsonBody(request);
+        if (body.endpoint) {
+          await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND staff_id = ?").bind(body.endpoint, request._staff.id).run();
+        }
+        return json({ ok: true });
       }
 
       // ---- Staff directory: any signed-in user can read names/departments ----
@@ -337,6 +502,17 @@ export default {
         ).run();
 
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+
+        const previewMap = { text: (text && text.trim()) || "", image: "📷 Photo", file: "📎 " + (fileName || "File"), audio: "🎤 Voice message" };
+        const notifyBody = urgent ? "🔴 Urgent: " + (previewMap[type] || "New message") : (previewMap[type] || "New message");
+        const notifyPromise = notifyDepartment(env, to, {
+          title: DEPT_NAMES[from] || from,
+          body: notifyBody,
+          url: "/",
+          tag: "hotel-ping-" + to,
+        }).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
         return json({ message: rowToMessage(row) }, 201);
       }
 
