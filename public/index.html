@@ -968,7 +968,19 @@ function openThread(deptId){
   document.getElementById("sidebar").classList.add("hide-mobile");
   document.querySelector(".main").classList.add("show-mobile");
   focusInput();
+  if(window.innerWidth <= 720 && !(history.state && history.state.dashThread)){
+    history.pushState({ dashThread: true }, "");
+  }
 }
+
+function closeThreadView(){
+  document.getElementById("sidebar").classList.remove("hide-mobile");
+  document.querySelector(".main").classList.remove("show-mobile");
+}
+
+window.addEventListener("popstate", function(){
+  closeThreadView();
+});
 
 function hexToRgba(hex, a){
   var n = parseInt(hex.slice(1), 16);
@@ -1700,8 +1712,11 @@ vpSend.addEventListener("click", function(){
 
 /* ---- mobile back ---- */
 document.getElementById("backBtn").addEventListener("click", function(){
-  document.getElementById("sidebar").classList.remove("hide-mobile");
-  document.querySelector(".main").classList.remove("show-mobile");
+  if(history.state && history.state.dashThread){
+    history.back();
+  } else {
+    closeThreadView();
+  }
 });
 
 /* ---------------- Boot ---------------- */
