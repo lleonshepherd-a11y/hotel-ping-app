@@ -476,17 +476,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-form input[name="pin"]{width:90px}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
-.handover-list{display:flex;flex-direction:column;gap:2px;margin-top:16px;max-height:340px;overflow-y:auto}
-.handover-note{padding:11px 0;border-bottom:1px solid var(--border)}
-.handover-note:last-child{border-bottom:none}
-.handover-note-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}
-.handover-note-author{font-weight:700;font-size:12.5px}
-.handover-note-time{font-size:11px;color:var(--text-faint)}
-.handover-note-body{font-size:13.5px;line-height:1.4;white-space:pre-wrap}
-.handover-note-del{border:none;background:none;color:var(--text-faint);padding:2px;display:inline-flex}
-.handover-note-del:hover{color:var(--urgent)}
+.handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
+.handover-note{padding:13px 14px;border-radius:14px;background:var(--surface-2);box-shadow:var(--shadow-soft)}
+.handover-note-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.handover-note-author{font-weight:700;font-size:12.5px;letter-spacing:.01em}
+.handover-note-time{font-size:11px;color:var(--text-faint);font-weight:600}
+.handover-note-body{font-size:13.5px;line-height:1.48;white-space:pre-wrap;color:var(--text)}
+.handover-note-del{border:none;background:none;color:var(--text-faint);padding:3px;display:inline-flex;border-radius:6px;opacity:.6}
+.handover-note-del:hover{color:var(--urgent);opacity:1;background:var(--urgent-tint)}
 .handover-note-del svg{width:12px;height:12px}
-.handover-empty{font-size:13px;color:var(--text-faint);padding:14px 0;text-align:center}
+.handover-empty{font-size:13px;color:var(--text-faint);padding:20px 0;text-align:center}
 .forward-dept-list{display:flex;flex-direction:column;gap:2px}
 .forward-dept-opt{display:flex;align-items:center;gap:12px;border:none;background:none;padding:10px 6px;border-radius:12px;text-align:left;font-size:14.5px;font-weight:600;color:var(--text)}
 .forward-dept-opt:hover{background:var(--surface-2)}
@@ -522,6 +521,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #broadcastText{width:100%;min-height:100px;padding:11px 13px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
 .broadcast-urgent-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text-dim);margin-top:10px}
 .broadcast-send-btn{width:100%;margin-top:14px;padding:11px}
+#handoverText{width:100%;min-height:110px;padding:12px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface-2);font-family:inherit;font-size:16px;resize:vertical}
 
 @media (max-width:720px){
   body{padding:0}
@@ -570,7 +570,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button type="submit" class="login-btn" id="setupBtn">Continue to messages</button>
       <div class="login-error" id="setupError"></div>
     </form>
-    <div class="login-tip">Tip: use the <b>On duty</b> switch in the app whenever you're off shift — you won't be notified about new messages until you switch back on. Management can still send messages and reach your conversation history at any time. All messages may be reviewed by management.</div>
+    <div class="login-tip">Tip: use the <b>On duty</b> switch in the app whenever you're off shift. You won't be notified about new messages until you switch back on. Management can still send messages and reach your conversation history at any time. All messages may be reviewed by management.</div>
   </div>
 </div>
 
@@ -797,7 +797,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <p class="broadcast-hint" id="handoverDeptLabel"></p>
     <form id="handoverForm">
       <textarea id="handoverText" placeholder="What does the next shift need to know?" required></textarea>
-      <button type="submit" class="admin-add-btn" id="handoverSendBtn">Add note</button>
+      <button type="submit" class="admin-add-btn broadcast-send-btn" id="handoverSendBtn">Add note</button>
       <div class="admin-add-error" id="handoverError"></div>
     </form>
     <div class="handover-list" id="handoverList"></div>
@@ -1838,7 +1838,7 @@ function buildMessageRow(m, groupEnd, msgsById){
 }
 
 function confirmDeleteMessage(id){
-  if(!confirm("Delete this message?\n\nIt will be hidden from this conversation, but it is not erased — management can still see the original message.")) return;
+  if(!confirm("Delete this message?\n\nIt will be hidden from this conversation, but it is not erased. Management can still see the original message.")) return;
   apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
     var deptId = STATE.active;
     var msgs = STATE.data[deptId] || [];
@@ -1883,7 +1883,7 @@ function updateComposerLock(){
   if(locked){
     var viewing = DEPTS[STATE.self] ? DEPTS[STATE.self].name : "this department";
     var home = DEPTS[AUTH.staff.departmentId] ? DEPTS[AUTH.staff.departmentId].name : "your department";
-    composerLocked.innerHTML = "Viewing <b>" + esc(viewing) + "</b>'s messages — read only. Switch back to <b>" + esc(home) + "</b> to send.";
+    composerLocked.innerHTML = "Viewing <b>" + esc(viewing) + "</b>'s messages (read only). Switch back to <b>" + esc(home) + "</b> to send.";
   }
 }
 
@@ -2769,7 +2769,7 @@ function loadHandoverNotes(){
 }
 
 handoverBtn.addEventListener("click", function(){
-  handoverDeptLabel.textContent = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self) + "'s shift notes — visible to everyone in this department.";
+  handoverDeptLabel.textContent = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self) + "'s shift notes. Visible to everyone in this department.";
   handoverText.value = "";
   handoverError.textContent = "";
   handoverForm.hidden = isViewOnly();
