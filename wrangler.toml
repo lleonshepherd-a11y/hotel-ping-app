@@ -20,6 +20,9 @@ bucket_name = "hotel-ping-uploads"
 VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19ZghGh4evavlwqbAzP-CsuJ-xLBkU"
 VAPID_SUBJECT = "mailto:admin@hotelping.co.uk"
 
+[triggers]
+crons = ["*/5 * * * *"]
+
 [[routes]]
 pattern = "hotelping.co.uk"
 custom_domain = true

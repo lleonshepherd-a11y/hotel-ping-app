@@ -71,6 +71,22 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
   };
 }
 
+const ESCALATION_MINUTES = 10;
+function checkEscalations() {
+  const cutoff = new Date(Date.now() - ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const rows = db.prepare(`
+    SELECT * FROM messages
+    WHERE urgent = 1 AND deleted_at IS NULL AND escalated_at IS NULL
+      AND status != 'read' AND created_at < ?
+  `).all(cutoff);
+  const now = new Date().toISOString();
+  for (const row of rows) {
+    console.log('[escalation] unread urgent message', row.id, row.from_dept, '->', row.to_dept);
+    db.prepare('UPDATE messages SET escalated_at = ? WHERE id = ?').run(now, row.id);
+  }
+  return rows.length;
+}
+
 function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -455,6 +471,13 @@ const server = http.createServer(async (req, res) => {
       const cutoff = new Date(Date.now() - 6000).toISOString();
       const rows = db.prepare('SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?').all(self, cutoff);
       return send(res, 200, { typing: rows.map((r) => r.from_dept) });
+    }
+
+    if (req.method === 'POST' && p === '/api/escalations/check') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const count = checkEscalations();
+      return send(res, 200, { escalated: count });
     }
 
     return send(res, 404, { error: 'Not found' });

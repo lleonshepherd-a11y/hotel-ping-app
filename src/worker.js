@@ -168,6 +168,45 @@ async function notifyDepartment(env, deptId, payloadObj) {
   }
 }
 
+async function notifyAdmins(env, payloadObj) {
+  const staffRows = await env.DB.prepare("SELECT id FROM staff WHERE is_admin = 1").all();
+  for (const s of staffRows.results) {
+    const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(s.id).all();
+    for (const sub of subs.results) {
+      try {
+        const res = await sendWebPush(env, sub, payloadObj);
+        if (res.status === 404 || res.status === 410) {
+          await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
+        }
+      } catch (e) {
+        // best-effort
+      }
+    }
+  }
+}
+
+const ESCALATION_MINUTES = 10;
+
+async function checkEscalations(env) {
+  const cutoff = new Date(Date.now() - ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const rows = await env.DB.prepare(
+    `SELECT * FROM messages
+     WHERE urgent = 1 AND deleted_at IS NULL AND escalated_at IS NULL
+       AND status != 'read' AND created_at < ?`
+  ).bind(cutoff).all();
+  for (const row of rows.results) {
+    const preview = row.type === "text" ? row.body : (row.type === "image" ? "a photo" : row.type === "file" ? "a file" : "a voice message");
+    await notifyAdmins(env, {
+      title: "⚠️ Unread urgent message",
+      body: (DEPT_NAMES[row.from_dept] || row.from_dept) + " → " + (DEPT_NAMES[row.to_dept] || row.to_dept) + ": " + preview,
+      url: "/",
+      tag: "hotel-ping-escalation-" + row.id,
+    });
+    await env.DB.prepare("UPDATE messages SET escalated_at = ? WHERE id = ?").bind(new Date().toISOString(), row.id).run();
+  }
+  return rows.results.length;
+}
+
 async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -638,9 +677,19 @@ export default {
         return json({ typing: rows.results.map((r) => r.from_dept) });
       }
 
+      if (method === "POST" && p === "/api/escalations/check") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const count = await checkEscalations(env);
+        return json({ escalated: count });
+      }
+
       return json({ error: "Not found" }, 404);
     } catch (err) {
       return json({ error: "Server error", detail: String((err && err.message) || err) }, 500);
     }
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(checkEscalations(env));
   },
 };

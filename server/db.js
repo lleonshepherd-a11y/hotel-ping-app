@@ -75,6 +75,9 @@ if (!messageColumns.includes('completed_at')) {
 if (!messageColumns.includes('completed_by')) {
   db.exec('ALTER TABLE messages ADD COLUMN completed_by TEXT');
 }
+if (!messageColumns.includes('escalated_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN escalated_at TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (
