@@ -1,0 +1,13 @@
+{
+  "name": "hotel-ping-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hotel Ping — department messaging app for hotel staff",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --no-warnings server/index.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}
