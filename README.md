@@ -1,30 +1,30 @@
 # Hotel Ping
 
-Department messaging app for hotel staff. Real backend (Node.js + SQLite), real frontend, staff sign-in.
+Department messaging app for hotel staff. Real backend, real frontend, staff sign-in.
 
-## Run it
+**Live deployment:** runs on Cloudflare Workers, with a D1 database and R2 file storage — no server to maintain.
 
-Needs Node.js 22.5 or newer (uses the built-in `node:sqlite` module — no external database).
-
-```
-npm start
-```
-
-Opens on http://localhost:4100
-
-First run creates `data/message-dash.sqlite` and seeds one admin account:
+## Sign in
 
 - Name: `Dave`
 - PIN: `1234`
 
 Sign in as Dave, then use "Manage staff" to add real staff accounts and change that PIN.
 
-## Deploying to a server
+## Deploying (Cloudflare)
 
-1. Copy this folder to the server.
-2. Install Node.js 22+ if it isn't already there.
-3. Run `npm start` (or better, keep it running with a process manager like `pm2` so it survives reboots/crashes: `pm2 start server/index.js --name hotel-ping`).
-4. Put it behind a reverse proxy (nginx or Caddy) on port 80/443 so it's reachable at the real domain, with HTTPS.
-5. Point the domain's DNS A record at the server's IP.
+```
+npx wrangler deploy
+```
 
-`data/` holds the database and uploaded files — back it up regularly.
+Needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set, and `wrangler.toml` pointing at your own D1 database and R2 bucket (created once with `wrangler d1 create` / `wrangler r2 bucket create`, then the schema applied with `wrangler d1 execute hotel-ping-db --remote --file=schema.sql`).
+
+## Running locally instead (Node.js version)
+
+A plain Node.js version also exists under `server/` and `public/` for local development, using the built-in `node:sqlite` module — no external database needed.
+
+```
+npm start
+```
+
+Opens on http://localhost:4100, storing data in `data/` (uploads + SQLite file).

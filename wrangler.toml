@@ -1,0 +1,17 @@
+name = "hotel-ping-app"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hotel-ping-db"
+database_id = "018a4539-a04b-4ada-841d-1962bcde934d"
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "hotel-ping-uploads"
