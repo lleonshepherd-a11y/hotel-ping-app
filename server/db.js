@@ -43,6 +43,7 @@ db.exec(`
     pin_hash TEXT NOT NULL,
     pin_salt TEXT NOT NULL,
     is_admin INTEGER NOT NULL DEFAULT 0,
+    profile_complete INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL,
     FOREIGN KEY (department_id) REFERENCES departments(id)
   );
@@ -58,6 +59,12 @@ db.exec(`
 const messageColumns = db.prepare("PRAGMA table_info(messages)").all().map((c) => c.name);
 if (!messageColumns.includes('transcript')) {
   db.exec('ALTER TABLE messages ADD COLUMN transcript TEXT');
+}
+
+const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
+if (!staffColumns.includes('profile_complete')) {
+  db.exec('ALTER TABLE staff ADD COLUMN profile_complete INTEGER NOT NULL DEFAULT 0');
+  db.exec('UPDATE staff SET profile_complete = 1');
 }
 
 const DEPARTMENTS = [
@@ -82,8 +89,8 @@ if (staffCount === 0) {
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = crypto.scryptSync('1234', salt, 64).toString('hex');
   db.prepare(`
-    INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, created_at)
-    VALUES (?, 'Dave', 'gm', ?, ?, 1, ?)
+    INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, profile_complete, created_at)
+    VALUES (?, 'Dave', 'gm', ?, ?, 1, 1, ?)
   `).run(crypto.randomUUID(), hash, salt, new Date().toISOString());
 }
 

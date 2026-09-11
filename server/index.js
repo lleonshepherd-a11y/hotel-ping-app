@@ -94,7 +94,7 @@ function markThreadRead(self, other) {
 }
 
 function rowToStaff(row) {
-  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at };
+  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete };
 }
 
 function hashPin(pin, salt) {
@@ -188,6 +188,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/staff') {
       const rows = db.prepare('SELECT * FROM staff ORDER BY name').all();
       return send(res, 200, { staff: rows.map(rowToStaff) });
+    }
+
+    // ---- Self-service profile setup: any signed-in user can edit their own name/PIN ----
+    if (req.method === 'PATCH' && p === '/api/profile') {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const body = await readJsonBody(req);
+      if (typeof body.name === 'string' && body.name.trim()) {
+        db.prepare('UPDATE staff SET name = ? WHERE id = ?').run(body.name.trim(), requester.id);
+      }
+      if (typeof body.pin === 'string' && body.pin) {
+        if (!/^\d{4,6}$/.test(body.pin)) return send(res, 400, { error: 'PIN must be 4-6 digits' });
+        const salt = crypto.randomBytes(16).toString('hex');
+        db.prepare('UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?').run(hashPin(body.pin, salt), salt, requester.id);
+      }
+      db.prepare('UPDATE staff SET profile_complete = 1 WHERE id = ?').run(requester.id);
+      const row = db.prepare('SELECT * FROM staff WHERE id = ?').get(requester.id);
+      return send(res, 200, { staff: rowToStaff(row) });
     }
 
     // ---- Staff management (admin only beyond this point) ----

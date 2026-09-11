@@ -79,13 +79,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* ---------- Sidebar ---------- */
 .sidebar{
-  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--sidebar-bg)) 0%, var(--sidebar-bg) 220px);
+  background:#fff;
   color:var(--text);
   display:flex;
   flex-direction:column;
   min-width:0;
   min-height:0;
-  box-shadow:1px 0 0 var(--border), 6px 0 24px -18px rgba(20,20,16,.5);
   position:relative;
   z-index:1;
 }
@@ -277,11 +276,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .composer{
   display:flex;align-items:flex-end;gap:8px;
-  background:var(--surface-2);border:none;
-  border-radius:24px;padding:6px 7px 6px 12px;
   max-width:640px;margin:0 auto;
 }
-.composer.urgent-mode{background:var(--urgent-tint)}
+.composer-pill{
+  flex:1;display:flex;align-items:flex-end;gap:4px;min-width:0;
+  background:var(--surface-2);
+  border-radius:24px;padding:6px 7px 6px 12px;
+  transition:background .15s ease;
+}
+.composer.urgent-mode .composer-pill{background:var(--urgent-tint)}
 .icon-btn{flex:none;width:34px;height:34px;border-radius:50%;border:none;background:none;color:var(--text-dim);display:flex;align-items:center;justify-content:center;transition:background .12s ease,color .12s ease,transform .1s ease}
 .icon-btn:active{transform:scale(.9)}
 .send-btn:active{transform:scale(.9)}
@@ -326,18 +329,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #msgInput:focus-visible{outline:none}
 #msgInput::placeholder{color:var(--text-faint)}
 .send-btn{
-  flex:none;width:0;height:34px;border-radius:50%;border:none;
+  flex:none;width:0;height:44px;border-radius:50%;border:none;
   background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;
   display:flex;align-items:center;justify-content:center;overflow:hidden;
   opacity:0;transform:scale(.4);margin-left:-8px;box-shadow:none;
   transition:width .22s cubic-bezier(.3,1.4,.4,1), opacity .16s ease, transform .22s cubic-bezier(.3,1.4,.4,1), margin-left .22s cubic-bezier(.3,1.4,.4,1), box-shadow .15s ease;
 }
-.send-btn.ready{width:34px;opacity:1;transform:scale(1);margin-left:0;box-shadow:0 6px 14px -3px rgba(52,116,196,.55)}
-.send-btn.ready.urgent{background:linear-gradient(150deg,var(--urgent),var(--urgent-2));box-shadow:0 6px 14px -3px rgba(214,73,60,.55)}
-.mic-quick{width:34px;opacity:1;transform:scale(1);margin-left:0;background:var(--surface-3);color:var(--text-dim);box-shadow:none}
-.mic-quick:hover{background:var(--surface-3);color:var(--text)}
+.send-btn.ready{width:44px;opacity:1;transform:scale(1);margin-left:0;box-shadow:0 8px 18px -4px rgba(52,116,196,.55)}
+.send-btn.ready.urgent{background:linear-gradient(150deg,var(--urgent),var(--urgent-2));box-shadow:0 8px 18px -4px rgba(214,73,60,.55)}
+.mic-quick{width:44px;opacity:1;transform:scale(1);margin-left:0;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 8px 18px -4px rgba(52,116,196,.55)}
+.mic-quick:hover{filter:brightness(1.06)}
 .mic-quick.hide{width:0;opacity:0;transform:scale(.4);margin-left:-8px}
-.send-btn svg{width:16px;height:16px}
+.send-btn svg{width:18px;height:18px}
+.mic-quick svg{width:19px;height:19px}
 
 .attach-preview{display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:14px}
 .attach-preview img{width:38px;height:38px;border-radius:8px;object-fit:cover;flex:none}
@@ -386,13 +390,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .login-btn:disabled{opacity:.4}
 .login-btn:not(:disabled):hover{opacity:.88}
 .login-error{font-size:12.5px;color:#ff6a5c;font-weight:600;margin-top:14px;min-height:16px}
+.login-tip{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.12);font-size:12px;line-height:1.5;color:rgba(255,255,255,.5);text-align:left}
+.login-tip b{color:rgba(255,255,255,.8)}
 
 /* ---------- Admin panel ---------- */
 .admin-btn{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--text-dim);background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:6px 10px;margin:0 20px 14px}
 .admin-btn svg{width:13px;height:13px}
 .signed-in-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;font-size:11.5px;color:var(--text-faint);font-weight:600}
 .signed-in-row strong{color:var(--text);font-weight:700}
-.logout-btn{font-size:11.5px;font-weight:700;color:var(--text-dim);background:none;border:none;text-decoration:underline;padding:0}
+.logout-btn{flex:none;width:32px;height:32px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;margin-left:auto}
+.logout-btn:hover{color:var(--urgent);background:var(--urgent-tint)}
+.logout-btn svg{width:15px;height:15px}
 .admin-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
 .admin-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-pop);padding:24px}
 .admin-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
@@ -453,6 +461,23 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="login-screen" id="setupScreen" hidden>
+  <div class="login-card">
+    <div class="login-mark"><img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo"></div>
+    <div class="login-title">Welcome</div>
+    <div class="login-sub">Set up your profile</div>
+    <form id="setupForm">
+      <div class="login-field">
+        <label for="setupName">Your name</label>
+        <input type="text" id="setupName" autocomplete="name" placeholder="e.g. Sarah" required>
+      </div>
+      <button type="submit" class="login-btn" id="setupBtn">Continue to messages</button>
+      <div class="login-error" id="setupError"></div>
+    </form>
+    <div class="login-tip">Tip: use the <b>On duty</b> switch in the app whenever you're off shift — you won't be notified about new messages until you switch back on. Management can still send messages and reach your conversation history at any time. All messages may be reviewed by management.</div>
+  </div>
+</div>
+
 <div class="app" id="app" hidden>
   <aside class="sidebar" id="sidebar">
     <div class="sb-head">
@@ -464,30 +489,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <div class="sb-title">Message Dash</div>
           <div class="sb-sub" id="sbSub">Noir House · Department heads</div>
         </div>
+        <button class="logout-btn" id="logoutBtn" type="button" title="Sign out" aria-label="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
       </div>
     </div>
 
     <div class="sb-switcher" id="switcherWrap">
       <div class="sb-switcher-label">Viewing as</div>
       <div class="switcher-row" id="switcherRow"></div>
-    </div>
-
-    <button class="admin-btn" id="adminBtn" hidden type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Manage staff
-    </button>
-
-    <div class="duty-row">
-      <div class="duty-caption">
-        <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
-      </div>
-      <div class="duty-switch-row">
-        <div class="duty-track" id="dutyTrack">
-          <div class="duty-knob" id="dutyKnob" role="switch" aria-checked="true" tabindex="0" aria-label="On duty. Slide or press Enter to turn the board off">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="sb-search">
@@ -498,9 +508,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </button>
     </div>
 
-    <div class="signed-in-row">
-      Signed in as <strong id="signedInName">—</strong>
-      <button class="logout-btn" id="logoutBtn" type="button">Sign out</button>
+    <div class="sb-toolbar">
+      <button class="admin-btn" id="adminBtn" hidden type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Manage staff
+      </button>
+      <div class="duty-row">
+        <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
+        <div class="duty-track" id="dutyTrack">
+          <div class="duty-knob" id="dutyKnob" role="switch" aria-checked="true" tabindex="0" aria-label="On duty. Slide or press Enter to turn the board off">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="sb-list-label" id="listLabel">Conversations</div>
@@ -532,26 +552,28 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
       <div class="composer" id="composer">
         <div id="composerIdle" class="rec-row">
-          <div class="plus-wrap">
-            <button class="icon-btn plus-btn" id="plusBtn" aria-label="Add photo, camera or urgent flag" aria-expanded="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-            <div class="plus-menu" id="plusMenu">
-              <button class="plus-opt" id="optPhoto" type="button">
-                <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
-                <span class="plus-opt-label">Photo</span>
+          <div class="composer-pill">
+            <div class="plus-wrap">
+              <button class="icon-btn plus-btn" id="plusBtn" aria-label="Add photo, camera or urgent flag" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
               </button>
-              <button class="plus-opt" id="optCamera" type="button">
-                <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/><circle cx="12" cy="13.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
-                <span class="plus-opt-label">Camera</span>
-              </button>
-              <button class="plus-opt" id="optUrgent" type="button">
-                <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" stroke-width="1.7"/><path d="M12 9v4.3" stroke-width="1.7"/><circle cx="12" cy="16.6" r="1" fill="currentColor" stroke="none"/></svg></span>
-                <span class="plus-opt-label">Urgent</span>
-              </button>
+              <div class="plus-menu" id="plusMenu">
+                <button class="plus-opt" id="optPhoto" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
+                  <span class="plus-opt-label">Photo</span>
+                </button>
+                <button class="plus-opt" id="optCamera" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/><circle cx="12" cy="13.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
+                  <span class="plus-opt-label">Camera</span>
+                </button>
+                <button class="plus-opt" id="optUrgent" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" stroke-width="1.7"/><path d="M12 9v4.3" stroke-width="1.7"/><circle cx="12" cy="16.6" r="1" fill="currentColor" stroke="none"/></svg></span>
+                  <span class="plus-opt-label">Urgent</span>
+                </button>
+              </div>
             </div>
+            <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
           </div>
-          <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
           <button class="send-btn mic-quick" id="micQuickBtn" aria-label="Record a voice note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg>
           </button>
@@ -1749,13 +1771,17 @@ function startPolling(){
 
 /* ---------------- Auth ---------------- */
 var loginScreen = document.getElementById("loginScreen");
+var setupScreen = document.getElementById("setupScreen");
 var appRoot = document.getElementById("app");
 var loginForm = document.getElementById("loginForm");
 var loginName = document.getElementById("loginName");
 var loginPin = document.getElementById("loginPin");
 var loginBtn = document.getElementById("loginBtn");
 var loginError = document.getElementById("loginError");
-var signedInName = document.getElementById("signedInName");
+var setupForm = document.getElementById("setupForm");
+var setupName = document.getElementById("setupName");
+var setupBtn = document.getElementById("setupBtn");
+var setupError = document.getElementById("setupError");
 var sbSub = document.getElementById("sbSub");
 var switcherWrap = document.getElementById("switcherWrap");
 var adminBtn = document.getElementById("adminBtn");
@@ -1767,8 +1793,8 @@ function enterApp(staff){
   AUTH.staff = staff;
   STATE.self = staff.departmentId;
   loginScreen.hidden = true;
+  setupScreen.hidden = true;
   appRoot.hidden = false;
-  signedInName.textContent = staff.name;
   sbSub.textContent = "Noir House · " + (DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "Department heads");
   switcherWrap.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
@@ -1776,11 +1802,20 @@ function enterApp(staff){
   startPolling();
 }
 
+function showSetup(staff){
+  loginScreen.hidden = true;
+  appRoot.hidden = true;
+  setupScreen.hidden = false;
+  setupName.value = staff.name || "";
+  setTimeout(function(){ setupName.focus(); setupName.select(); }, 30);
+}
+
 function showLogin(message){
   AUTH.token = null;
   AUTH.staff = null;
   try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
   appRoot.hidden = true;
+  setupScreen.hidden = true;
   loginScreen.hidden = false;
   loginError.textContent = message || "";
   loginPin.value = "";
@@ -1797,12 +1832,29 @@ loginForm.addEventListener("submit", function(e){
   apiSend('/api/auth/login', 'POST', { name: name, pin: pin }).then(function(res){
     AUTH.token = res.token;
     try{ localStorage.setItem(TOKEN_KEY, res.token); }catch(e){}
-    enterApp(res.staff);
+    if(!res.staff.profileComplete){
+      showSetup(res.staff);
+    } else {
+      enterApp(res.staff);
+    }
   }).catch(function(err){
     loginError.textContent = err.message || "Sign in failed";
     loginPin.value = "";
     loginPin.focus();
   }).finally(function(){ loginBtn.disabled = false; });
+});
+
+setupForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var name = setupName.value.trim();
+  if(!name) return;
+  setupBtn.disabled = true;
+  setupError.textContent = "";
+  apiSend('/api/profile', 'PATCH', { name: name }).then(function(res){
+    enterApp(res.staff);
+  }).catch(function(err){
+    setupError.textContent = err.message || "Couldn't save your profile";
+  }).finally(function(){ setupBtn.disabled = false; });
 });
 
 logoutBtn.addEventListener("click", function(){
@@ -1818,7 +1870,11 @@ logoutBtn.addEventListener("click", function(){
   if(!token){ showLogin(); return; }
   AUTH.token = token;
   apiGet('/api/auth/me').then(function(res){
-    enterApp(res.staff);
+    if(!res.staff.profileComplete){
+      showSetup(res.staff);
+    } else {
+      enterApp(res.staff);
+    }
   }).catch(function(){
     showLogin();
   });

@@ -55,7 +55,7 @@ function rowToMessage(row) {
   };
 }
 function rowToStaff(row) {
-  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at };
+  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete };
 }
 
 async function readJsonBody(request) {
@@ -165,6 +165,23 @@ export default {
       if (method === "GET" && p === "/api/staff") {
         const rows = await env.DB.prepare("SELECT * FROM staff ORDER BY name").all();
         return json({ staff: rows.results.map(rowToStaff) });
+      }
+
+      // ---- Self-service profile setup: any signed-in user can edit their own name/PIN ----
+      if (method === "PATCH" && p === "/api/profile") {
+        const id = request._staff.id;
+        const body = await readJsonBody(request);
+        if (typeof body.name === "string" && body.name.trim()) {
+          await env.DB.prepare("UPDATE staff SET name = ? WHERE id = ?").bind(body.name.trim(), id).run();
+        }
+        if (typeof body.pin === "string" && body.pin) {
+          if (!PIN_RE.test(body.pin)) return json({ error: "PIN must be 4-6 digits" }, 400);
+          const salt = randomSaltHex();
+          await env.DB.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(await hashPin(body.pin, salt), salt, id).run();
+        }
+        await env.DB.prepare("UPDATE staff SET profile_complete = 1 WHERE id = ?").bind(id).run();
+        const row = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(id).first();
+        return json({ staff: rowToStaff(row) });
       }
 
       // ---- Staff management (admin only beyond this point) ----
