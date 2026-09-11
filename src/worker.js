@@ -199,23 +199,25 @@ async function insertMessage(env, ctx, opts) {
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
-function rowToMessage(row) {
+function rowToMessage(row, revealDeleted) {
   const deleted = !!row.deleted_at;
+  const hide = deleted && !revealDeleted;
   return {
     id: row.id,
     from: row.from_dept,
     to: row.to_dept,
     type: row.type,
-    body: deleted ? null : row.body,
-    fileName: deleted ? null : row.file_name,
-    fileUrl: deleted || !row.file_path ? null : "/uploads/" + row.file_path,
-    fileSize: deleted ? null : row.file_size,
-    duration: deleted ? null : row.duration,
-    transcript: deleted ? null : row.transcript,
+    body: hide ? null : row.body,
+    fileName: hide ? null : row.file_name,
+    fileUrl: hide || !row.file_path ? null : "/uploads/" + row.file_path,
+    fileSize: hide ? null : row.file_size,
+    duration: hide ? null : row.duration,
+    transcript: hide ? null : row.transcript,
     urgent: !!row.urgent,
     status: row.status,
     createdAt: row.created_at,
     deleted: deleted,
+    deletedAt: deleted && revealDeleted ? row.deleted_at : undefined,
   };
 }
 function rowToStaff(row) {
@@ -472,7 +474,7 @@ export default {
           ).bind(self, other).first();
           conversations.push({
             departmentId: other,
-            lastMessage: last ? rowToMessage(last) : null,
+            lastMessage: last ? rowToMessage(last, request._staff.is_admin) : null,
             unreadCount: unread.n,
             hasUrgentUnread: urgentUnread.n > 0,
           });
@@ -488,7 +490,7 @@ export default {
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
         ).bind(self, other, other, self).all();
-        return json({ messages: rows.results.map(rowToMessage) });
+        return json({ messages: rows.results.map((r) => rowToMessage(r, request._staff.is_admin)) });
       }
 
       if (method === "POST" && p === "/api/messages/read") {

@@ -40,23 +40,25 @@ function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
 
-function rowToMessage(row) {
+function rowToMessage(row, revealDeleted) {
   const deleted = !!row.deleted_at;
+  const hide = deleted && !revealDeleted;
   return {
     id: row.id,
     from: row.from_dept,
     to: row.to_dept,
     type: row.type,
-    body: deleted ? null : row.body,
-    fileName: deleted ? null : row.file_name,
-    fileUrl: deleted || !row.file_path ? null : '/uploads/' + row.file_path,
-    fileSize: deleted ? null : row.file_size,
-    duration: deleted ? null : row.duration,
-    transcript: deleted ? null : row.transcript,
+    body: hide ? null : row.body,
+    fileName: hide ? null : row.file_name,
+    fileUrl: hide || !row.file_path ? null : '/uploads/' + row.file_path,
+    fileSize: hide ? null : row.file_size,
+    duration: hide ? null : row.duration,
+    transcript: hide ? null : row.transcript,
     urgent: !!row.urgent,
     status: row.status,
     createdAt: row.created_at,
     deleted: deleted,
+    deletedAt: deleted && revealDeleted ? row.deleted_at : undefined,
   };
 }
 
@@ -79,7 +81,7 @@ function getDepartments() {
   return rows.map(rowToDepartment);
 }
 
-function getConversations(self) {
+function getConversations(self, revealDeleted) {
   const others = DEPARTMENTS.filter((d) => d.id !== self);
   const lastMsgStmt = db.prepare(`
     SELECT * FROM messages
@@ -98,7 +100,7 @@ function getConversations(self) {
     const urgentUnread = urgentUnreadStmt.get(self, d.id).n;
     return {
       departmentId: d.id,
-      lastMessage: last ? rowToMessage(last) : null,
+      lastMessage: last ? rowToMessage(last, revealDeleted) : null,
       unreadCount: unread,
       hasUrgentUnread: urgentUnread > 0,
     };
@@ -300,19 +302,21 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/conversations') {
       const self = url.searchParams.get('self');
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
-      return send(res, 200, { conversations: getConversations(self) });
+      const requester = staffFromToken(req);
+      return send(res, 200, { conversations: getConversations(self, requester.is_admin) });
     }
 
     if (req.method === 'GET' && p === '/api/messages') {
       const self = url.searchParams.get('self');
       const other = url.searchParams.get('with');
       if (!DEPT_IDS.has(self) || !DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      const requester = staffFromToken(req);
       const rows = db.prepare(`
         SELECT * FROM messages
         WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?)
         ORDER BY created_at ASC
       `).all(self, other, other, self);
-      return send(res, 200, { messages: rows.map(rowToMessage) });
+      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, requester.is_admin)) });
     }
 
     if (req.method === 'POST' && p === '/api/messages/read') {

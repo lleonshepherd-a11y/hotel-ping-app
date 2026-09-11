@@ -258,6 +258,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-delete-btn:hover{color:var(--urgent);opacity:1}
 .msg-delete-btn svg{width:11px;height:11px}
 .deleted-bubble{background:var(--surface-2) !important;color:var(--text-faint) !important;font-style:italic;font-size:13.5px}
+.audit-deleted-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--urgent);margin-bottom:3px}
 .msg-status .ticks{display:inline-flex;color:var(--text-faint)}
 .msg-status.read .ticks{color:var(--accent)}
 .msg-status .ticks svg{width:15px;height:10px}
@@ -826,7 +827,8 @@ function mapServerMessage(row, self){
     fileSize: row.fileSize || undefined,
     duration: row.duration || undefined,
     transcript: row.transcript || undefined,
-    deleted: !!row.deleted
+    deleted: !!row.deleted,
+    deletedAt: row.deletedAt ? new Date(row.deletedAt).getTime() : undefined
   };
 }
 
@@ -1250,7 +1252,9 @@ function buildMessageRow(m, groupEnd){
   var wrap = document.createElement("div");
   wrap.className = "bubble-wrap";
 
-  if(m.deleted){
+  var revealedDeleted = m.deleted && (m.text || m.url || m.transcript || m.dataUrl);
+
+  if(m.deleted && !revealedDeleted){
     var delBubble = document.createElement("div");
     delBubble.className = "bubble deleted-bubble";
     delBubble.textContent = "This message was deleted";
@@ -1261,6 +1265,13 @@ function buildMessageRow(m, groupEnd){
     wrap.appendChild(delMeta);
     row.appendChild(wrap);
     return row;
+  }
+
+  if(revealedDeleted){
+    var auditTag = document.createElement("div");
+    auditTag.className = "audit-deleted-tag";
+    auditTag.textContent = "Deleted" + (m.deletedAt ? " " + fmtClock(m.deletedAt) : "") + " · visible to management only";
+    wrap.appendChild(auditTag);
   }
 
   if(m.urgent){
@@ -1340,19 +1351,21 @@ function buildMessageRow(m, groupEnd){
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (m.status === "read" ? " read" : "");
-    var delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "msg-delete-btn";
-    delBtn.setAttribute("aria-label", "Delete message");
-    delBtn.title = "Delete";
-    delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
-    delBtn.addEventListener("click", function(){ confirmDeleteMessage(m.id); });
+    if(!m.deleted){
+      var delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "msg-delete-btn";
+      delBtn.setAttribute("aria-label", "Delete message");
+      delBtn.title = "Delete";
+      delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+      delBtn.addEventListener("click", function(){ confirmDeleteMessage(m.id); });
+      meta.appendChild(delBtn);
+    }
     var timeSpan = document.createElement("span");
     timeSpan.textContent = fmtClock(m.t);
     var ticks = document.createElement("span");
     ticks.className = "ticks";
     ticks.innerHTML = TICK_SVG;
-    meta.appendChild(delBtn);
     meta.appendChild(timeSpan);
     meta.appendChild(ticks);
   } else {
