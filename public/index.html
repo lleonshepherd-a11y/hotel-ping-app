@@ -59,7 +59,8 @@ input,textarea{font-family:inherit}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:rgba(128,128,140,.28);border-radius:8px}
 ::-webkit-scrollbar-track{background:transparent}
-:focus-visible{outline:none}
+:focus,:focus-visible{outline:none}
+textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important} }
 
 .app{
