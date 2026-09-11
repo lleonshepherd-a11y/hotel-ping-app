@@ -86,6 +86,16 @@ db.exec(`
     updated_at TEXT NOT NULL,
     PRIMARY KEY (from_dept, to_dept)
   );
+
+  CREATE TABLE IF NOT EXISTS handover_notes (
+    id TEXT PRIMARY KEY,
+    department_id TEXT NOT NULL,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_handover_dept ON handover_notes(department_id, created_at);
 `);
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);

@@ -69,6 +69,16 @@ CREATE TABLE IF NOT EXISTS typing_status (
   PRIMARY KEY (from_dept, to_dept)
 );
 
+CREATE TABLE IF NOT EXISTS handover_notes (
+  id TEXT PRIMARY KEY,
+  department_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  staff_name TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_handover_dept ON handover_notes(department_id, created_at);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Front of House', NULL, 1),

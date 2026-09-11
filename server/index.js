@@ -36,6 +36,9 @@ function readJsonBody(req) {
   });
 }
 
+function rowToHandoverNote(row) {
+  return { id: row.id, departmentId: row.department_id, staffId: row.staff_id, staffName: row.staff_name, body: row.body, createdAt: row.created_at };
+}
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
@@ -471,6 +474,43 @@ const server = http.createServer(async (req, res) => {
       const cutoff = new Date(Date.now() - 6000).toISOString();
       const rows = db.prepare('SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?').all(self, cutoff);
       return send(res, 200, { typing: rows.map((r) => r.from_dept) });
+    }
+
+    if (req.method === 'GET' && p === '/api/handover') {
+      const dept = url.searchParams.get('department');
+      if (!DEPT_IDS.has(dept)) return send(res, 400, { error: 'Unknown department' });
+      const requester = staffFromToken(req);
+      if (dept !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Not part of this department' });
+      }
+      const rows = db.prepare('SELECT * FROM handover_notes WHERE department_id = ? ORDER BY created_at DESC LIMIT 30').all(dept);
+      return send(res, 200, { notes: rows.map(rowToHandoverNote) });
+    }
+
+    if (req.method === 'POST' && p === '/api/handover') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const text = String(body.body || '').trim();
+      if (!text) return send(res, 400, { error: 'Note text is required' });
+      const dept = requester.department_id;
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO handover_notes (id, department_id, staff_id, staff_name, body, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, dept, requester.id, requester.name, text, now);
+      const row = db.prepare('SELECT * FROM handover_notes WHERE id = ?').get(id);
+      return send(res, 201, { note: rowToHandoverNote(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/handover/')) {
+      const id = decodeURIComponent(p.slice('/api/handover/'.length));
+      const existing = db.prepare('SELECT * FROM handover_notes WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Note not found' });
+      const requester = staffFromToken(req);
+      if (existing.staff_id !== requester.id && !requester.is_admin) {
+        return send(res, 403, { error: 'You can only remove your own notes' });
+      }
+      db.prepare('DELETE FROM handover_notes WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p === '/api/escalations/check') {

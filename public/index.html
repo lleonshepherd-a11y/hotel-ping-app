@@ -476,6 +476,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-form input[name="pin"]{width:90px}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
+.handover-list{display:flex;flex-direction:column;gap:2px;margin-top:16px;max-height:340px;overflow-y:auto}
+.handover-note{padding:11px 0;border-bottom:1px solid var(--border)}
+.handover-note:last-child{border-bottom:none}
+.handover-note-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:3px}
+.handover-note-author{font-weight:700;font-size:12.5px}
+.handover-note-time{font-size:11px;color:var(--text-faint)}
+.handover-note-body{font-size:13.5px;line-height:1.4;white-space:pre-wrap}
+.handover-note-del{border:none;background:none;color:var(--text-faint);padding:2px;display:inline-flex}
+.handover-note-del:hover{color:var(--urgent)}
+.handover-note-del svg{width:12px;height:12px}
+.handover-empty{font-size:13px;color:var(--text-faint);padding:14px 0;text-align:center}
 .forward-dept-list{display:flex;flex-direction:column;gap:2px}
 .forward-dept-opt{display:flex;align-items:center;gap:12px;border:none;background:none;padding:10px 6px;border-radius:12px;text-align:left;font-size:14.5px;font-weight:600;color:var(--text)}
 .forward-dept-opt:hover{background:var(--surface-2)}
@@ -601,6 +612,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </button>
         <button class="admin-btn" id="broadcastBtn" hidden type="button" aria-label="Broadcast to all departments" title="Broadcast to all departments">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v3a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a3 3 0 0 1 0 6"/><path d="M18 6a7 7 0 0 1 0 12"/></svg>
+        </button>
+        <button class="admin-btn" id="handoverBtn" type="button" aria-label="Shift handover notes" title="Shift handover notes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M9 13h6M9 17h4"/></svg>
+          Handover
         </button>
       </div>
       <div class="duty-row">
@@ -768,6 +783,24 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button type="submit" class="admin-add-btn broadcast-send-btn" id="broadcastSendBtn">Send to all departments</button>
       <div class="admin-add-error" id="broadcastError"></div>
     </form>
+  </div>
+</div>
+
+<div class="admin-overlay" id="handoverOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Shift handover notes</h2>
+      <button class="admin-close" id="handoverClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint" id="handoverDeptLabel"></p>
+    <form id="handoverForm">
+      <textarea id="handoverText" placeholder="What does the next shift need to know?" required></textarea>
+      <button type="submit" class="admin-add-btn" id="handoverSendBtn">Add note</button>
+      <div class="admin-add-error" id="handoverError"></div>
+    </form>
+    <div class="handover-list" id="handoverList"></div>
   </div>
 </div>
 
@@ -2676,6 +2709,91 @@ broadcastForm.addEventListener("submit", function(e){
   }).catch(function(err){
     broadcastError.textContent = err.message || "Couldn't send broadcast.";
   }).finally(function(){ broadcastSendBtn.disabled = false; });
+});
+
+var handoverBtn = document.getElementById("handoverBtn");
+var handoverOverlay = document.getElementById("handoverOverlay");
+var handoverClose = document.getElementById("handoverClose");
+var handoverDeptLabel = document.getElementById("handoverDeptLabel");
+var handoverForm = document.getElementById("handoverForm");
+var handoverText = document.getElementById("handoverText");
+var handoverSendBtn = document.getElementById("handoverSendBtn");
+var handoverError = document.getElementById("handoverError");
+var handoverList = document.getElementById("handoverList");
+
+function fmtNoteTime(ts){
+  return new Date(ts).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+}
+
+function renderHandoverNotes(notes){
+  if(!notes.length){
+    handoverList.innerHTML = '<div class="handover-empty">No handover notes yet.</div>';
+    return;
+  }
+  handoverList.innerHTML = "";
+  notes.forEach(function(n){
+    var row = document.createElement("div");
+    row.className = "handover-note";
+    var canDelete = n.staffId === AUTH.staff.id || AUTH.staff.isAdmin;
+    row.innerHTML =
+      '<div class="handover-note-head">'+
+        '<span class="handover-note-author">'+esc(n.staffName)+'</span>'+
+        '<span class="handover-note-time">'+fmtNoteTime(n.createdAt)+'</span>'+
+      '</div>'+
+      '<div class="handover-note-body">'+esc(n.body)+'</div>';
+    if(canDelete){
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "handover-note-del";
+      del.setAttribute("aria-label", "Remove note");
+      del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+      del.addEventListener("click", function(){
+        if(!confirm("Remove this handover note?")) return;
+        apiDelete('/api/handover/' + encodeURIComponent(n.id)).then(function(){
+          notes = notes.filter(function(x){ return x.id !== n.id; });
+          renderHandoverNotes(notes);
+        }).catch(function(){});
+      });
+      row.querySelector(".handover-note-head").appendChild(del);
+    }
+    handoverList.appendChild(row);
+  });
+}
+
+function loadHandoverNotes(){
+  return apiGet('/api/handover?department=' + encodeURIComponent(STATE.self)).then(function(res){
+    renderHandoverNotes(res.notes);
+  }).catch(function(){
+    handoverList.innerHTML = '<div class="handover-empty">Couldn\'t load handover notes.</div>';
+  });
+}
+
+handoverBtn.addEventListener("click", function(){
+  handoverDeptLabel.textContent = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self) + "'s shift notes — visible to everyone in this department.";
+  handoverText.value = "";
+  handoverError.textContent = "";
+  handoverForm.hidden = isViewOnly();
+  handoverOverlay.hidden = false;
+  handoverList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  loadHandoverNotes();
+  if(!isViewOnly()) setTimeout(function(){ handoverText.focus(); }, 30);
+});
+handoverClose.addEventListener("click", function(){ handoverOverlay.hidden = true; });
+handoverOverlay.addEventListener("click", function(e){ if(e.target === handoverOverlay) handoverOverlay.hidden = true; });
+
+handoverForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var text = handoverText.value.trim();
+  if(!text) return;
+  if(containsProfanity(text)){ handoverError.textContent = "Let's keep it professional. That note can't be posted."; return; }
+  handoverSendBtn.disabled = true;
+  handoverError.textContent = "";
+  apiSend('/api/handover', 'POST', { body: text }).then(function(){
+    handoverText.value = "";
+    return loadHandoverNotes();
+  }).catch(function(err){
+    handoverError.textContent = err.message || "Couldn't post that note.";
+  }).finally(function(){ handoverSendBtn.disabled = false; });
 });
 
 if("serviceWorker" in navigator){
