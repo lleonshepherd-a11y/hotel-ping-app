@@ -107,8 +107,7 @@ input,textarea{font-family:inherit}
 .sw-avatar svg{width:16px;height:16px}
 
 .duty-row{margin:16px 16px 0}
-.duty-caption{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
-.duty-caption span:first-child{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint)}
+.duty-caption{display:flex;align-items:center;margin-bottom:9px}
 .duty-status-pill{font-size:10px;font-weight:800;padding:2px 9px;border-radius:10px;background:var(--active-tint-strong);color:var(--accent);transition:background .2s ease,color .2s ease}
 .duty-status-pill.off{background:var(--urgent-tint);color:var(--urgent)}
 
@@ -480,7 +479,6 @@ input,textarea{font-family:inherit}
 
     <div class="duty-row">
       <div class="duty-caption">
-        <span>Notifications</span>
         <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
       </div>
       <div class="duty-switch-row">
@@ -1743,10 +1741,25 @@ function startPolling(){
   if(pollTimer) return;
   pollTimer = setInterval(function(){
     if(STATE.loading) return;
+    var prevIds = {};
+    Object.keys(STATE.data).forEach(function(id){
+      prevIds[id] = {};
+      (STATE.data[id] || []).forEach(function(m){ prevIds[id][m.id] = true; });
+    });
     buildData(STATE.self).then(function(data){
+      var hasNew = false, hasUrgent = false;
+      Object.keys(data).forEach(function(id){
+        (data[id] || []).forEach(function(m){
+          if(m.from !== "self" && (!prevIds[id] || !prevIds[id][m.id])){
+            hasNew = true;
+            if(m.urgent) hasUrgent = true;
+          }
+        });
+      });
       STATE.data = data;
       renderList();
       if(STATE.active) renderThread();
+      if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
     }).catch(function(){});
   }, 4000);
 }
