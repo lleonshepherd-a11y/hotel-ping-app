@@ -494,6 +494,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .handover-note-del:hover{color:var(--urgent);opacity:1;background:var(--urgent-tint)}
 .handover-note-del svg{width:12px;height:12px}
 .handover-empty{font-size:13px;color:var(--text-faint);padding:20px 0;text-align:center}
+.feed-list{display:flex;flex-direction:column;gap:2px;margin-top:14px;max-height:420px;overflow-y:auto}
+.feed-row{display:flex;align-items:flex-start;gap:11px;padding:11px 6px;border-radius:12px;text-align:left;border:none;background:none;width:100%}
+.feed-row:hover{background:var(--surface-2)}
+.feed-avatar{flex:none;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
+.feed-avatar svg{width:15px;height:15px}
+.feed-body{flex:1;min-width:0}
+.feed-route{font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.feed-route .arrow{color:var(--text-faint);font-weight:400}
+.feed-text{font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.feed-text.deleted{font-style:italic;color:var(--text-faint)}
+.feed-time{flex:none;font-size:11px;color:var(--text-faint);white-space:nowrap;padding-top:2px}
 .forward-dept-list{display:flex;flex-direction:column;gap:2px}
 .forward-dept-opt{display:flex;align-items:center;gap:12px;border:none;background:none;padding:10px 6px;border-radius:12px;text-align:left;font-size:14.5px;font-weight:600;color:var(--text)}
 .forward-dept-opt:hover{background:var(--surface-2)}
@@ -618,6 +629,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="sb-menu-row" id="adminBtn" hidden type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
         <span class="sb-menu-label">Manage staff</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <button class="sb-menu-row" id="feedBtn" hidden type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+        <span class="sb-menu-label">Activity feed</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="broadcastBtn" hidden type="button">
@@ -798,6 +814,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button type="submit" class="admin-add-btn broadcast-send-btn" id="broadcastSendBtn">Send to all departments</button>
       <div class="admin-add-error" id="broadcastError"></div>
     </form>
+  </div>
+</div>
+
+<div class="admin-overlay" id="feedOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Activity feed</h2>
+      <button class="admin-close" id="feedClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Every conversation across the hotel, most recent first. Tap one to open it.</p>
+    <div class="feed-list" id="feedList"></div>
   </div>
 </div>
 
@@ -2532,6 +2561,7 @@ function enterApp(staff){
   switcherWrap.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
+  feedBtn.hidden = !staff.isAdmin;
   boot();
   startPolling();
   checkPushPrompt();
@@ -2884,6 +2914,66 @@ handoverForm.addEventListener("submit", function(e){
     handoverError.textContent = err.message || "Couldn't post that note.";
   }).finally(function(){ handoverSendBtn.disabled = false; });
 });
+
+var feedBtn = document.getElementById("feedBtn");
+var feedOverlay = document.getElementById("feedOverlay");
+var feedClose = document.getElementById("feedClose");
+var feedList = document.getElementById("feedList");
+
+function openFeedItem(m){
+  feedOverlay.hidden = true;
+  var targetSelf = m.from, targetOther = m.to;
+  if(STATE.self === targetSelf){
+    openThread(targetOther);
+    return;
+  }
+  STATE.self = targetSelf;
+  STATE.loading = true;
+  renderSwitcher();
+  updateComposerLock();
+  buildData(targetSelf).then(function(data){
+    STATE.data = mergePendingIntoData(data);
+    renderList();
+    renderDuty();
+    openThread(targetOther);
+  }).finally(function(){ STATE.loading = false; });
+}
+
+function renderFeed(messages){
+  if(!messages.length){
+    feedList.innerHTML = '<div class="handover-empty">No messages yet.</div>';
+    return;
+  }
+  feedList.innerHTML = "";
+  messages.forEach(function(m){
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "feed-row";
+    var preview = messagePreviewLabel(m);
+    row.innerHTML =
+      '<span class="feed-avatar" style="background:'+avatarGradient(m.from)+'">'+iconSvg(m.from)+'</span>'+
+      '<span class="feed-body">'+
+        '<span class="feed-route">'+esc(DEPTS[m.from] ? DEPTS[m.from].name : m.from)+
+          '<span class="arrow">→</span>'+esc(DEPTS[m.to] ? DEPTS[m.to].name : m.to)+'</span>'+
+        '<span class="feed-text'+(m.deleted?' deleted':'')+'">'+esc(preview)+'</span>'+
+      '</span>'+
+      '<span class="feed-time">'+fmtRelative(m.t)+'</span>';
+    row.addEventListener("click", function(){ openFeedItem(m); });
+    feedList.appendChild(row);
+  });
+}
+
+feedBtn.addEventListener("click", function(){
+  feedList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  feedOverlay.hidden = false;
+  apiGet('/api/feed?limit=60').then(function(res){
+    renderFeed(res.messages.map(function(row){ return mapServerMessage(row, "__feed__"); }));
+  }).catch(function(){
+    feedList.innerHTML = '<div class="handover-empty">Couldn\'t load the feed.</div>';
+  });
+});
+feedClose.addEventListener("click", function(){ feedOverlay.hidden = true; });
+feedOverlay.addEventListener("click", function(e){ if(e.target === feedOverlay) feedOverlay.hidden = true; });
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", function(){

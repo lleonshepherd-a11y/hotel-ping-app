@@ -545,6 +545,16 @@ export default {
         return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }
 
+      if (method === "GET" && p === "/api/feed") {
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const limit = Math.min(parseInt(url.searchParams.get("limit") || "60", 10) || 60, 200);
+        const rows = await env.DB.prepare(
+          `SELECT * FROM messages ORDER BY created_at DESC LIMIT ?`
+        ).bind(limit).all();
+        return json({ messages: rows.results.map((r) => rowToMessage(r, r.from_dept, true)).filter(Boolean) });
+      }
+
       if (method === "POST" && p === "/api/messages/read") {
         const body = await readJsonBody(request);
         if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return json({ error: "Unknown department" }, 400);

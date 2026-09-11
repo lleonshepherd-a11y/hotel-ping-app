@@ -347,6 +347,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
     }
 
+    if (req.method === 'GET' && p === '/api/feed') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const limit = Math.min(parseInt(url.searchParams.get('limit') || '60', 10) || 60, 200);
+      const rows = db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT ?').all(limit);
+      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, r.from_dept, true)).filter(Boolean) });
+    }
+
     if (req.method === 'POST' && p === '/api/messages/read') {
       const body = await readJsonBody(req);
       if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return send(res, 400, { error: 'Unknown department' });
