@@ -81,6 +81,9 @@ if (!messageColumns.includes('escalated_at')) {
 if (!messageColumns.includes('broadcast_id')) {
   db.exec('ALTER TABLE messages ADD COLUMN broadcast_id TEXT');
 }
+if (!messageColumns.includes('room_number')) {
+  db.exec('ALTER TABLE messages ADD COLUMN room_number TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (

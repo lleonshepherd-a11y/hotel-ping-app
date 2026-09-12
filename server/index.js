@@ -72,6 +72,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completedAt: row.completed_at || undefined,
     completedBy: row.completed_by || undefined,
     broadcastId: row.broadcast_id || undefined,
+    roomNumber: row.room_number || undefined,
   };
 }
 
@@ -95,12 +96,12 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null
   );
   return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
 }
@@ -365,10 +366,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId } = body;
+      const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber } = body;
       if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
       if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
+      if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
 
       let filePathOnDisk = null;
       let fileSize = null;
@@ -389,6 +391,7 @@ const server = http.createServer(async (req, res) => {
         duration: duration || null, transcript: transcript?.trim() || null,
         urgent: !!urgent,
         replyToId: replyToId || null,
+        roomNumber: roomNumber ? String(roomNumber).trim() : null,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }

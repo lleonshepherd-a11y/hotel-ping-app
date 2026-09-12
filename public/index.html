@@ -326,6 +326,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .reply-preview-bar-text{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-preview-bar-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:4px;display:flex;align-items:center}
 .reply-preview-bar-close svg{width:16px;height:16px}
+.room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
+.room-tag-input::placeholder{color:var(--text-faint)}
+.room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -779,6 +782,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </button>
       </div>
 
+      <div class="reply-preview-bar" id="roomTagBar" hidden>
+        <div class="reply-preview-bar-accent"></div>
+        <div class="reply-preview-bar-body">
+          <div class="reply-preview-bar-name">Room number</div>
+          <input type="text" id="roomTagInput" class="room-tag-input" placeholder="e.g. 204" maxlength="10">
+        </div>
+        <button type="button" class="reply-preview-bar-close" id="roomTagClose" aria-label="Remove room tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
       <div class="composer-locked" id="composerLocked" hidden></div>
 
       <div class="composer" id="composer">
@@ -800,6 +814,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                 <button class="plus-opt" id="optUrgent" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" stroke-width="1.7"/><path d="M12 9v4.3" stroke-width="1.7"/><circle cx="12" cy="16.6" r="1" fill="currentColor" stroke="none"/></svg></span>
                   <span class="plus-opt-label">Urgent</span>
+                </button>
+                <button class="plus-opt" id="optRoom" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6.5a2.5 2.5 0 0 1 2.5-2.5H12v17" stroke-width="1.7"/><path d="M12 8h5a2 2 0 0 1 2 2v11" stroke-width="1.7"/><path d="M2 21h20" stroke-width="1.7"/><circle cx="9" cy="13" r="0.9" fill="currentColor" stroke="none"/></svg></span>
+                  <span class="plus-opt-label">Room</span>
                 </button>
               </div>
             </div>
@@ -1097,7 +1115,8 @@ function mapServerMessage(row, self){
     completed: !!row.completed,
     completedAt: row.completedAt ? new Date(row.completedAt).getTime() : undefined,
     completedBy: row.completedBy || undefined,
-    broadcastId: row.broadcastId || undefined
+    broadcastId: row.broadcastId || undefined,
+    roomNumber: row.roomNumber || undefined
   };
 }
 
@@ -1628,6 +1647,22 @@ function clearReplyBar(){
 }
 replyPreviewClose.addEventListener("click", clearReplyBar);
 
+var roomTagBar = document.getElementById("roomTagBar");
+var roomTagInput = document.getElementById("roomTagInput");
+var roomTagClose = document.getElementById("roomTagClose");
+function showRoomTagBar(){
+  roomTagBar.hidden = false;
+  roomTagInput.focus();
+}
+function clearRoomTagBar(){
+  roomTagInput.value = "";
+  roomTagBar.hidden = true;
+}
+roomTagClose.addEventListener("click", clearRoomTagBar);
+roomTagInput.addEventListener("keydown", function(e){
+  if(e.key === "Enter"){ e.preventDefault(); msgInput.focus(); }
+});
+
 var appToast = document.getElementById("appToast");
 var toastTimer = null;
 function showToast(text){
@@ -1917,6 +1952,13 @@ function buildMessageRow(m, groupEnd, msgsById){
     wrap.appendChild(doneTag);
   }
 
+  if(m.roomNumber){
+    var roomTagEl = document.createElement("div");
+    roomTagEl.className = "room-msg-tag";
+    roomTagEl.textContent = "🛏 Room " + m.roomNumber;
+    wrap.appendChild(roomTagEl);
+  }
+
   if(m.replyTo && msgsById && msgsById[m.replyTo]){
     var origMsg = msgsById[m.replyTo];
     var quote = document.createElement("div");
@@ -2167,6 +2209,7 @@ var optPhoto = document.getElementById("optPhoto");
 var optCamera = document.getElementById("optCamera");
 var micQuickBtn = document.getElementById("micQuickBtn");
 var optUrgent = document.getElementById("optUrgent");
+var optRoom = document.getElementById("optRoom");
 var fileInput = document.getElementById("fileInput");
 var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
@@ -2270,6 +2313,10 @@ optUrgent.addEventListener("click", function(){
   refreshSendState();
   closePlusMenu();
 });
+optRoom.addEventListener("click", function(){
+  closePlusMenu();
+  showRoomTagBar();
+});
 
 function handleAttachedFile(file){
   if(!file) return;
@@ -2351,7 +2398,7 @@ function pendingMessageFromQueueItem(item){
     id: item.localId, from: "self", type: "text", text: item.payload.text,
     urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
     replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
-    deleted: false, pending: true
+    deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined
   };
 }
 function queueOfflineMessage(deptId, payload){
@@ -2420,6 +2467,9 @@ function doSend(){
   var payload = { from: STATE.self, to: deptId, urgent: wasUrgent };
   if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
   clearReplyBar();
+  var roomTag = roomTagInput.value.trim();
+  if(roomTag) payload.roomNumber = roomTag;
+  clearRoomTagBar();
   var sendPromise;
   if(attachment && attachment.type === "image"){
     payload.type = "image"; payload.text = text; payload.fileName = attachment.name;

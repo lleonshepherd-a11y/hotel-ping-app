@@ -217,12 +217,12 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -277,6 +277,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completedAt: row.completed_at || undefined,
     completedBy: row.completed_by || undefined,
     broadcastId: row.broadcast_id || undefined,
+    roomNumber: row.room_number || undefined,
   };
 }
 function rowToStaff(row) {
@@ -571,10 +572,11 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId } = body;
+        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber } = body;
         if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
+        if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
 
         let filePathOnDisk = null;
         let fileSize = null;
@@ -597,6 +599,7 @@ export default {
           duration: duration || null, transcript: transcript && transcript.trim() ? transcript.trim() : null,
           urgent: !!urgent,
           replyToId: replyToId || null,
+          roomNumber: roomNumber ? String(roomNumber).trim() : null,
         });
 
         return json({ message: rowToMessage(row, from, false) }, 201);
