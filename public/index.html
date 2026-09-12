@@ -326,6 +326,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .reply-preview-bar-text{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-preview-bar-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:4px;display:flex;align-items:center}
 .reply-preview-bar-close svg{width:16px;height:16px}
+#taskTagClose{color:var(--accent)}
 .room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
 .room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
@@ -384,8 +385,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .plus-menu{
   position:absolute;bottom:calc(100% + 10px);left:0;
   display:flex;gap:6px;padding:8px;
-  background:var(--surface);border-radius:20px;
-  box-shadow:0 10px 28px -8px rgba(20,20,16,.28), 0 2px 8px rgba(20,20,16,.08), inset 0 0 0 1px var(--border);
+  background:rgba(246,246,244,.72);border-radius:20px;
+  backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
+  box-shadow:0 10px 28px -8px rgba(20,20,16,.28), 0 2px 8px rgba(20,20,16,.08), inset 0 0 0 1px rgba(255,255,255,.5);
   transform-origin:20px 100%;
   transform:scale(.4);opacity:0;pointer-events:none;
   transition:transform .22s cubic-bezier(.32,1.5,.4,1), opacity .16s ease;
@@ -806,7 +808,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <div class="reply-preview-bar-accent"></div>
         <div class="reply-preview-bar-body">
           <div class="reply-preview-bar-name">Task</div>
-          <div class="reply-preview-bar-text">This message will be tagged as a task</div>
+          <div class="reply-preview-bar-text">Type your message below and hit send to create the task</div>
         </div>
         <button type="button" class="reply-preview-bar-close" id="taskTagClose" aria-label="Remove task tag">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
