@@ -625,6 +625,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card-btn{flex:1;border:none;border-radius:9px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
 .maint-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .maint-card-btn.fixed-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
+.maint-card{cursor:pointer}
+.ticket-detail-modal{width:420px}
+.ticket-detail-room{font-size:12.5px;font-weight:800;color:var(--accent);display:flex;align-items:center;gap:5px;margin-bottom:8px}
+.ticket-detail-room svg{width:14px;height:14px}
+.ticket-detail-desc{font-size:15.5px;line-height:1.45;color:var(--text);margin-bottom:12px;white-space:pre-wrap}
+.ticket-detail-media{width:100%;border-radius:14px;margin-bottom:12px;max-height:280px;object-fit:cover;display:block;background:#000}
+.ticket-detail-meta{font-size:12px;color:var(--text-faint);margin-bottom:16px}
+.ticket-detail-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:14px}
+.ticket-detail-status.status-reported{background:rgba(224,144,44,.14);color:#b5701f}
+.ticket-detail-status.status-in_progress{background:rgba(24,119,242,.12);color:var(--accent)}
+.ticket-detail-status.status-fixed{background:rgba(47,154,92,.14);color:#2f9a5c}
+.ticket-detail-actions{display:flex;gap:8px;margin-bottom:4px}
+.ticket-detail-nav{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+.ticket-detail-nav .maint-card-btn{flex:none;padding:8px 14px}
+.ticket-detail-nav .maint-card-btn:disabled{opacity:.35;cursor:default}
+.ticket-detail-pos{font-size:12px;color:var(--text-faint);font-weight:600}
 
 .h-group-avatars{display:flex;align-items:center;margin-left:2px;cursor:pointer}
 .h-group-avatars .group-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px #fff;margin-left:-6px;transition:margin-left .22s cubic-bezier(.32,1.4,.4,1)}
@@ -1196,6 +1212,23 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
     <div class="forward-dept-list" id="forwardDeptList"></div>
     <div class="admin-add-error" id="forwardError"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="ticketDetailOverlay" hidden>
+  <div class="admin-modal ticket-detail-modal">
+    <div class="admin-modal-head">
+      <h2>Ticket</h2>
+      <button class="admin-close" id="ticketDetailClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="ticketDetailBody"></div>
+    <div class="ticket-detail-nav">
+      <button type="button" id="ticketDetailPrev" class="maint-card-btn">← Previous</button>
+      <span class="ticket-detail-pos" id="ticketDetailPos"></span>
+      <button type="button" id="ticketDetailNext" class="maint-card-btn">Next →</button>
+    </div>
   </div>
 </div>
 
@@ -4159,6 +4192,46 @@ function loadTickets(){
 }
 
 var MAINT_STATUS_LABEL = { reported: "Reported", in_progress: "In progress", fixed: "Fixed" };
+function isTicketVideo(t){
+  return !!(t.photoUrl && /\.(mp4|webm|mov|m4v|3gp)($|\?)/i.test(t.photoUrl));
+}
+function buildStatusActions(t, onAfterUpdate){
+  var actions = document.createElement("div");
+  actions.className = "maint-card-actions";
+  function go(status){
+    updateTicketStatus(t.id, status);
+    if(onAfterUpdate) onAfterUpdate();
+  }
+  if(t.status === "reported"){
+    var startBtn = document.createElement("button");
+    startBtn.type = "button";
+    startBtn.className = "maint-card-btn primary";
+    startBtn.textContent = "Start work";
+    startBtn.addEventListener("click", function(e){ e.stopPropagation(); go("in_progress"); });
+    actions.appendChild(startBtn);
+  } else if(t.status === "in_progress"){
+    var backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "maint-card-btn";
+    backBtn.textContent = "Back to reported";
+    backBtn.addEventListener("click", function(e){ e.stopPropagation(); go("reported"); });
+    actions.appendChild(backBtn);
+    var fixedBtn = document.createElement("button");
+    fixedBtn.type = "button";
+    fixedBtn.className = "maint-card-btn fixed-btn";
+    fixedBtn.textContent = "Mark fixed";
+    fixedBtn.addEventListener("click", function(e){ e.stopPropagation(); go("fixed"); });
+    actions.appendChild(fixedBtn);
+  } else {
+    var reopenBtn = document.createElement("button");
+    reopenBtn.type = "button";
+    reopenBtn.className = "maint-card-btn";
+    reopenBtn.textContent = "Reopen";
+    reopenBtn.addEventListener("click", function(e){ e.stopPropagation(); go("in_progress"); });
+    actions.appendChild(reopenBtn);
+  }
+  return actions;
+}
 function buildMaintCard(t){
   var card = document.createElement("div");
   card.className = "maint-card status-" + t.status;
@@ -4167,7 +4240,7 @@ function buildMaintCard(t){
     html += '<div class="maint-card-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
   }
   html += '<div class="maint-card-desc">' + esc(t.description) + '</div>';
-  var isVideo = t.photoUrl && /\.(mp4|webm|mov|m4v|3gp)($|\?)/i.test(t.photoUrl);
+  var isVideo = isTicketVideo(t);
   if(t.photoUrl && isVideo){
     html += '<video class="maint-card-photo" src="' + t.photoUrl + '" controls playsinline></video>';
   } else if(t.photoUrl){
@@ -4175,43 +4248,74 @@ function buildMaintCard(t){
   }
   html += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   card.innerHTML = html;
-
-  var actions = document.createElement("div");
-  actions.className = "maint-card-actions";
-  if(t.status === "reported"){
-    var startBtn = document.createElement("button");
-    startBtn.type = "button";
-    startBtn.className = "maint-card-btn primary";
-    startBtn.textContent = "Start work";
-    startBtn.addEventListener("click", function(){ updateTicketStatus(t.id, "in_progress"); });
-    actions.appendChild(startBtn);
-  } else if(t.status === "in_progress"){
-    var backBtn = document.createElement("button");
-    backBtn.type = "button";
-    backBtn.className = "maint-card-btn";
-    backBtn.textContent = "Back to reported";
-    backBtn.addEventListener("click", function(){ updateTicketStatus(t.id, "reported"); });
-    actions.appendChild(backBtn);
-    var fixedBtn = document.createElement("button");
-    fixedBtn.type = "button";
-    fixedBtn.className = "maint-card-btn fixed-btn";
-    fixedBtn.textContent = "Mark fixed";
-    fixedBtn.addEventListener("click", function(){ updateTicketStatus(t.id, "fixed"); });
-    actions.appendChild(fixedBtn);
-  } else {
-    var reopenBtn = document.createElement("button");
-    reopenBtn.type = "button";
-    reopenBtn.className = "maint-card-btn";
-    reopenBtn.textContent = "Reopen";
-    reopenBtn.addEventListener("click", function(){ updateTicketStatus(t.id, "in_progress"); });
-    actions.appendChild(reopenBtn);
-  }
-  card.appendChild(actions);
+  card.appendChild(buildStatusActions(t));
   if(t.photoUrl && !isVideo){
-    card.querySelector(".maint-card-photo").addEventListener("click", function(){ window.open(t.photoUrl, "_blank"); });
+    card.querySelector(".maint-card-photo").addEventListener("click", function(e){ e.stopPropagation(); window.open(t.photoUrl, "_blank"); });
   }
+  card.addEventListener("click", function(){ openTicketDetail(t.id); });
   return card;
 }
+
+/* ---- Ticket detail / one-by-one feed view ---- */
+var ticketDetailOverlay = document.getElementById("ticketDetailOverlay");
+var ticketDetailBody = document.getElementById("ticketDetailBody");
+var ticketDetailClose = document.getElementById("ticketDetailClose");
+var ticketDetailPrev = document.getElementById("ticketDetailPrev");
+var ticketDetailNext = document.getElementById("ticketDetailNext");
+var ticketDetailPos = document.getElementById("ticketDetailPos");
+STATE.ticketDetailQueue = [];
+STATE.ticketDetailIndex = -1;
+
+function openTicketDetail(ticketId){
+  var t = STATE.tickets.find(function(x){ return x.id === ticketId; });
+  if(!t) return;
+  STATE.ticketDetailQueue = STATE.tickets.filter(function(x){ return x.status === t.status; }).map(function(x){ return x.id; });
+  STATE.ticketDetailIndex = STATE.ticketDetailQueue.indexOf(ticketId);
+  ticketDetailOverlay.hidden = false;
+  renderTicketDetail();
+}
+function closeTicketDetail(){
+  ticketDetailOverlay.hidden = true;
+  STATE.ticketDetailQueue = [];
+  STATE.ticketDetailIndex = -1;
+}
+function renderTicketDetail(){
+  var id = STATE.ticketDetailQueue[STATE.ticketDetailIndex];
+  var t = id && STATE.tickets.find(function(x){ return x.id === id; });
+  if(!t){ closeTicketDetail(); return; }
+
+  var html = '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
+  if(t.roomNumber){
+    html += '<div class="ticket-detail-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
+  }
+  html += '<div class="ticket-detail-desc">' + esc(t.description) + '</div>';
+  var isVideo = isTicketVideo(t);
+  if(t.photoUrl && isVideo){
+    html += '<video class="ticket-detail-media" src="' + t.photoUrl + '" controls playsinline></video>';
+  } else if(t.photoUrl){
+    html += '<img class="ticket-detail-media" src="' + t.photoUrl + '" alt="Issue photo">';
+  }
+  html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
+  ticketDetailBody.innerHTML = html;
+  ticketDetailBody.appendChild(buildStatusActions(t, function(){
+    STATE.ticketDetailQueue.splice(STATE.ticketDetailIndex, 1);
+    if(!STATE.ticketDetailQueue.length){ closeTicketDetail(); return; }
+    if(STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length) STATE.ticketDetailIndex = STATE.ticketDetailQueue.length - 1;
+    renderTicketDetail();
+  }));
+
+  ticketDetailPos.textContent = (STATE.ticketDetailIndex + 1) + " of " + STATE.ticketDetailQueue.length + " · " + MAINT_STATUS_LABEL[t.status];
+  ticketDetailPrev.disabled = STATE.ticketDetailIndex <= 0;
+  ticketDetailNext.disabled = STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length - 1;
+}
+ticketDetailClose.addEventListener("click", closeTicketDetail);
+ticketDetailOverlay.addEventListener("click", function(e){ if(e.target === ticketDetailOverlay) closeTicketDetail(); });
+ticketDetailPrev.addEventListener("click", function(){
+  if(STATE.ticketDetailIndex > 0){ STATE.ticketDetailIndex -= 1; renderTicketDetail(); }
+});
+ticketDetailNext.addEventListener("click", function(){
+  if(STATE.ticketDetailIndex < STATE.ticketDetailQueue.length - 1){ STATE.ticketDetailIndex += 1; renderTicketDetail(); }
+});
 
 function renderMaintenanceBoard(){
   var tickets = STATE.tickets || [];
