@@ -127,7 +127,8 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  resolved_at TEXT
+  resolved_at TEXT,
+  pinned_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 

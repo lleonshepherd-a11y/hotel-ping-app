@@ -198,7 +198,8 @@ db.exec(`
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    resolved_at TEXT
+    resolved_at TEXT,
+    pinned_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 
@@ -208,6 +209,11 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 `);
+
+const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);
+if (!maintenanceColumns.includes('pinned_at')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN pinned_at TEXT');
+}
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);
 if (!groupColumns.includes('deleted_at')) {

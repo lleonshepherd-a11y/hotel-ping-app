@@ -59,6 +59,7 @@ function rowToTicket(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || undefined,
+    pinned: !!row.pinned_at,
   };
 }
 
@@ -842,6 +843,17 @@ const server = http.createServer(async (req, res) => {
       const now = new Date().toISOString();
       db.prepare('UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?')
         .run(status, now, status === 'fixed' ? now : null, id);
+      const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/pin')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/pin'.length));
+      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const nextPinned = !existing.pinned_at;
+      db.prepare('UPDATE maintenance_tickets SET pinned_at = ? WHERE id = ?')
+        .run(nextPinned ? new Date().toISOString() : null, id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       return send(res, 200, { ticket: rowToTicket(row) });
     }

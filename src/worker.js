@@ -276,6 +276,7 @@ function rowToTicket(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || undefined,
+    pinned: !!row.pinned_at,
   };
 }
 function rowToGroup(row, members) {
@@ -1074,6 +1075,18 @@ export default {
         await env.DB.prepare(
           "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?"
         ).bind(status, now, status === "fixed" ? now : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        return json({ ticket: rowToTicket(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/pin")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/pin".length));
+        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        const nextPinned = !existing.pinned_at;
+        await env.DB.prepare(
+          "UPDATE maintenance_tickets SET pinned_at = ? WHERE id = ?"
+        ).bind(nextPinned ? new Date().toISOString() : null, id).run();
         const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
         return json({ ticket: rowToTicket(row) });
       }
