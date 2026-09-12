@@ -3657,7 +3657,7 @@ function attachDragChip(chipEl, onDrop, opts){
     if(axisPending){
       if(Math.abs(dx) < AXIS_THRESHOLD && Math.abs(dy) < AXIS_THRESHOLD) return;
       axisPending = false;
-      if(Math.abs(dx) > Math.abs(dy)){
+      if(Math.abs(dx) > Math.abs(dy) * 1.6){
         aborted = true;
         endDragVisuals();
         return;
