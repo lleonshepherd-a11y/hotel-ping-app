@@ -12,6 +12,7 @@
 <style>
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:#fff}
+  html{scroll-behavior:smooth}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",Roboto,sans-serif;
     color:#1f1c17;
@@ -21,38 +22,84 @@
     flex-direction:column;
     align-items:center;
     padding:0 20px calc(24px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    -webkit-tap-highlight-color:transparent;
   }
-  .brand{flex:none;padding-top:calc(34px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:9px}
-  .brand-mark{width:38px;height:38px;border-radius:10px;overflow:hidden;box-shadow:0 6px 16px -6px rgba(31,28,23,.22),0 0 0 1px rgba(31,28,23,.06)}
+  ::selection{background:rgba(184,151,92,.28)}
+  button{-webkit-tap-highlight-color:transparent}
+
+  @keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes popIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+  }
+
+  .brand{flex:none;padding-top:calc(34px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:10px;animation:riseIn .5s cubic-bezier(.22,.85,.35,1) both}
+  .brand-mark{width:40px;height:40px;border-radius:11px;overflow:hidden;box-shadow:0 8px 20px -8px rgba(31,28,23,.28),0 0 0 1px rgba(31,28,23,.06)}
   .brand-mark img{width:100%;height:100%;object-fit:cover;display:block}
-  .brand-tag{font-size:11px;font-weight:700;letter-spacing:.22em;color:rgba(31,28,23,.4);text-transform:uppercase}
-  .hero{text-align:center;margin:26px 0 22px;max-width:400px;width:100%}
-  .hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#a3823f;margin-bottom:8px}
-  .hero-room{font-family:Manrope,sans-serif;font-weight:800;font-size:34px;letter-spacing:-.02em;color:#1f1c17}
-  .hero-rule{width:34px;height:2px;background:linear-gradient(90deg,rgba(184,151,92,0),rgba(184,151,92,.9),rgba(184,151,92,0));margin:12px auto}
-  .hero-sub{font-size:13px;color:rgba(31,28,23,.52);font-weight:500}
-  .panel{width:100%;max-width:400px;background:#fff;border:1px solid rgba(31,28,23,.07);border-radius:20px;padding:16px 16px 14px;box-shadow:0 20px 46px -26px rgba(31,28,23,.22);margin-bottom:22px}
-  .panel-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(31,28,23,.4);margin-bottom:8px}
-  .panel textarea{width:100%;min-height:64px;border-radius:13px;border:1.5px solid rgba(31,28,23,.1);background:#f8f5ef;font-size:16px;color:#1f1c17;padding:12px 13px;margin-bottom:10px;line-height:1.4;font-family:inherit;resize:none}
-  .panel textarea::placeholder{color:rgba(31,28,23,.32)}
-  .send-btn{width:100%;padding:13px;border:none;border-radius:13px;background:linear-gradient(150deg,#d9bb8b,#b8975c);color:#2a2013;font-size:14px;font-weight:800;letter-spacing:.01em;cursor:pointer;font-family:inherit}
-  .send-btn:disabled{opacity:.55;cursor:default}
-  .form-error{font-size:12.5px;color:#c0392b;font-weight:600;margin-top:9px;min-height:1px}
-  .list-wrap{width:100%;max-width:400px}
-  .list-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(31,28,23,.4);margin-bottom:10px}
-  .req-empty{font-size:12.5px;color:rgba(31,28,23,.4);text-align:center;padding:10px 0}
-  .req-card{background:#fff;border:1px solid rgba(31,28,23,.07);border-radius:16px;padding:13px 15px;margin-bottom:10px;box-shadow:0 10px 24px -18px rgba(31,28,23,.18)}
-  .req-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .req-text{font-size:13.5px;color:#1f1c17;font-weight:600}
-  .req-pill{display:inline-flex;align-items:center;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:20px;white-space:nowrap}
-  .req-pill.new{background:rgba(224,144,44,.14);color:#b5701f}
-  .req-pill.in_progress{background:rgba(24,119,242,.12);color:#1877f2}
-  .req-pill.completed{background:rgba(47,154,92,.14);color:#2f9a5c}
-  .req-time{font-size:11.5px;color:rgba(31,28,23,.4);margin-top:5px}
-  .req-reply-rule{border-top:1px solid rgba(31,28,23,.08);margin:8px 0}
-  .req-reply{font-size:13px;color:rgba(31,28,23,.62);line-height:1.5;font-style:italic}
-  .footer{flex:none;text-align:center;font-size:11.5px;color:rgba(31,28,23,.38);font-weight:500;padding:16px 20px 6px}
-  .no-room{max-width:340px;text-align:center;margin-top:120px;font-size:14px;color:rgba(31,28,23,.55);line-height:1.5}
+  .brand-tag{font-size:11px;font-weight:700;letter-spacing:.24em;color:rgba(31,28,23,.38);text-transform:uppercase}
+
+  .hero{text-align:center;margin:28px 0 24px;max-width:400px;width:100%;animation:riseIn .55s cubic-bezier(.22,.85,.35,1) .05s both}
+  .hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#a3823f;margin-bottom:9px}
+  .hero-room{font-family:Manrope,sans-serif;font-weight:800;font-size:36px;letter-spacing:-.025em;color:#1f1c17;text-wrap:balance}
+  .hero-rule{width:36px;height:2px;background:linear-gradient(90deg,rgba(184,151,92,0),rgba(184,151,92,.9),rgba(184,151,92,0));margin:13px auto}
+  .hero-sub{font-size:13.5px;color:rgba(31,28,23,.5);font-weight:500;letter-spacing:-.005em}
+
+  .panel{
+    width:100%;max-width:400px;background:#fff;border:1px solid rgba(31,28,23,.06);border-radius:22px;
+    padding:18px 18px 16px;box-shadow:0 1px 2px rgba(31,28,23,.04),0 22px 48px -28px rgba(31,28,23,.24);
+    margin-bottom:24px;animation:riseIn .55s cubic-bezier(.22,.85,.35,1) .1s both;
+  }
+  .panel-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(31,28,23,.38);margin-bottom:9px}
+  .panel textarea{
+    width:100%;min-height:60px;max-height:200px;border-radius:14px;border:1.5px solid rgba(31,28,23,.1);
+    background:#f8f5ef;font-size:16px;color:#1f1c17;padding:13px 14px;margin-bottom:12px;line-height:1.45;
+    font-family:inherit;resize:none;overflow-y:hidden;
+    transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease;
+  }
+  .panel textarea::placeholder{color:rgba(31,28,23,.3)}
+  .panel textarea:focus{
+    outline:none;border-color:rgba(184,151,92,.75);background:#fff;
+    box-shadow:0 0 0 3.5px rgba(184,151,92,.14);
+  }
+  .send-btn{
+    width:100%;padding:14px;border:none;border-radius:14px;
+    background:linear-gradient(150deg,#d9bb8b,#b8975c);color:#2a2013;font-size:14.5px;font-weight:800;
+    letter-spacing:.005em;cursor:pointer;font-family:inherit;
+    box-shadow:0 1px 1px rgba(255,255,255,.4) inset,0 10px 22px -12px rgba(184,151,92,.65);
+    transition:transform .12s cubic-bezier(.3,1,.4,1),box-shadow .12s ease,opacity .15s ease;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .send-btn:active{transform:scale(.975);box-shadow:0 1px 1px rgba(255,255,255,.4) inset,0 6px 14px -10px rgba(184,151,92,.65)}
+  .send-btn:disabled{opacity:.6;cursor:default;transform:none}
+  .send-spinner{width:15px;height:15px;border-radius:50%;border:2px solid rgba(42,32,19,.25);border-top-color:#2a2013;animation:spin .7s linear infinite;display:none}
+  .send-btn.sending .send-spinner{display:inline-block}
+  .send-btn.sending .send-label{opacity:.85}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .form-error{font-size:12.5px;color:#c0392b;font-weight:600;margin-top:10px;min-height:1px;text-align:center}
+
+  .list-wrap{width:100%;max-width:400px;animation:riseIn .55s cubic-bezier(.22,.85,.35,1) .15s both}
+  .list-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(31,28,23,.38);margin-bottom:11px}
+  .req-empty{font-size:12.5px;color:rgba(31,28,23,.38);text-align:center;padding:22px 0;border:1.5px dashed rgba(31,28,23,.1);border-radius:16px}
+  .req-card{
+    background:#fff;border:1px solid rgba(31,28,23,.06);border-radius:17px;padding:14px 16px;margin-bottom:11px;
+    box-shadow:0 1px 2px rgba(31,28,23,.03),0 12px 28px -20px rgba(31,28,23,.2);
+    animation:popIn .35s cubic-bezier(.26,1.1,.4,1) both;
+  }
+  .req-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .req-text{font-size:13.5px;color:#1f1c17;font-weight:600;line-height:1.4}
+  .req-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:4px 9px;border-radius:20px;white-space:nowrap;flex:none;margin-top:1px}
+  .req-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+  .req-pill.new{background:rgba(224,144,44,.13);color:#b5701f}
+  .req-pill.in_progress{background:rgba(24,119,242,.11);color:#1877f2}
+  .req-pill.completed{background:rgba(47,154,92,.13);color:#2f9a5c}
+  .req-time{font-size:11.5px;color:rgba(31,28,23,.36);margin-top:6px;font-variant-numeric:tabular-nums}
+  .req-reply-rule{border-top:1px solid rgba(31,28,23,.07);margin:10px 0 9px}
+  .req-reply{font-size:13px;color:rgba(31,28,23,.65);line-height:1.55;font-style:italic}
+
+  .footer{flex:none;text-align:center;font-size:11.5px;color:rgba(31,28,23,.35);font-weight:500;padding:18px 20px 6px}
+  .no-room{max-width:340px;text-align:center;margin-top:120px;font-size:14px;color:rgba(31,28,23,.55);line-height:1.6}
 </style>
 </head>
 <body>
@@ -72,8 +119,11 @@
 
   <form class="panel" id="requestForm">
     <div class="panel-label">New request</div>
-    <textarea id="requestText" placeholder="A taxi for 7pm, a dinner reservation, extra towels&hellip;" maxlength="500" required></textarea>
-    <button type="submit" class="send-btn" id="sendBtn">Send request</button>
+    <textarea id="requestText" rows="1" placeholder="A taxi for 7pm, a dinner reservation, extra towels&hellip;" maxlength="500" required></textarea>
+    <button type="submit" class="send-btn" id="sendBtn">
+      <span class="send-spinner"></span>
+      <span class="send-label">Send request</span>
+    </button>
     <div class="form-error" id="formError"></div>
   </form>
 
@@ -156,12 +206,20 @@
   var sendBtn = document.getElementById("sendBtn");
   var errorEl = document.getElementById("formError");
 
+  function autoGrow(){
+    textEl.style.height = "auto";
+    textEl.style.height = Math.min(textEl.scrollHeight, 200) + "px";
+  }
+  textEl.addEventListener("input", autoGrow);
+  autoGrow();
+
   form.addEventListener("submit", function(e){
     e.preventDefault();
     var text = textEl.value.trim();
     if(!text) return;
     errorEl.textContent = "";
     sendBtn.disabled = true;
+    sendBtn.classList.add("sending");
     fetch('/api/guest-requests', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -178,10 +236,12 @@
       saveIds(order);
       render();
       textEl.value = "";
+      autoGrow();
     }).catch(function(err){
       errorEl.textContent = err.message || "Couldn't send that. Please try again.";
     }).finally(function(){
       sendBtn.disabled = false;
+      sendBtn.classList.remove("sending");
     });
   });
 })();
