@@ -126,17 +126,19 @@ function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
 }
 
-const ESCALATION_MINUTES = 10;
+const URGENT_ESCALATION_MINUTES = 10;
+const NORMAL_ESCALATION_MINUTES = 25;
 function checkEscalations() {
-  const cutoff = new Date(Date.now() - ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const urgentCutoff = new Date(Date.now() - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const normalCutoff = new Date(Date.now() - NORMAL_ESCALATION_MINUTES * 60 * 1000).toISOString();
   const rows = db.prepare(`
     SELECT * FROM messages
-    WHERE urgent = 1 AND deleted_at IS NULL AND escalated_at IS NULL
-      AND status != 'read' AND created_at < ?
-  `).all(cutoff);
+    WHERE deleted_at IS NULL AND escalated_at IS NULL AND status != 'read'
+      AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))
+  `).all(urgentCutoff, normalCutoff);
   const now = new Date().toISOString();
   for (const row of rows) {
-    console.log('[escalation] unread urgent message', row.id, row.from_dept, '->', row.to_dept);
+    console.log('[escalation] unread message', row.id, row.urgent ? '(urgent)' : '(normal)', row.from_dept, '->', row.to_dept);
     db.prepare('UPDATE messages SET escalated_at = ? WHERE id = ?').run(now, row.id);
   }
   return rows.length;

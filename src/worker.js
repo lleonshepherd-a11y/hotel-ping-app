@@ -198,19 +198,22 @@ async function notifyAdmins(env, payloadObj) {
   }
 }
 
-const ESCALATION_MINUTES = 10;
+const URGENT_ESCALATION_MINUTES = 10;
+const NORMAL_ESCALATION_MINUTES = 25;
 
 async function checkEscalations(env) {
-  const cutoff = new Date(Date.now() - ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const now = Date.now();
+  const urgentCutoff = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const normalCutoff = new Date(now - NORMAL_ESCALATION_MINUTES * 60 * 1000).toISOString();
   const rows = await env.DB.prepare(
     `SELECT * FROM messages
-     WHERE urgent = 1 AND deleted_at IS NULL AND escalated_at IS NULL
-       AND status != 'read' AND created_at < ?`
-  ).bind(cutoff).all();
+     WHERE deleted_at IS NULL AND escalated_at IS NULL AND status != 'read'
+       AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))`
+  ).bind(urgentCutoff, normalCutoff).all();
   for (const row of rows.results) {
     const preview = row.type === "text" ? row.body : (row.type === "image" ? "a photo" : row.type === "file" ? "a file" : "a voice message");
     await notifyAdmins(env, {
-      title: "⚠️ Unread urgent message",
+      title: row.urgent ? "⚠️ Unread urgent message" : "Unread message",
       body: (DEPT_NAMES[row.from_dept] || row.from_dept) + " → " + (DEPT_NAMES[row.to_dept] || row.to_dept) + ": " + preview,
       url: "/",
       tag: "hotel-ping-escalation-" + row.id,
