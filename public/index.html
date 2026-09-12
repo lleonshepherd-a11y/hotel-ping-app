@@ -1582,9 +1582,10 @@ function markRead(deptId){
 }
 
 function openThread(deptId){
-  if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; }
+  if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; saveCurrentDraft(); }
   STATE.active = deptId;
   STATE.activeGroupId = null;
+  loadDraftInto(deptId, null);
   markRead(deptId);
   renderList();
   renderHeader();
@@ -1598,6 +1599,7 @@ function openThread(deptId){
 }
 
 function closeThreadView(){
+  saveCurrentDraft();
   document.getElementById("sidebar").classList.remove("hide-mobile");
   document.querySelector(".main").classList.remove("show-mobile");
   STATE.activeGroupId = null;
@@ -1875,6 +1877,33 @@ editBarClose.addEventListener("click", function(){
   autoGrow();
   refreshSendState();
 });
+
+function draftKeyFor(deptId, groupId){
+  var staffId = AUTH.staff ? AUTH.staff.id : "anon";
+  if(groupId) return "hp_draft_" + staffId + "_group_" + groupId;
+  if(deptId) return "hp_draft_" + staffId + "_dept_" + deptId;
+  return null;
+}
+function saveCurrentDraft(){
+  if(STATE.editingMessage) return;
+  var key = draftKeyFor(STATE.active, STATE.activeGroupId);
+  if(!key) return;
+  var val = msgInput.value;
+  try{
+    if(val) localStorage.setItem(key, val);
+    else localStorage.removeItem(key);
+  }catch(e){}
+}
+function loadDraftInto(deptId, groupId){
+  var key = draftKeyFor(deptId, groupId);
+  var val = "";
+  if(key){
+    try{ val = localStorage.getItem(key) || ""; }catch(e){ val = ""; }
+  }
+  msgInput.value = val;
+  autoGrow();
+  refreshSendState();
+}
 
 var roomTagBar = document.getElementById("roomTagBar");
 var roomTagInput = document.getElementById("roomTagInput");
@@ -4017,8 +4046,10 @@ function openGroupThread(groupId){
   clearReplyBar();
   clearEditBar();
   mentionPopover.hidden = true;
+  saveCurrentDraft();
   STATE.active = null;
   STATE.activeGroupId = groupId;
+  loadDraftInto(null, groupId);
   updateComposerLock();
   renderHeader();
   renderThread();
