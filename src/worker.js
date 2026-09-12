@@ -1076,6 +1076,15 @@ export default {
           "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?"
         ).bind(status, now, status === "fixed" ? now : null, id).run();
         const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+
+        const statusNotice = { in_progress: "Started work on: ", fixed: "Fixed: " };
+        if (statusNotice[status] && existing.created_by !== "maintenance") {
+          await insertMessage(env, ctx, {
+            from: "maintenance", to: existing.created_by, type: "text",
+            body: statusNotice[status] + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
+          });
+        }
+
         return json({ ticket: rowToTicket(row) });
       }
 

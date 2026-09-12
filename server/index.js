@@ -844,6 +844,15 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?')
         .run(status, now, status === 'fixed' ? now : null, id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+
+      const statusNotice = { in_progress: 'Started work on: ', fixed: 'Fixed: ' };
+      if (statusNotice[status] && existing.created_by !== 'maintenance') {
+        insertMessage({
+          from: 'maintenance', to: existing.created_by, type: 'text',
+          body: statusNotice[status] + existing.description + (existing.room_number ? ' (' + existing.room_number + ')' : ''),
+        });
+      }
+
       return send(res, 200, { ticket: rowToTicket(row) });
     }
 
