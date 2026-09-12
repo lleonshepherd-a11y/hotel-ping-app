@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS typing_status (
   PRIMARY KEY (from_dept, to_dept)
 );
 
+CREATE TABLE IF NOT EXISTS muted_conversations (
+  department_id TEXT NOT NULL,
+  other_dept_id TEXT NOT NULL,
+  muted_at TEXT NOT NULL,
+  PRIMARY KEY (department_id, other_dept_id)
+);
+
 CREATE TABLE IF NOT EXISTS handover_notes (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,

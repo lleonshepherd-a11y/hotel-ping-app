@@ -497,6 +497,28 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { typing: rows.map((r) => r.from_dept) });
     }
 
+    if (req.method === 'GET' && p === '/api/muted') {
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const rows = db.prepare('SELECT other_dept_id FROM muted_conversations WHERE department_id = ?').all(self);
+      return send(res, 200, { muted: rows.map((r) => r.other_dept_id) });
+    }
+
+    if (req.method === 'POST' && p === '/api/muted') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const other = body.with;
+      if (!DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      const self = requester.department_id;
+      const existing = db.prepare('SELECT 1 FROM muted_conversations WHERE department_id = ? AND other_dept_id = ?').get(self, other);
+      if (existing) {
+        db.prepare('DELETE FROM muted_conversations WHERE department_id = ? AND other_dept_id = ?').run(self, other);
+        return send(res, 200, { muted: false });
+      }
+      db.prepare('INSERT INTO muted_conversations (department_id, other_dept_id, muted_at) VALUES (?, ?, ?)').run(self, other, new Date().toISOString());
+      return send(res, 200, { muted: true });
+    }
+
     if (req.method === 'GET' && p === '/api/handover') {
       const dept = url.searchParams.get('department');
       if (!DEPT_IDS.has(dept)) return send(res, 400, { error: 'Unknown department' });

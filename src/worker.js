@@ -149,9 +149,15 @@ async function sendWebPush(env, subscription, payloadObj) {
   return res;
 }
 
-async function notifyDepartment(env, deptId, payloadObj) {
+async function notifyDepartment(env, deptId, payloadObj, fromDeptId) {
   const dept = await env.DB.prepare("SELECT on_duty FROM departments WHERE id = ?").bind(deptId).first();
   if (!dept || !dept.on_duty) return;
+  if (fromDeptId) {
+    const muted = await env.DB.prepare(
+      "SELECT 1 FROM muted_conversations WHERE department_id = ? AND other_dept_id = ?"
+    ).bind(deptId, fromDeptId).first();
+    if (muted) return;
+  }
   const staffRows = await env.DB.prepare("SELECT id FROM staff WHERE department_id = ?").bind(deptId).all();
   for (const s of staffRows.results) {
     const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(s.id).all();
@@ -229,7 +235,7 @@ async function insertMessage(env, ctx, opts) {
     url: "/",
     tag: "hotel-ping-" + opts.to,
     icon: "/avatars/" + opts.from + ".png",
-  }).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
+  }, opts.from).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
   if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
   return row;
@@ -701,6 +707,32 @@ export default {
           "SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?"
         ).bind(self, cutoff).all();
         return json({ typing: rows.results.map((r) => r.from_dept) });
+      }
+
+      if (method === "GET" && p === "/api/muted") {
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const rows = await env.DB.prepare("SELECT other_dept_id FROM muted_conversations WHERE department_id = ?").bind(self).all();
+        return json({ muted: rows.results.map((r) => r.other_dept_id) });
+      }
+
+      if (method === "POST" && p === "/api/muted") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const other = body.with;
+        if (!DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        const self = requester.department_id;
+        const existing = await env.DB.prepare(
+          "SELECT 1 FROM muted_conversations WHERE department_id = ? AND other_dept_id = ?"
+        ).bind(self, other).first();
+        if (existing) {
+          await env.DB.prepare("DELETE FROM muted_conversations WHERE department_id = ? AND other_dept_id = ?").bind(self, other).run();
+          return json({ muted: false });
+        }
+        await env.DB.prepare(
+          "INSERT INTO muted_conversations (department_id, other_dept_id, muted_at) VALUES (?, ?, ?)"
+        ).bind(self, other, new Date().toISOString()).run();
+        return json({ muted: true });
       }
 
       if (method === "GET" && p === "/api/handover") {

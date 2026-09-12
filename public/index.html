@@ -180,6 +180,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-preview{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .thread-item.unread .t-preview{color:var(--text);font-weight:600}
 .t-preview.search-hit{color:var(--accent);font-weight:600}
+.t-mute-ic{width:12px;height:12px;color:var(--text-faint);vertical-align:-1px}
 .thread-item.unread .t-name{color:var(--text)}
 .t-badge{flex:none;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .t-badge.urgent{background:var(--urgent)}
@@ -200,6 +201,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .back-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;border:none;background:var(--surface-2);color:var(--text);border-radius:50%;box-shadow:0 2px 6px -2px rgba(20,20,16,.2)}
 .back-btn svg{width:19px;height:19px}
+.mute-btn{position:absolute;right:16px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:none;background:none;color:var(--text-faint);border-radius:50%}
+.mute-btn:hover{background:var(--surface-2)}
+.mute-btn svg{width:18px;height:18px}
+.mute-btn.active{color:var(--accent)}
 .back-btn:active{background:var(--surface-3)}
 .h-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 12px -3px rgba(15,15,20,.35)}
 .h-avatar svg{width:19px;height:19px}
@@ -721,6 +726,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <span class="h-dot" id="hDot"></span><span id="hSub">Active now</span>
         </div>
       </div>
+      <button class="mute-btn" id="muteBtn" type="button" aria-label="Mute this conversation" title="Mute notifications for this conversation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
     </header>
 
     <div class="off-duty-banner" id="offDutyBanner" hidden></div>
@@ -982,7 +990,8 @@ var STATE = {
   searchTerm: "",
   loading: false,
   typingFrom: {},
-  replyingTo: null
+  replyingTo: null,
+  muted: {}
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -1303,7 +1312,7 @@ function renderList(){
     el.innerHTML =
       '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
+        '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
@@ -1363,6 +1372,25 @@ var hContactWrap = document.getElementById("hContactWrap");
 
 var offDutyBanner = document.getElementById("offDutyBanner");
 var hDot = document.getElementById("hDot");
+var muteBtn = document.getElementById("muteBtn");
+muteBtn.addEventListener("click", function(){
+  var deptId = STATE.active;
+  var wasMuted = !!STATE.muted[deptId];
+  STATE.muted[deptId] = !wasMuted;
+  muteBtn.classList.toggle("active", !wasMuted);
+  renderList();
+  apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
+    STATE.muted[deptId] = res.muted;
+    muteBtn.classList.toggle("active", res.muted);
+    muteBtn.title = res.muted ? "Unmute this conversation" : "Mute notifications for this conversation";
+    renderList();
+    showToast(res.muted ? "Muted" : "Unmuted");
+  }).catch(function(){
+    STATE.muted[deptId] = wasMuted;
+    muteBtn.classList.toggle("active", wasMuted);
+    renderList();
+  });
+});
 
 function renderHeader(){
   var d = DEPTS[STATE.active];
@@ -1380,6 +1408,8 @@ function renderHeader(){
   hDot.classList.toggle("off", !targetOn);
   renderContactName();
   renderOffDutyBanner();
+  muteBtn.classList.toggle("active", !!STATE.muted[STATE.active]);
+  muteBtn.title = STATE.muted[STATE.active] ? "Unmute this conversation" : "Mute notifications for this conversation";
 }
 
 function renderOffDutyBanner(){
@@ -1966,14 +1996,21 @@ function confirmDeleteMessage(id){
 }
 
 /* ---------------- Identity switching ---------------- */
+function loadMutedList(){
+  return apiGet('/api/muted?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    STATE.muted = {};
+    (res.muted || []).forEach(function(id){ STATE.muted[id] = true; });
+  }).catch(function(){});
+}
+
 function switchSelf(id){
   if(id === STATE.self || STATE.loading) return;
   STATE.self = id;
   STATE.loading = true;
   renderSwitcher();
   updateComposerLock();
-  buildData(id).then(function(data){
-    STATE.data = data;
+  Promise.all([buildData(id), loadMutedList()]).then(function(results){
+    STATE.data = results[0];
     var order = sortedDeptIds();
     STATE.active = order[0];
     renderList();
@@ -2516,7 +2553,7 @@ document.getElementById("backBtn").addEventListener("click", function(){
 /* ---------------- Boot ---------------- */
 function boot(){
   STATE.loading = true;
-  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self)]).then(function(results){
+  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList()]).then(function(results){
     STATE.data = mergePendingIntoData(results[2]);
     flushOfflineQueue();
     var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
