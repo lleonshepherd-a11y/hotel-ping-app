@@ -13,6 +13,7 @@ const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
 const DEPT_NAMES = {};
 DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
+const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -44,6 +45,19 @@ function rowToHandoverNote(row) {
 }
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
+}
+function rowToTicket(row) {
+  return {
+    id: row.id,
+    roomNumber: row.room_number || undefined,
+    description: row.description,
+    photoUrl: row.photo_path ? '/uploads/' + row.photo_path : undefined,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    resolvedAt: row.resolved_at || undefined,
+  };
 }
 
 function rowToMessage(row, viewerDeptId, isAdmin) {
@@ -759,6 +773,65 @@ const server = http.createServer(async (req, res) => {
         return send(res, 403, { error: 'You can only remove your own notes' });
       }
       db.prepare('DELETE FROM handover_notes WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/maintenance') {
+      const rows = db.prepare('SELECT * FROM maintenance_tickets ORDER BY created_at DESC').all();
+      return send(res, 200, { tickets: rows.map(rowToTicket) });
+    }
+
+    if (req.method === 'POST' && p === '/api/maintenance') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const description = String(body.description || '').trim();
+      if (!description) return send(res, 400, { error: 'A description is required' });
+      const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
+      if (roomNumber && roomNumber.length > 20) return send(res, 400, { error: 'Room number is too long' });
+
+      let photoPath = null;
+      if (body.photoBase64) {
+        const buf = Buffer.from(body.photoBase64, 'base64');
+        if (buf.length > 25 * 1024 * 1024) return send(res, 400, { error: 'Photo is too large (25MB max)' });
+        const ext = (body.photoMime && body.photoMime.split('/')[1]) ? '.' + body.photoMime.split('/')[1].split(';')[0] : '';
+        const safeName = crypto.randomUUID() + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
+        photoPath = safeName;
+      }
+
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?)"
+      ).run(id, roomNumber, description, photoPath, requester.department_id, now, now);
+      const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      console.log('[maintenance notify] maintenance department:', (roomNumber ? 'Room ' + roomNumber + ': ' : '') + description);
+      return send(res, 201, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/status')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/status'.length));
+      const body = await readJsonBody(req);
+      const status = body.status;
+      if (!MAINT_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
+      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const now = new Date().toISOString();
+      db.prepare('UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?')
+        .run(status, now, status === 'fixed' ? now : null, id);
+      const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/maintenance/')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length));
+      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const requester = staffFromToken(req);
+      if (existing.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: "You can only remove your own department's tickets" });
+      }
+      db.prepare('DELETE FROM maintenance_tickets WHERE id = ?').run(id);
       return send(res, 200, { ok: true });
     }
 

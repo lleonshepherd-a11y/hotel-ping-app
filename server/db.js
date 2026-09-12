@@ -188,6 +188,19 @@ db.exec(`
     last_read_at TEXT NOT NULL,
     PRIMARY KEY (group_id, department_id)
   );
+
+  CREATE TABLE IF NOT EXISTS maintenance_tickets (
+    id TEXT PRIMARY KEY,
+    room_number TEXT,
+    description TEXT NOT NULL,
+    photo_path TEXT,
+    status TEXT NOT NULL DEFAULT 'reported' CHECK(status IN ('reported','in_progress','fixed')),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    resolved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 `);
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);

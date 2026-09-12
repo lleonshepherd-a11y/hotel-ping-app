@@ -5,6 +5,7 @@ const DEPT_NAMES = {
 };
 const PIN_RE = /^\d{4,6}$/;
 const TASK_STATUSES = ["not_started", "in_progress", "completed"];
+const MAINT_STATUSES = ["reported", "in_progress", "fixed"];
 
 function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
@@ -262,6 +263,19 @@ function rowToHandoverNote(row) {
 }
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
+}
+function rowToTicket(row) {
+  return {
+    id: row.id,
+    roomNumber: row.room_number || undefined,
+    description: row.description,
+    photoUrl: row.photo_path ? "/uploads/" + row.photo_path : undefined,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    resolvedAt: row.resolved_at || undefined,
+  };
 }
 function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
@@ -973,6 +987,76 @@ export default {
           return json({ error: "You can only remove your own notes" }, 403);
         }
         await env.DB.prepare("DELETE FROM handover_notes WHERE id = ?").bind(id).run();
+        return json({ ok: true });
+      }
+
+      if (method === "GET" && p === "/api/maintenance") {
+        const rows = await env.DB.prepare("SELECT * FROM maintenance_tickets ORDER BY created_at DESC").all();
+        return json({ tickets: rows.results.map(rowToTicket) });
+      }
+
+      if (method === "POST" && p === "/api/maintenance") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const description = String(body.description || "").trim();
+        if (!description) return json({ error: "A description is required" }, 400);
+        const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
+        if (roomNumber && roomNumber.length > 20) return json({ error: "Room number is too long" }, 400);
+
+        let photoPath = null;
+        if (body.photoBase64) {
+          const binary = atob(body.photoBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          if (bytes.length > 25 * 1024 * 1024) return json({ error: "Photo is too large (25MB max)" }, 400);
+          const ext = body.photoMime && body.photoMime.split("/")[1] ? "." + body.photoMime.split("/")[1].split(";")[0] : "";
+          const safeName = crypto.randomUUID() + ext;
+          await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.photoMime || "application/octet-stream" } });
+          photoPath = safeName;
+        }
+
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?)"
+        ).bind(id, roomNumber, description, photoPath, requester.department_id, now, now).run();
+        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+
+        const notifyPromise = notifyDepartment(env, "maintenance", {
+          title: "🔧 New maintenance ticket",
+          body: (roomNumber ? "Room " + roomNumber + ": " : "") + description,
+          url: "/",
+          tag: "hotel-ping-maintenance-" + id,
+        }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maintenance) error:", e && e.stack || e); });
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
+        return json({ ticket: rowToTicket(row) }, 201);
+      }
+
+      if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/status")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/status".length));
+        const body = await readJsonBody(request);
+        const status = body.status;
+        if (!MAINT_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
+        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?"
+        ).bind(status, now, status === "fixed" ? now : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        return json({ ticket: rowToTicket(row) });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/maintenance/")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length));
+        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        const requester = request._staff;
+        if (existing.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "You can only remove your own department's tickets" }, 403);
+        }
+        await env.DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 
