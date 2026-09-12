@@ -334,6 +334,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .task-msg-tag.in_progress{color:var(--accent);background:rgba(24,119,242,.12)}
 .task-msg-tag.completed{color:#2f9a5c;background:rgba(47,154,92,.12)}
 .task-msg-tag svg{width:11px;height:11px}
+.task-msg-tag.readonly{cursor:default;opacity:.85}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -384,8 +385,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .plus-btn.open{transform:rotate(45deg);background:var(--surface-3);color:var(--text)}
 .plus-menu{
   position:absolute;bottom:calc(100% + 10px);left:0;
-  display:flex;gap:6px;padding:8px;
-  background:rgba(246,246,244,.72);border-radius:20px;
+  display:flex;align-items:center;gap:4px;padding:6px;
+  background:rgba(246,246,244,.72);border-radius:999px;
   backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
   box-shadow:0 10px 28px -8px rgba(20,20,16,.28), 0 2px 8px rgba(20,20,16,.08), inset 0 0 0 1px rgba(255,255,255,.5);
   transform-origin:20px 100%;
@@ -394,18 +395,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .plus-menu.open{transform:scale(1);opacity:1;pointer-events:auto}
 .plus-opt{
-  display:flex;flex-direction:column;align-items:center;gap:5px;
-  border:none;background:none;padding:6px 8px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;background:none;padding:3px;border-radius:50%;
   transition:background .12s ease,transform .12s ease;
 }
-.plus-opt:hover{background:var(--surface-3)}
+.plus-opt:hover{background:rgba(0,0,0,.05)}
 .plus-opt:active{transform:scale(.93)}
 .plus-opt-ic{width:38px;height:38px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-dim);box-shadow:inset 0 0 0 1px var(--border);transition:box-shadow .15s ease}
 #optPhoto .plus-opt-ic,#optCamera .plus-opt-ic{color:var(--text)}
 #optUrgent .plus-opt-ic{background:var(--urgent-tint);color:var(--urgent);box-shadow:none}
 #optRoom .plus-opt-ic,#optTask .plus-opt-ic{background:rgba(24,119,242,.1);color:var(--accent);box-shadow:none}
 .plus-opt-ic svg{width:17px;height:17px}
-.plus-opt-label{font-size:10.5px;font-weight:700;color:var(--text-dim);white-space:nowrap}
+.plus-opt-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .plus-opt#optUrgent.active .plus-opt-ic{box-shadow:0 0 0 2px var(--urgent)}
 .plus-opt#optUrgent.active .plus-opt-label{color:var(--urgent)}
 .plus-opt#optTask.active .plus-opt-ic{box-shadow:0 0 0 2px var(--accent)}
@@ -1151,6 +1152,7 @@ function mapServerMessage(row, self){
   return {
     id: row.id,
     from: row.from === self ? "self" : row.from,
+    to: row.to,
     type: row.type,
     text: row.body || "",
     urgent: !!row.urgent,
@@ -2007,11 +2009,12 @@ function buildMessageRow(m, groupEnd, msgsById){
   }
 
   if(m.taskStatus){
-    var taskTag = document.createElement("button");
-    taskTag.type = "button";
-    taskTag.className = "task-msg-tag " + m.taskStatus;
+    var canActionTask = m.to === AUTH.staff.departmentId;
+    var taskTag = document.createElement(canActionTask ? "button" : "div");
+    if(canActionTask) taskTag.type = "button";
+    taskTag.className = "task-msg-tag " + m.taskStatus + (canActionTask ? "" : " readonly");
     taskTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.3 2.3L16 9.5"/></svg> ' + TASK_LABELS[m.taskStatus];
-    taskTag.addEventListener("click", function(){ cycleTaskStatus(m); });
+    if(canActionTask) taskTag.addEventListener("click", function(){ cycleTaskStatus(m); });
     wrap.appendChild(taskTag);
   }
 
@@ -2489,7 +2492,7 @@ function saveOfflineQueue(q){
 }
 function pendingMessageFromQueueItem(item){
   return {
-    id: item.localId, from: "self", type: "text", text: item.payload.text,
+    id: item.localId, from: "self", to: item.deptId, type: "text",
     urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
     replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
     deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined,

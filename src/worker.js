@@ -668,12 +668,19 @@ export default {
         if (!existing) return json({ error: "Message not found" }, 404);
         if (!existing.task_status) return json({ error: "This message isn't tagged as a task" }, 400);
         const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
-        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        if (existing.to_dept !== requester.department_id) return json({ error: "Only the department this task was sent to can update it" }, 403);
         const bodyIn = await readJsonBody(request);
         if (!TASK_STATUSES.includes(bodyIn.status)) return json({ error: "Invalid task status" }, 400);
         await env.DB.prepare("UPDATE messages SET task_status = ? WHERE id = ?").bind(bodyIn.status, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (bodyIn.status === "in_progress" || bodyIn.status === "completed") {
+          const verb = bodyIn.status === "in_progress" ? "Accepted" : "Completed";
+          const taskPreview = existing.body ? ': "' + existing.body + '"' : "";
+          await insertMessage(env, ctx, {
+            from: existing.to_dept, to: existing.from_dept, type: "text",
+            body: verb + " task" + taskPreview,
+          });
+        }
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 

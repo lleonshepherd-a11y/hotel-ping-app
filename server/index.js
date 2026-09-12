@@ -468,12 +468,19 @@ const server = http.createServer(async (req, res) => {
       if (!existing) return send(res, 404, { error: 'Message not found' });
       if (!existing.task_status) return send(res, 400, { error: "This message isn't tagged as a task" });
       const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
-      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      if (existing.to_dept !== requester.department_id) return send(res, 403, { error: 'Only the department this task was sent to can update it' });
       const bodyIn = await readJsonBody(req);
       if (!TASK_STATUSES.includes(bodyIn.status)) return send(res, 400, { error: 'Invalid task status' });
       db.prepare('UPDATE messages SET task_status = ? WHERE id = ?').run(bodyIn.status, id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (bodyIn.status === 'in_progress' || bodyIn.status === 'completed') {
+        const verb = bodyIn.status === 'in_progress' ? 'Accepted' : 'Completed';
+        const taskPreview = existing.body ? ': "' + existing.body + '"' : '';
+        insertMessage({
+          from: existing.to_dept, to: existing.from_dept, type: 'text',
+          body: verb + ' task' + taskPreview,
+        });
+      }
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 
