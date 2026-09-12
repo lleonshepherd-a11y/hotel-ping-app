@@ -672,7 +672,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guests-header-icon{width:30px;height:30px;border-radius:9px;background:rgba(184,151,92,.14);color:#b8975c;display:flex;align-items:center;justify-content:center;flex:none}
 .guests-header-icon svg{width:15px;height:15px}
 .guests-feed{display:flex;flex-direction:column;gap:7px;padding:4px 20px 20px}
-.guest-card{position:relative;background:#fff;border-radius:12px;padding:11px 34px 12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-left:4px solid #e0902c}
+.guest-card{position:relative;background:#fff;border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-left:4px solid #e0902c}
 .guest-card.status-in_progress{border-left-color:var(--accent)}
 .guest-card.status-completed{border-left-color:#2f9a5c;opacity:.88}
 .guest-card.pinned{box-shadow:0 0 0 2px rgba(184,151,92,.55),0 1px 3px rgba(0,0,0,.08)}
@@ -685,15 +685,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guest-status-pill.status-new{background:rgba(224,144,44,.14);color:#b5701f}
 .guest-status-pill.status-in_progress{background:rgba(24,119,242,.12);color:var(--accent)}
 .guest-status-pill.status-completed{background:rgba(47,154,92,.14);color:#2f9a5c}
-.guest-card-desc{font-size:13.5px;line-height:1.4;color:var(--text);margin-bottom:6px}
-.guest-card-meta{font-size:10px;color:var(--text-faint);margin-bottom:9px}
-.guest-reply-box{border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:var(--surface-2)}
-.guest-reply-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin-bottom:5px}
+.guest-card-desc{font-size:13px;line-height:1.3;color:var(--text);margin-bottom:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.guest-card-meta{font-size:10px;color:var(--text-faint);margin-bottom:6px}
+.guest-reply-box{border:1.5px solid var(--border);border-radius:9px;padding:6px 8px;margin-bottom:6px;background:var(--surface-2)}
+.guest-reply-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin-bottom:4px}
 .guest-reply-input{width:100%;border:none;background:none;font-size:16px;color:var(--text-dim);font-family:inherit;padding:0}
 .guest-reply-input::placeholder{color:var(--text-faint)}
 .guest-reply-text{font-size:12.5px;color:var(--text)}
-.guest-card-actions{display:flex;gap:7px}
-.guest-card-btn{flex:1;border:none;border-radius:9px;padding:9px 8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
+.guest-card-actions{display:flex;gap:6px}
+.guest-card-btn{flex:1;border:none;border-radius:8px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
 .guest-card-btn.primary{background:linear-gradient(150deg,#d9bb8b,#b8975c);color:#2a2013}
 .guest-card-btn.complete-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
 .ticket-detail-modal{width:420px}
