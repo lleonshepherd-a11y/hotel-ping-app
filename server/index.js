@@ -485,6 +485,10 @@ const server = http.createServer(async (req, res) => {
       if (group.created_by !== requester.department_id && !requester.is_admin) {
         return send(res, 403, { error: 'Only the department that created this event can delete it' });
       }
+      const memberCount = db.prepare('SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?').get(id);
+      if (memberCount.n > 1 && !requester.is_admin) {
+        return send(res, 400, { error: "Other departments have joined this event and it can't be deleted" });
+      }
       db.prepare('UPDATE groups SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
       return send(res, 200, { ok: true });
     }
@@ -874,6 +878,9 @@ const server = http.createServer(async (req, res) => {
       const requester = staffFromToken(req);
       if (existing.created_by !== requester.department_id && !requester.is_admin) {
         return send(res, 403, { error: "You can only remove your own department's tickets" });
+      }
+      if (existing.status !== 'reported' && !requester.is_admin) {
+        return send(res, 400, { error: "This job has already been picked up and can't be deleted" });
       }
       db.prepare('DELETE FROM maintenance_tickets WHERE id = ?').run(id);
       return send(res, 200, { ok: true });

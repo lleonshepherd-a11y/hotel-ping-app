@@ -655,6 +655,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ticket-detail-status.status-in_progress{background:rgba(24,119,242,.12);color:var(--accent)}
 .ticket-detail-status.status-fixed{background:rgba(47,154,92,.14);color:#2f9a5c}
 .ticket-detail-actions{display:flex;gap:8px;margin-bottom:4px}
+.ticket-detail-delete{display:block;width:100%;border:none;background:none;color:var(--urgent);font-size:12.5px;font-weight:700;padding:10px 0 2px;cursor:pointer}
 .ticket-detail-nav{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
 .ticket-detail-nav .maint-card-btn{flex:none;padding:8px 14px}
 .ticket-detail-nav .maint-card-btn:disabled{opacity:.35;cursor:default}
@@ -4122,12 +4123,12 @@ function deleteGroup(groupId){
   }
   apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
     return loadGroups();
-  }).then(renderEventList).catch(function(){
+  }).then(renderEventList).catch(function(err){
     if(removed){
       STATE.groups.splice(removedIdx, 0, removed);
       renderEventList();
     }
-    showToast("Couldn't delete the event");
+    showToast(err.message || "Couldn't delete the event");
   });
 }
 
@@ -4385,6 +4386,16 @@ function renderTicketDetail(){
     renderTicketDetail();
   }));
 
+  var canDelete = (t.status === "reported" || AUTH.staff.isAdmin) && (t.createdBy === STATE.self || AUTH.staff.isAdmin);
+  if(canDelete){
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "ticket-detail-delete";
+    delBtn.textContent = "Delete this job";
+    delBtn.addEventListener("click", function(){ deleteTicketFromDetail(t.id); });
+    ticketDetailBody.appendChild(delBtn);
+  }
+
   ticketDetailPos.textContent = (STATE.ticketDetailIndex + 1) + " of " + STATE.ticketDetailQueue.length + " · " + MAINT_STATUS_LABEL[t.status];
   ticketDetailPrev.disabled = STATE.ticketDetailIndex <= 0;
   ticketDetailNext.disabled = STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length - 1;
@@ -4397,6 +4408,21 @@ ticketDetailPrev.addEventListener("click", function(){
 ticketDetailNext.addEventListener("click", function(){
   if(STATE.ticketDetailIndex < STATE.ticketDetailQueue.length - 1){ STATE.ticketDetailIndex += 1; renderTicketDetail(); }
 });
+function deleteTicketFromDetail(id){
+  if(!confirm("Delete this job? This can't be undone.")) return;
+  apiDelete('/api/maintenance/' + encodeURIComponent(id)).then(function(){
+    STATE.tickets = STATE.tickets.filter(function(x){ return x.id !== id; });
+    STATE.ticketDetailQueue.splice(STATE.ticketDetailIndex, 1);
+    if(!STATE.ticketDetailQueue.length){ closeTicketDetail(); } else {
+      if(STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length) STATE.ticketDetailIndex = STATE.ticketDetailQueue.length - 1;
+      renderTicketDetail();
+    }
+    renderMaintenanceBoard();
+    showToast("Deleted");
+  }).catch(function(err){
+    showToast(err.message || "Couldn't delete that");
+  });
+}
 
 var tabMaintBadge = document.getElementById("tabMaintBadge");
 function refreshMaintenanceBadge(){

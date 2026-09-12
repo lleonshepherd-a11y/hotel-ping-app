@@ -702,6 +702,10 @@ export default {
         if (group.created_by !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can delete it" }, 403);
         }
+        const memberCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?").bind(id).first();
+        if (memberCount.n > 1 && !requester.is_admin) {
+          return json({ error: "Other departments have joined this event and it can't be deleted" }, 400);
+        }
         await env.DB.prepare("UPDATE groups SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         return json({ ok: true });
       }
@@ -1107,6 +1111,9 @@ export default {
         const requester = request._staff;
         if (existing.created_by !== requester.department_id && !requester.is_admin) {
           return json({ error: "You can only remove your own department's tickets" }, 403);
+        }
+        if (existing.status !== "reported" && !requester.is_admin) {
+          return json({ error: "This job has already been picked up and can't be deleted" }, 400);
         }
         await env.DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
         return json({ ok: true });
