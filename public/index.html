@@ -4296,13 +4296,13 @@ function sortedTickets(){
   var order = { reported: 0, in_progress: 1, fixed: 2 };
   return (STATE.tickets || []).slice().sort(function(a, b){
     if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    var pa = MAINT_PRIORITY_ORDER[a.priority] != null ? MAINT_PRIORITY_ORDER[a.priority] : 2;
+    var pb = MAINT_PRIORITY_ORDER[b.priority] != null ? MAINT_PRIORITY_ORDER[b.priority] : 2;
+    if(pa !== pb) return pa - pb;
     var aDeadline = a.status !== "fixed" && a.deadline;
     var bDeadline = b.status !== "fixed" && b.deadline;
     if(!!aDeadline !== !!bDeadline) return aDeadline ? -1 : 1;
     if(aDeadline && bDeadline && a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
-    var pa = MAINT_PRIORITY_ORDER[a.priority] != null ? MAINT_PRIORITY_ORDER[a.priority] : 2;
-    var pb = MAINT_PRIORITY_ORDER[b.priority] != null ? MAINT_PRIORITY_ORDER[b.priority] : 2;
-    if(pa !== pb) return pa - pb;
     if(order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
