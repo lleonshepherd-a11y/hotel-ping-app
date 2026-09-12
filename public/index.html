@@ -546,6 +546,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .18s cubic-bezier(.32,1.4,.4,1),background .18s ease}
 .event-card.deletable{touch-action:none}
 .event-card.drag-over{background:rgba(24,119,242,.14);box-shadow:0 0 0 2px var(--accent)}
+.event-card.landed{animation:eventCardLanded .4s cubic-bezier(.32,1.4,.4,1)}
+@keyframes eventCardLanded{
+  0%{background:rgba(24,119,242,.35);box-shadow:0 0 0 3px var(--accent);transform:scale(1.03)}
+  100%{background:var(--surface-2);box-shadow:0 0 0 0 transparent;transform:scale(1)}
+}
 .event-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .event-card-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
 .event-card-badge{background:var(--urgent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 7px}
@@ -3596,6 +3601,7 @@ var newEventForm = document.getElementById("newEventForm");
 var newEventName = document.getElementById("newEventName");
 
 STATE.groups = [];
+var pendingLandedGroupId = null;
 STATE.activeGroupId = null;
 STATE.groupMessages = {};
 
@@ -3689,13 +3695,24 @@ function attachDragChip(chipEl, onDrop, opts){
     if(!wasDragging) return;
     if(opts && opts.isMember){
       var overZone = pointOverDropZone(dropX, dropY);
+      if(overZone && navigator.vibrate) navigator.vibrate(18);
       endDragVisuals();
       if(overZone) onDrop();
     } else {
       var el = document.elementFromPoint(dropX, dropY);
       var cardEl = el && el.closest ? el.closest(".event-card") : null;
       endDragVisuals();
-      if(cardEl) onDrop(cardEl.getAttribute("data-group-id"));
+      if(cardEl){
+        if(navigator.vibrate) navigator.vibrate(18);
+        var landedGroupId = cardEl.getAttribute("data-group-id");
+        pendingLandedGroupId = landedGroupId;
+        setTimeout(function(){
+          if(pendingLandedGroupId === landedGroupId) pendingLandedGroupId = null;
+          var el = eventList.querySelector('.event-card[data-group-id="'+landedGroupId+'"]');
+          if(el) el.classList.remove("landed");
+        }, 450);
+        onDrop(landedGroupId);
+      }
     }
   }
   chipEl.addEventListener("pointerdown", function(e){
@@ -3718,26 +3735,63 @@ function attachDragChip(chipEl, onDrop, opts){
 }
 
 function joinGroup(groupId, deptId){
+  var deptName = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+  var g = STATE.groups.find(function(x){ return x.id === groupId; });
+  var alreadyMember = g && g.members.indexOf(deptId) !== -1;
+  if(g && !alreadyMember){
+    g.members.push(deptId);
+    g.isMember = g.isMember || deptId === STATE.self;
+    renderEventList();
+  }
+  showToast(deptName + " joined");
   apiSend('/api/groups/' + encodeURIComponent(groupId) + '/join', 'POST', { self: deptId }).then(function(){
-    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " joined");
     return loadGroups();
-  }).then(renderEventList).catch(function(){ showToast("Couldn't add them"); });
+  }).then(renderEventList).catch(function(){
+    if(g && !alreadyMember){
+      var idx = g.members.indexOf(deptId);
+      if(idx !== -1) g.members.splice(idx, 1);
+      renderEventList();
+    }
+    showToast("Couldn't add them");
+  });
 }
 function leaveGroup(groupId, deptId){
+  var deptName = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+  var g = STATE.groups.find(function(x){ return x.id === groupId; });
+  var idx = g ? g.members.indexOf(deptId) : -1;
+  if(g && idx !== -1){
+    g.members.splice(idx, 1);
+    renderEventList();
+  }
+  showToast(deptName + " left the event");
   apiSend('/api/groups/' + encodeURIComponent(groupId) + '/leave', 'POST', { self: deptId }).then(function(){
-    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " left the event");
     return loadGroups();
-  }).then(renderEventList).catch(function(){ showToast("Couldn't remove them"); });
+  }).then(renderEventList).catch(function(){
+    if(g && idx !== -1){
+      g.members.splice(idx, 0, deptId);
+      renderEventList();
+    }
+    showToast("Couldn't remove them");
+  });
 }
 function deleteGroup(groupId){
+  var removedIdx = STATE.groups.findIndex(function(x){ return x.id === groupId; });
+  var removed = removedIdx !== -1 ? STATE.groups.splice(removedIdx, 1)[0] : null;
+  if(removed) renderEventList();
+  showToast("Event deleted");
+  if(STATE.activeGroupId === groupId){
+    STATE.activeGroupId = null;
+    closeThreadView();
+  }
   apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
-    showToast("Event deleted");
-    if(STATE.activeGroupId === groupId){
-      STATE.activeGroupId = null;
-      closeThreadView();
-    }
     return loadGroups();
-  }).then(renderEventList).catch(function(){ showToast("Couldn't delete the event"); });
+  }).then(renderEventList).catch(function(){
+    if(removed){
+      STATE.groups.splice(removedIdx, 0, removed);
+      renderEventList();
+    }
+    showToast("Couldn't delete the event");
+  });
 }
 
 function renderEventPalette(){
@@ -3763,7 +3817,7 @@ function renderEventList(){
   }
   STATE.groups.forEach(function(g){
     var card = document.createElement("div");
-    card.className = "event-card";
+    card.className = "event-card" + (g.id === pendingLandedGroupId ? " landed" : "");
     card.setAttribute("data-group-id", g.id);
     var membersHtml = g.members.map(function(deptId){
       return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
