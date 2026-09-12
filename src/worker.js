@@ -830,6 +830,39 @@ export default {
         return json({ departments: rows.results.map((r) => ({ deptId: r.to_dept, avgSeconds: r.avg_seconds, count: r.n })) });
       }
 
+      if (method === "GET" && p === "/api/missed") {
+        const dept = request._staff.department_id;
+        const items = [];
+
+        const msgRows = await env.DB.prepare(
+          "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL ORDER BY created_at ASC"
+        ).bind(dept).all();
+        for (const m of msgRows.results) {
+          items.push({ kind: "message", id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+        }
+
+        if (dept === "maintenance") {
+          const ticketRows = await env.DB.prepare(
+            "SELECT * FROM maintenance_tickets WHERE status != 'fixed' ORDER BY created_at ASC"
+          ).all();
+          for (const t of ticketRows.results) {
+            items.push({ kind: "ticket", id: t.id, createdAt: t.created_at, ticket: rowToTicket(t) });
+          }
+        }
+
+        if (dept === "concierge") {
+          const reqRows = await env.DB.prepare(
+            "SELECT * FROM guest_requests WHERE status = 'new' ORDER BY created_at ASC"
+          ).all();
+          for (const r of reqRows.results) {
+            items.push({ kind: "guestRequest", id: r.id, createdAt: r.created_at, request: rowToGuestRequest(r) });
+          }
+        }
+
+        items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+        return json({ items });
+      }
+
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
         const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions } = body;

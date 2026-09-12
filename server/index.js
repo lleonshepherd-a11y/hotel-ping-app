@@ -611,6 +611,40 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { departments });
     }
 
+    if (req.method === 'GET' && p === '/api/missed') {
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      const items = [];
+
+      const msgRows = db.prepare(
+        "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL ORDER BY created_at ASC"
+      ).all(dept);
+      for (const m of msgRows) {
+        items.push({ kind: 'message', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+      }
+
+      if (dept === 'maintenance') {
+        const ticketRows = db.prepare(
+          "SELECT * FROM maintenance_tickets WHERE status != 'fixed' ORDER BY created_at ASC"
+        ).all();
+        for (const t of ticketRows) {
+          items.push({ kind: 'ticket', id: t.id, createdAt: t.created_at, ticket: rowToTicket(t) });
+        }
+      }
+
+      if (dept === 'concierge') {
+        const reqRows = db.prepare(
+          "SELECT * FROM guest_requests WHERE status = 'new' ORDER BY created_at ASC"
+        ).all();
+        for (const r of reqRows) {
+          items.push({ kind: 'guestRequest', id: r.id, createdAt: r.created_at, request: rowToGuestRequest(r) });
+        }
+      }
+
+      items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      return send(res, 200, { items });
+    }
+
     if (req.method === 'POST' && p === '/api/messages/read') {
       const body = await readJsonBody(req);
       if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return send(res, 400, { error: 'Unknown department' });

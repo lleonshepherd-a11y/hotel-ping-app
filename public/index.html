@@ -555,6 +555,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .mute-row-name{font-size:14px;font-weight:600;color:var(--text)}
 .mute-row button{flex:none;border:none;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:700;background:var(--surface-3);color:var(--text-dim);cursor:pointer}
 .logout-btn svg{width:15px;height:15px}
+.sb-menu-badge{flex:none;min-width:20px;height:20px;padding:0 6px;margin-right:2px;border-radius:10px;background:var(--urgent);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.missed-section + .missed-section{margin-top:22px}
+.missed-section-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.missed-section-title{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim)}
+.missed-section-count{background:var(--surface-3);color:var(--text-dim);font-size:11px;font-weight:800;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.missed-list{display:flex;flex-direction:column;gap:8px}
+.missed-empty{font-size:13px;color:var(--text-faint);padding:6px 2px 14px}
+.missed-msg-card{display:flex;gap:10px;background:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.08);cursor:pointer;border-left:4px solid var(--accent)}
+.missed-msg-card:active{background:var(--surface-3)}
+.missed-msg-avatar{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:800}
+.missed-msg-body{flex:1;min-width:0}
+.missed-msg-top{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.missed-msg-from{font-size:12.5px;font-weight:700;color:var(--text)}
+.missed-msg-urgent{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--urgent);background:rgba(255,59,48,.12);padding:1px 6px;border-radius:8px}
+.missed-msg-preview{font-size:13px;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.missed-msg-time{font-size:10.5px;color:var(--text-faint);margin-top:3px}
 .admin-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
 .admin-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-pop);padding:24px}
 .admin-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
@@ -937,6 +953,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="sb-menu-row" id="handoverBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M9 13h6M9 17h4"/></svg></span>
         <span class="sb-menu-label">Shift handover</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <button class="sb-menu-row" id="missedBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
+        <span class="sb-menu-label">Missed while off duty</span>
+        <span class="sb-menu-badge" id="missedBadge" hidden>0</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="moreOptionsBtn" type="button">
@@ -1405,6 +1427,39 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
     <p class="broadcast-hint">Your average time to read urgent messages, last 7 days.</p>
     <div class="resp-list" id="myActivityList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="missedOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Missed while off duty</h2>
+      <button class="admin-close" id="missedClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Everything that came in while you were off duty. Reply or update each one here, it clears itself as you go.</p>
+    <div class="missed-section">
+      <div class="missed-section-head">
+        <span class="missed-section-title">Messages</span>
+        <span class="missed-section-count" id="missedMsgCount">0</span>
+      </div>
+      <div class="missed-list" id="missedMsgList"></div>
+    </div>
+    <div class="missed-section" id="missedTicketsSection" hidden>
+      <div class="missed-section-head">
+        <span class="missed-section-title">Repair tickets</span>
+        <span class="missed-section-count" id="missedTicketCount">0</span>
+      </div>
+      <div class="missed-list" id="missedTicketList"></div>
+    </div>
+    <div class="missed-section" id="missedGuestsSection" hidden>
+      <div class="missed-section-head">
+        <span class="missed-section-title">Guest requests</span>
+        <span class="missed-section-count" id="missedGuestCount">0</span>
+      </div>
+      <div class="missed-list" id="missedGuestList"></div>
+    </div>
   </div>
 </div>
 
@@ -3493,7 +3548,7 @@ function refreshNow(){
 
 function startPolling(){
   if(pollTimer) return;
-  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); refreshMaintenanceBadge(); }, 4000);
+  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); refreshMaintenanceBadge(); pollMissed(); }, 4000);
   startTypingPoll();
 }
 
@@ -3559,6 +3614,7 @@ function enterApp(staff){
   startPolling();
   refreshMaintenanceBadge();
   if(staff.departmentId === "concierge") refreshGuestsBadge();
+  pollMissed();
   checkPushPrompt();
 }
 
@@ -4044,6 +4100,105 @@ myActivityBtn.addEventListener("click", function(){
 });
 myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
 myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
+
+var missedBtn = document.getElementById("missedBtn");
+var missedBadge = document.getElementById("missedBadge");
+var missedOverlay = document.getElementById("missedOverlay");
+var missedClose = document.getElementById("missedClose");
+var missedMsgList = document.getElementById("missedMsgList");
+var missedMsgCount = document.getElementById("missedMsgCount");
+var missedTicketsSection = document.getElementById("missedTicketsSection");
+var missedTicketList = document.getElementById("missedTicketList");
+var missedTicketCount = document.getElementById("missedTicketCount");
+var missedGuestsSection = document.getElementById("missedGuestsSection");
+var missedGuestList = document.getElementById("missedGuestList");
+var missedGuestCount = document.getElementById("missedGuestCount");
+
+function buildMissedMessageCard(item){
+  var m = item.message;
+  var dept = DEPTS[m.from] || { name: m.from, initials: "?", color: "#888" };
+  var preview = m.type === "text" ? m.body : (m.type === "image" ? "📷 Photo" : m.type === "file" ? "📎 " + (m.fileName || "File") : "🎤 Voice message");
+  var card = document.createElement("div");
+  card.className = "missed-msg-card";
+  card.innerHTML =
+    '<span class="missed-msg-avatar" style="background:' + dept.color + '">' + esc(dept.initials) + '</span>' +
+    '<div class="missed-msg-body">' +
+      '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span>' + (m.urgent ? '<span class="missed-msg-urgent">Urgent</span>' : '') + '</div>' +
+      '<div class="missed-msg-preview">' + esc(preview) + '</div>' +
+      '<div class="missed-msg-time">' + fmtNoteTime(item.createdAt) + '</div>' +
+    '</div>';
+  card.addEventListener("click", function(){
+    missedOverlay.hidden = true;
+    showTab("chat");
+    openThread(m.from);
+  });
+  return card;
+}
+
+function renderMissedFeed(items){
+  var messages = items.filter(function(i){ return i.kind === "message"; });
+  var tickets = items.filter(function(i){ return i.kind === "ticket"; });
+  var guests = items.filter(function(i){ return i.kind === "guestRequest"; });
+
+  missedMsgCount.textContent = String(messages.length);
+  missedMsgList.innerHTML = "";
+  if(!messages.length){
+    missedMsgList.innerHTML = '<div class="missed-empty">No missed messages. Nice work.</div>';
+  } else {
+    messages.forEach(function(item){ missedMsgList.appendChild(buildMissedMessageCard(item)); });
+  }
+
+  missedTicketsSection.hidden = STATE.self !== "maintenance";
+  if(STATE.self === "maintenance"){
+    missedTicketCount.textContent = String(tickets.length);
+    missedTicketList.innerHTML = "";
+    if(!tickets.length){
+      missedTicketList.innerHTML = '<div class="missed-empty">No open tickets waiting on you.</div>';
+    } else {
+      tickets.forEach(function(item){
+        STATE.tickets = STATE.tickets || [];
+        if(!STATE.tickets.some(function(x){ return x.id === item.ticket.id; })) STATE.tickets.push(item.ticket);
+        var card = buildMaintCard(item.ticket);
+        card.addEventListener("click", function(){ missedOverlay.hidden = true; });
+        missedTicketList.appendChild(card);
+      });
+    }
+  }
+
+  missedGuestsSection.hidden = STATE.self !== "concierge";
+  if(STATE.self === "concierge"){
+    missedGuestCount.textContent = String(guests.length);
+    missedGuestList.innerHTML = "";
+    if(!guests.length){
+      missedGuestList.innerHTML = '<div class="missed-empty">No new guest requests waiting.</div>';
+    } else {
+      guests.forEach(function(item){
+        STATE.guestRequests = STATE.guestRequests || [];
+        if(!STATE.guestRequests.some(function(x){ return x.id === item.request.id; })) STATE.guestRequests.push(item.request);
+        missedGuestList.appendChild(buildGuestCard(item.request));
+      });
+    }
+  }
+}
+
+function pollMissed(){
+  apiGet('/api/missed').then(function(res){
+    var n = res.items.length;
+    missedBadge.hidden = n === 0;
+    missedBadge.textContent = n > 99 ? "99+" : String(n);
+    if(!missedOverlay.hidden) renderMissedFeed(res.items);
+  }).catch(function(){});
+}
+
+missedBtn.addEventListener("click", function(){
+  missedOverlay.hidden = false;
+  missedMsgList.innerHTML = '<div class="missed-empty">Loading…</div>';
+  missedTicketList.innerHTML = "";
+  missedGuestList.innerHTML = "";
+  pollMissed();
+});
+missedClose.addEventListener("click", function(){ missedOverlay.hidden = true; });
+missedOverlay.addEventListener("click", function(e){ if(e.target === missedOverlay) missedOverlay.hidden = true; });
 
 var privacyBtn = document.getElementById("privacyBtn");
 var privacyOverlay = document.getElementById("privacyOverlay");
