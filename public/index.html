@@ -179,6 +179,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-row2{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:2px}
 .t-preview{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .thread-item.unread .t-preview{color:var(--text);font-weight:600}
+.t-preview.search-hit{color:var(--accent);font-weight:600}
 .thread-item.unread .t-name{color:var(--text)}
 .t-badge{flex:none;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .t-badge.urgent{background:var(--urgent)}
@@ -1259,23 +1260,30 @@ function contactNameFor(id){
   return staff.map(function(s){ return s.name; }).join(", ");
 }
 
-function matchesSearch(id, term){
-  if(!term) return true;
+function findSearchMatch(id, term){
+  if(!term) return { match: true, message: null };
   var d = DEPTS[id];
-  if(d.name.toLowerCase().indexOf(term) !== -1) return true;
+  if(d.name.toLowerCase().indexOf(term) !== -1) return { match: true, message: null };
   var contact = contactNameFor(id);
-  if(contact && contact.toLowerCase().indexOf(term) !== -1) return true;
-  return (STATE.data[id] || []).some(function(m){
-    var t = (m.text || m.fileName || "").toLowerCase();
-    return t.indexOf(term) !== -1;
-  });
+  if(contact && contact.toLowerCase().indexOf(term) !== -1) return { match: true, message: null };
+  var msgs = STATE.data[id] || [];
+  for(var i = msgs.length - 1; i >= 0; i--){
+    var t = (msgs[i].text || msgs[i].fileName || "").toLowerCase();
+    if(t.indexOf(term) !== -1) return { match: true, message: msgs[i] };
+  }
+  return { match: false, message: null };
 }
 
 function renderList(){
   listLabel.textContent = DEPTS[STATE.self].name + " · Conversations";
   threadList.innerHTML = "";
   var term = (STATE.searchTerm || "").trim().toLowerCase();
-  var ids = sortedDeptIds().filter(function(id){ return matchesSearch(id, term); });
+  var matches = {};
+  var ids = sortedDeptIds().filter(function(id){
+    var r = findSearchMatch(id, term);
+    if(r.match) matches[id] = r.message;
+    return r.match;
+  });
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
   if(ids.length === 0){ searchEmptyTerm.textContent = STATE.searchTerm; return; }
@@ -1286,6 +1294,7 @@ function renderList(){
     var unread = unreadCount(id);
     var urgentUnread = hasUrgentUnread(id);
     var contact = contactNameFor(id);
+    var searchHit = matches[id];
 
     var el = document.createElement("button");
     el.className = "thread-item" + (id === STATE.active ? " active" : "") + (unread ? " unread" : "");
@@ -1293,11 +1302,23 @@ function renderList(){
       '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
       '<div class="t-body">'+
         '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
-        '<div class="t-row2"><span class="t-preview">'+(last ? esc(previewText(last)) : 'No messages yet')+'</span>'+
+        '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
       '</div>';
-    el.addEventListener("click", function(){ openThread(id); });
+    el.addEventListener("click", function(){
+      openThread(id);
+      if(searchHit){
+        setTimeout(function(){
+          var target = threadScroll.querySelector('[data-msg-id="'+searchHit.id+'"]');
+          if(target){
+            target.scrollIntoView({ behavior: "smooth", block: "center" });
+            target.classList.add("flash-highlight");
+            setTimeout(function(){ target.classList.remove("flash-highlight"); }, 1200);
+          }
+        }, 80);
+      }
+    });
     threadList.appendChild(el);
   });
 }
