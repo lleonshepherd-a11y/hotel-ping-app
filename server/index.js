@@ -228,6 +228,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && !p.startsWith('/api/') && !p.startsWith('/uploads/')) {
       let filePath = path.join(PUBLIC_DIR, p === '/' ? 'index.html' : p);
       if (!filePath.startsWith(PUBLIC_DIR)) return send(res, 403, { error: 'Forbidden' });
+      if ((!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) && fs.existsSync(filePath + '.html')) {
+        filePath = filePath + '.html';
+      }
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) filePath = path.join(PUBLIC_DIR, 'index.html');
       const ext = path.extname(filePath);
       const type = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[ext] || 'application/octet-stream';
