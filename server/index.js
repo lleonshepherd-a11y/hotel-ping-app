@@ -815,7 +815,7 @@ const server = http.createServer(async (req, res) => {
       let photoPath = null;
       if (body.photoBase64) {
         const buf = Buffer.from(body.photoBase64, 'base64');
-        if (buf.length > 25 * 1024 * 1024) return send(res, 400, { error: 'Photo is too large (25MB max)' });
+        if (buf.length > 60 * 1024 * 1024) return send(res, 400, { error: 'File is too large (60MB max)' });
         const ext = (body.photoMime && body.photoMime.split('/')[1]) ? '.' + body.photoMime.split('/')[1].split(';')[0] : '';
         const safeName = crypto.randomUUID() + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);

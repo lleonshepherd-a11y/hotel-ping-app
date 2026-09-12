@@ -596,7 +596,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-photo-btn svg{width:16px;height:16px}
 .maint-new-form .admin-add-btn{flex:none}
 .maint-photo-preview{position:relative;width:84px}
-.maint-photo-preview img{width:84px;height:84px;object-fit:cover;border-radius:10px;display:block}
+.maint-photo-preview img,.maint-photo-preview video{width:84px;height:84px;object-fit:cover;border-radius:10px;display:block;background:#000}
 .maint-photo-remove{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--urgent);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .maint-photo-remove svg{width:11px;height:11px}
 .maint-board{display:flex;gap:12px;overflow-x:auto;padding:4px 20px 20px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -876,14 +876,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <div class="maint-form-row">
           <label class="maint-photo-btn" for="newMaintPhoto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/></svg>
-            <span id="maintPhotoBtnLabel">Add photo</span>
+            <span id="maintPhotoBtnLabel">Add photo or video</span>
           </label>
-          <input type="file" id="newMaintPhoto" accept="image/*" hidden>
+          <input type="file" id="newMaintPhoto" accept="image/*,video/*" hidden>
           <button type="submit" class="admin-add-btn">Report issue</button>
         </div>
         <div class="maint-photo-preview" id="maintPhotoPreview" hidden>
           <img id="maintPhotoPreviewImg" alt="Photo preview">
-          <button type="button" class="maint-photo-remove" id="maintPhotoRemove" aria-label="Remove photo">
+          <video id="maintPhotoPreviewVideo" muted playsinline hidden></video>
+          <button type="button" class="maint-photo-remove" id="maintPhotoRemove" aria-label="Remove photo or video">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
@@ -1231,7 +1232,7 @@ function avatarGradient(deptId){
 
 var DEPTS = {
   gm:           { name:"General Manager",          initials:"GM", color:"#a3854f" },
-  foh:          { name:"Front of House Manager",   initials:"FH", color:"#4c6f92" },
+  foh:          { name:"Head Receptionist",   initials:"FH", color:"#4c6f92" },
   concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8" },
   restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f" },
   kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c" },
@@ -4131,6 +4132,7 @@ var newMaintDesc = document.getElementById("newMaintDesc");
 var newMaintPhoto = document.getElementById("newMaintPhoto");
 var maintPhotoPreview = document.getElementById("maintPhotoPreview");
 var maintPhotoPreviewImg = document.getElementById("maintPhotoPreviewImg");
+var maintPhotoPreviewVideo = document.getElementById("maintPhotoPreviewVideo");
 var maintPhotoRemove = document.getElementById("maintPhotoRemove");
 var maintError = document.getElementById("maintError");
 var maintPhotoFile = null;
@@ -4159,7 +4161,10 @@ function buildMaintCard(t){
     html += '<div class="maint-card-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
   }
   html += '<div class="maint-card-desc">' + esc(t.description) + '</div>';
-  if(t.photoUrl){
+  var isVideo = t.photoUrl && /\.(mp4|webm|mov|m4v|3gp)($|\?)/i.test(t.photoUrl);
+  if(t.photoUrl && isVideo){
+    html += '<video class="maint-card-photo" src="' + t.photoUrl + '" controls playsinline></video>';
+  } else if(t.photoUrl){
     html += '<img class="maint-card-photo" src="' + t.photoUrl + '" alt="Issue photo">';
   }
   html += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
@@ -4196,7 +4201,7 @@ function buildMaintCard(t){
     actions.appendChild(reopenBtn);
   }
   card.appendChild(actions);
-  if(t.photoUrl){
+  if(t.photoUrl && !isVideo){
     card.querySelector(".maint-card-photo").addEventListener("click", function(){ window.open(t.photoUrl, "_blank"); });
   }
   return card;
@@ -4243,9 +4248,18 @@ newMaintPhoto.addEventListener("change", function(){
   var file = newMaintPhoto.files && newMaintPhoto.files[0];
   if(!file) return;
   maintPhotoFile = file;
+  var isVideo = file.type.indexOf("video/") === 0;
   var reader = new FileReader();
   reader.onload = function(){
-    maintPhotoPreviewImg.src = String(reader.result);
+    if(isVideo){
+      maintPhotoPreviewVideo.src = String(reader.result);
+      maintPhotoPreviewVideo.hidden = false;
+      maintPhotoPreviewImg.hidden = true;
+    } else {
+      maintPhotoPreviewImg.src = String(reader.result);
+      maintPhotoPreviewImg.hidden = false;
+      maintPhotoPreviewVideo.hidden = true;
+    }
     maintPhotoPreview.hidden = false;
   };
   reader.readAsDataURL(file);
@@ -4254,6 +4268,7 @@ maintPhotoRemove.addEventListener("click", function(){
   maintPhotoFile = null;
   newMaintPhoto.value = "";
   maintPhotoPreview.hidden = true;
+  maintPhotoPreviewVideo.src = "";
 });
 
 newMaintForm.addEventListener("submit", function(e){
@@ -4279,6 +4294,7 @@ newMaintForm.addEventListener("submit", function(e){
     maintPhotoFile = null;
     newMaintPhoto.value = "";
     maintPhotoPreview.hidden = true;
+    maintPhotoPreviewVideo.src = "";
     showToast("Reported");
   }).catch(function(err){
     maintError.textContent = err.message || "Couldn't report that issue.";

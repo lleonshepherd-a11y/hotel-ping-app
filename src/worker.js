@@ -1,6 +1,6 @@
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
 const DEPT_NAMES = {
-  gm: "General Manager", foh: "Front of House Manager", concierge: "Head Concierge", restaurant: "Restaurant Manager",
+  gm: "General Manager", foh: "Head Receptionist", concierge: "Head Concierge", restaurant: "Restaurant Manager",
   kitchen: "Head Chef", bar: "Bar Manager", housekeeping: "Head Housekeeper", maintenance: "Maintenance Manager",
   dashboard: "Dashboard",
 };
@@ -1038,7 +1038,7 @@ export default {
           const binary = atob(body.photoBase64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          if (bytes.length > 25 * 1024 * 1024) return json({ error: "Photo is too large (25MB max)" }, 400);
+          if (bytes.length > 60 * 1024 * 1024) return json({ error: "File is too large (60MB max)" }, 400);
           const ext = body.photoMime && body.photoMime.split("/")[1] ? "." + body.photoMime.split("/")[1].split(";")[0] : "";
           const safeName = crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.photoMime || "application/octet-stream" } });

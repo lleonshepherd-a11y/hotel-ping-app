@@ -222,7 +222,7 @@ if (!staffColumns.includes('profile_complete')) {
 
 const DEPARTMENTS = [
   { id: 'gm', name: 'General Manager', contact: 'Dave' },
-  { id: 'foh', name: 'Front of House Manager', contact: null },
+  { id: 'foh', name: 'Head Receptionist', contact: null },
   { id: 'concierge', name: 'Head Concierge', contact: null },
   { id: 'restaurant', name: 'Restaurant Manager', contact: null },
   { id: 'kitchen', name: 'Head Chef', contact: 'Peter' },

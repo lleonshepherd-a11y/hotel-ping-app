@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS external_notifications (
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
-  ('foh', 'Front of House Manager', NULL, 1),
+  ('foh', 'Head Receptionist', NULL, 1),
   ('concierge', 'Head Concierge', NULL, 1),
   ('restaurant', 'Restaurant Manager', NULL, 1),
   ('kitchen', 'Head Chef', 'Peter', 1),
