@@ -4752,8 +4752,7 @@ function renderEventList(){
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
-    var alreadySharedToAll = DEPT_ORDER.every(function(d){ return g.members.indexOf(d) !== -1; });
-    var canShare = AUTH.staff && AUTH.staff.isAdmin && !alreadySharedToAll;
+    var canShare = AUTH.staff && AUTH.staff.isAdmin && !g.sharedAt;
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+'</span>'+

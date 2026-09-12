@@ -238,6 +238,7 @@ async function insertMessage(env, ctx, opts) {
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+  if (opts.silent) return row;
 
   const previewMap = { text: opts.body || "", image: "📷 Photo", file: "📎 " + (opts.fileName || "File"), audio: "🎤 Voice message" };
   const notifyBody = opts.urgent ? "🔴 Urgent: " + (previewMap[opts.type] || "New message") : (previewMap[opts.type] || "New message");
@@ -307,7 +308,7 @@ function rowToGuestRequest(row) {
   };
 }
 function rowToGroup(row, members) {
-  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined };
+  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined };
 }
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
@@ -698,7 +699,7 @@ export default {
           const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
           const members = memberRows.results.map((m) => m.department_id);
           const isMember = members.includes(self);
-          if (g.archived_at && !isMember && !request._staff.is_admin) continue;
+          if (g.archived_at && !request._staff.is_admin && !g.shared_at) continue;
           const last = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1").bind(g.id).first();
           const readRow = await env.DB.prepare("SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?").bind(g.id, self).first();
           const since = readRow ? readRow.last_read_at : "1970-01-01T00:00:00.000Z";
@@ -707,7 +708,7 @@ export default {
           ).bind(g.id, self, since).first();
           groups.push({
             id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
-            archivedAt: g.archived_at || undefined,
+            archivedAt: g.archived_at || undefined, sharedAt: g.shared_at || undefined,
             members, isMember,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: isMember ? unread.n : 0,
@@ -778,6 +779,7 @@ export default {
         await insertMessage(env, ctx, {
           from: requester.department_id, groupId: id, type: "text",
           body: actorName + " ended this event. It's kept here for training.",
+          silent: true,
         });
         const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
         return json({ group: rowToGroup(row) });
@@ -791,25 +793,39 @@ export default {
         if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
         if (!group.archived_at) return json({ error: "End the event before sharing it" }, 400);
         const now = new Date().toISOString();
-        for (const deptId of DEPT_IDS) {
-          await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, deptId, now).run();
-        }
+        await env.DB.prepare("UPDATE groups SET shared_at = ? WHERE id = ?").bind(now, id).run();
         const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
         await insertMessage(env, ctx, {
           from: requester.department_id, groupId: id, type: "text",
+          silent: true,
           body: actorName + " shared this event with every department.",
         });
-        const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(id).all();
+        const shareNotify = Promise.all(
+          Array.from(DEPT_IDS).filter((d) => d !== requester.department_id).map((deptId) => notifyDepartment(env, deptId, {
+            title: actorName,
+            body: "Shared the event “" + group.name + "” for you to look back through",
+            url: "/",
+            tag: "hotel-ping-group-" + id,
+          }, requester.department_id))
+        ).catch((e) => console.error("notifyDepartment (share) top-level error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(shareNotify); else await shareNotify;
         const row2 = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        return json({ group: rowToGroup(row2, memberRows.results.map((m) => m.department_id)) });
+        return json({ group: rowToGroup(row2) });
       }
 
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/messages")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/messages".length));
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
-        if (!member && !request._staff.is_admin) return json({ error: "Not a member of this group" }, 403);
+        const group = await env.DB.prepare("SELECT archived_at, shared_at FROM groups WHERE id = ?").bind(id).first();
+        if (!request._staff.is_admin) {
+          if (group && group.archived_at) {
+            if (!group.shared_at) return json({ error: "This event has ended and is only visible to the General Manager" }, 403);
+          } else {
+            const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
+            if (!member) return json({ error: "Not a member of this group" }, 403);
+          }
+        }
         const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
         return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }

@@ -256,6 +256,9 @@ if (!groupColumns.includes('deleted_at')) {
 if (!groupColumns.includes('archived_at')) {
   db.exec('ALTER TABLE groups ADD COLUMN archived_at TEXT');
 }
+if (!groupColumns.includes('shared_at')) {
+  db.exec('ALTER TABLE groups ADD COLUMN shared_at TEXT');
+}
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
 if (!staffColumns.includes('profile_complete')) {
