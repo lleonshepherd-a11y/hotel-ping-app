@@ -19,6 +19,7 @@ const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const GUEST_REQUEST_STATUSES = ['new', 'in_progress', 'completed'];
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -70,6 +71,19 @@ function rowToTicket(row) {
 }
 function rowToTicketReply(row) {
   return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
+}
+function rowToGuestRequest(row) {
+  return {
+    id: row.id,
+    roomNumber: row.room_number,
+    text: row.request_text,
+    status: row.status,
+    replyText: row.reply_text || undefined,
+    pinned: !!row.pinned_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at || undefined,
+  };
 }
 
 function rowToMessage(row, viewerDeptId, isAdmin) {
@@ -249,6 +263,33 @@ const server = http.createServer(async (req, res) => {
       db.prepare('INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)')
         .run(idempotencyKey, row.id, new Date().toISOString());
       return send(res, 201, { ok: true, duplicate: false, messageId: row.id });
+    }
+
+    // ---- Guest concierge requests (public, no staff session — reached via a room QR code) ----
+    if (req.method === 'POST' && p === '/api/guest-requests') {
+      const body = await readJsonBody(req);
+      const roomNumber = String(body.roomNumber || '').trim();
+      const text = String(body.text || '').trim();
+      if (!roomNumber) return send(res, 400, { error: 'Room number is required' });
+      if (roomNumber.length > 20) return send(res, 400, { error: 'Room number is too long' });
+      if (!text) return send(res, 400, { error: 'Please describe what you need' });
+      if (text.length > 500) return send(res, 400, { error: 'Message is too long' });
+
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO guest_requests (id, room_number, request_text, status, created_at, updated_at) VALUES (?, ?, ?, 'new', ?, ?)"
+      ).run(id, roomNumber, text, now, now);
+      const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      console.log('[guest request notify] concierge department: Room ' + roomNumber + ': ' + text);
+      return send(res, 201, { request: rowToGuestRequest(row) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/guest-requests/') && !p.endsWith('/status') && !p.endsWith('/pin')) {
+      const id = decodeURIComponent(p.slice('/api/guest-requests/'.length));
+      const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      if (!row) return send(res, 404, { error: 'Not found' });
+      return send(res, 200, { request: rowToGuestRequest(row) });
     }
 
     // ---- Auth gate: every /api/ route except login needs a valid session ----
@@ -955,6 +996,49 @@ const server = http.createServer(async (req, res) => {
       }
       db.prepare('DELETE FROM maintenance_tickets WHERE id = ?').run(id);
       return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/guest-requests') {
+      const requester = staffFromToken(req);
+      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+        return send(res, 403, { error: 'Concierge access required' });
+      }
+      const rows = db.prepare('SELECT * FROM guest_requests ORDER BY created_at DESC').all();
+      return send(res, 200, { requests: rows.map(rowToGuestRequest) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/status')) {
+      const requester = staffFromToken(req);
+      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+        return send(res, 403, { error: 'Concierge access required' });
+      }
+      const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/status'.length));
+      const body = await readJsonBody(req);
+      const status = body.status;
+      if (!GUEST_REQUEST_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
+      const existing = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Request not found' });
+      const replyText = body.replyText !== undefined ? (String(body.replyText).trim() || null) : existing.reply_text;
+      const now = new Date().toISOString();
+      db.prepare('UPDATE guest_requests SET status = ?, reply_text = ?, updated_at = ?, completed_at = ? WHERE id = ?')
+        .run(status, replyText, now, status === 'completed' ? now : null, id);
+      const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      return send(res, 200, { request: rowToGuestRequest(row) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/pin')) {
+      const requester = staffFromToken(req);
+      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+        return send(res, 403, { error: 'Concierge access required' });
+      }
+      const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/pin'.length));
+      const existing = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Request not found' });
+      const now = new Date().toISOString();
+      const newPinned = existing.pinned_at ? null : now;
+      db.prepare('UPDATE guest_requests SET pinned_at = ? WHERE id = ?').run(newPinned, id);
+      const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
+      return send(res, 200, { request: rowToGuestRequest(row) });
     }
 
     if (req.method === 'POST' && p === '/api/escalations/check') {

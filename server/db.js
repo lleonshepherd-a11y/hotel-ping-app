@@ -220,6 +220,19 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS guest_requests (
+    id TEXT PRIMARY KEY,
+    room_number TEXT NOT NULL,
+    request_text TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new','in_progress','completed')),
+    reply_text TEXT,
+    pinned_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_guest_requests_status ON guest_requests(status, created_at);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

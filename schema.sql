@@ -150,6 +150,19 @@ CREATE TABLE IF NOT EXISTS maintenance_replies (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
 
+CREATE TABLE IF NOT EXISTS guest_requests (
+  id TEXT PRIMARY KEY,
+  room_number TEXT NOT NULL,
+  request_text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK(status IN ('new','in_progress','completed')),
+  reply_text TEXT,
+  pinned_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_guest_requests_status ON guest_requests(status, created_at);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Head Receptionist', NULL, 1),

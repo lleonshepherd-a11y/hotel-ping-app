@@ -1,0 +1,190 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Concierge — Noir House Hotel</title>
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#fff}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",Roboto,sans-serif;
+    color:#1f1c17;
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:0 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  .brand{flex:none;padding-top:calc(34px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:9px}
+  .brand-mark{width:38px;height:38px;border-radius:10px;overflow:hidden;box-shadow:0 6px 16px -6px rgba(31,28,23,.22),0 0 0 1px rgba(31,28,23,.06)}
+  .brand-mark img{width:100%;height:100%;object-fit:cover;display:block}
+  .brand-tag{font-size:11px;font-weight:700;letter-spacing:.22em;color:rgba(31,28,23,.4);text-transform:uppercase}
+  .hero{text-align:center;margin:26px 0 22px;max-width:400px;width:100%}
+  .hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#a3823f;margin-bottom:8px}
+  .hero-room{font-family:Manrope,sans-serif;font-weight:800;font-size:34px;letter-spacing:-.02em;color:#1f1c17}
+  .hero-rule{width:34px;height:2px;background:linear-gradient(90deg,rgba(184,151,92,0),rgba(184,151,92,.9),rgba(184,151,92,0));margin:12px auto}
+  .hero-sub{font-size:13px;color:rgba(31,28,23,.52);font-weight:500}
+  .panel{width:100%;max-width:400px;background:#fff;border:1px solid rgba(31,28,23,.07);border-radius:20px;padding:16px 16px 14px;box-shadow:0 20px 46px -26px rgba(31,28,23,.22);margin-bottom:22px}
+  .panel-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(31,28,23,.4);margin-bottom:8px}
+  .panel textarea{width:100%;min-height:64px;border-radius:13px;border:1.5px solid rgba(31,28,23,.1);background:#f8f5ef;font-size:16px;color:#1f1c17;padding:12px 13px;margin-bottom:10px;line-height:1.4;font-family:inherit;resize:none}
+  .panel textarea::placeholder{color:rgba(31,28,23,.32)}
+  .send-btn{width:100%;padding:13px;border:none;border-radius:13px;background:linear-gradient(150deg,#d9bb8b,#b8975c);color:#2a2013;font-size:14px;font-weight:800;letter-spacing:.01em;cursor:pointer;font-family:inherit}
+  .send-btn:disabled{opacity:.55;cursor:default}
+  .form-error{font-size:12.5px;color:#c0392b;font-weight:600;margin-top:9px;min-height:1px}
+  .list-wrap{width:100%;max-width:400px}
+  .list-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(31,28,23,.4);margin-bottom:10px}
+  .req-empty{font-size:12.5px;color:rgba(31,28,23,.4);text-align:center;padding:10px 0}
+  .req-card{background:#fff;border:1px solid rgba(31,28,23,.07);border-radius:16px;padding:13px 15px;margin-bottom:10px;box-shadow:0 10px 24px -18px rgba(31,28,23,.18)}
+  .req-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .req-text{font-size:13.5px;color:#1f1c17;font-weight:600}
+  .req-pill{display:inline-flex;align-items:center;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .req-pill.new{background:rgba(224,144,44,.14);color:#b5701f}
+  .req-pill.in_progress{background:rgba(24,119,242,.12);color:#1877f2}
+  .req-pill.completed{background:rgba(47,154,92,.14);color:#2f9a5c}
+  .req-time{font-size:11.5px;color:rgba(31,28,23,.4);margin-top:5px}
+  .req-reply-rule{border-top:1px solid rgba(31,28,23,.08);margin:8px 0}
+  .req-reply{font-size:13px;color:rgba(31,28,23,.62);line-height:1.5;font-style:italic}
+  .footer{flex:none;text-align:center;font-size:11.5px;color:rgba(31,28,23,.38);font-weight:500;padding:16px 20px 6px}
+  .no-room{max-width:340px;text-align:center;margin-top:120px;font-size:14px;color:rgba(31,28,23,.55);line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <div class="brand-mark"><img src="hotel-ping-logo-tight.png" alt="Noir House Hotel logo"></div>
+  <div class="brand-tag">Noir House Hotel</div>
+</div>
+
+<div id="app" hidden style="width:100%;display:flex;flex-direction:column;align-items:center;flex:1;min-height:0;overflow-y:auto">
+  <div class="hero">
+    <div class="hero-eyebrow">Concierge</div>
+    <div class="hero-room" id="roomLabel">Room</div>
+    <div class="hero-rule"></div>
+    <div class="hero-sub">How can we help you today?</div>
+  </div>
+
+  <form class="panel" id="requestForm">
+    <div class="panel-label">New request</div>
+    <textarea id="requestText" placeholder="A taxi for 7pm, a dinner reservation, extra towels&hellip;" maxlength="500" required></textarea>
+    <button type="submit" class="send-btn" id="sendBtn">Send request</button>
+    <div class="form-error" id="formError"></div>
+  </form>
+
+  <div class="list-wrap">
+    <div class="list-label">Your requests</div>
+    <div id="reqList"></div>
+  </div>
+</div>
+
+<div id="noRoom" class="no-room" hidden>This link is missing a room number. Please scan the QR code in your room again, or ask reception for help.</div>
+
+<div class="footer">Concierge, whenever you need us</div>
+
+<script>
+(function(){
+  var params = new URLSearchParams(location.search);
+  var room = (params.get("room") || "").trim();
+  var appEl = document.getElementById("app");
+  var noRoomEl = document.getElementById("noRoom");
+  if(!room){ noRoomEl.hidden = false; return; }
+  appEl.hidden = false;
+  document.getElementById("roomLabel").textContent = "Room " + room;
+
+  var STORE_KEY = "hp_guest_requests_" + room;
+  function loadIds(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); }catch(e){ return []; } }
+  function saveIds(ids){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(ids)); }catch(e){} }
+
+  var requests = {}; // id -> request object
+  var order = loadIds();
+
+  function esc(s){ return (s||"").replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; }); }
+  function fmtTime(iso){
+    var d = new Date(iso);
+    return d.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  }
+  var STATUS_LABEL = { new: "Received", in_progress: "In progress", completed: "Completed" };
+
+  function render(){
+    var listEl = document.getElementById("reqList");
+    var items = order.map(function(id){ return requests[id]; }).filter(Boolean);
+    if(!items.length){
+      listEl.innerHTML = '<div class="req-empty">No requests yet</div>';
+      return;
+    }
+    listEl.innerHTML = items.map(function(r){
+      var html = '<div class="req-card">' +
+        '<div class="req-head"><span class="req-text">' + esc(r.text) + '</span>' +
+        '<span class="req-pill ' + r.status + '">' + STATUS_LABEL[r.status] + '</span></div>' +
+        '<div class="req-time">Sent ' + fmtTime(r.createdAt) + '</div>';
+      if(r.status === "completed" && r.replyText){
+        html += '<div class="req-reply-rule"></div><div class="req-reply">“' + esc(r.replyText) + '”</div>';
+      }
+      html += '</div>';
+      return html;
+    }).join("");
+  }
+
+  function pollRequest(id){
+    fetch('/api/guest-requests/' + encodeURIComponent(id)).then(function(res){
+      if(!res.ok) return null;
+      return res.json();
+    }).then(function(data){
+      if(data && data.request){
+        requests[id] = data.request;
+        render();
+      }
+    }).catch(function(){});
+  }
+
+  function pollAll(){ order.forEach(pollRequest); }
+
+  // seed from any ids already stored, then poll
+  order.forEach(function(id){ requests[id] = requests[id] || { text: "", status: "new", createdAt: new Date().toISOString() }; });
+  render();
+  pollAll();
+  setInterval(pollAll, 12000);
+
+  var form = document.getElementById("requestForm");
+  var textEl = document.getElementById("requestText");
+  var sendBtn = document.getElementById("sendBtn");
+  var errorEl = document.getElementById("formError");
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    var text = textEl.value.trim();
+    if(!text) return;
+    errorEl.textContent = "";
+    sendBtn.disabled = true;
+    fetch('/api/guest-requests', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomNumber: room, text: text }),
+    }).then(function(res){
+      return res.json().then(function(data){
+        if(!res.ok) throw new Error(data.error || "Couldn't send that");
+        return data;
+      });
+    }).then(function(data){
+      var r = data.request;
+      requests[r.id] = r;
+      order.unshift(r.id);
+      saveIds(order);
+      render();
+      textEl.value = "";
+    }).catch(function(err){
+      errorEl.textContent = err.message || "Couldn't send that. Please try again.";
+    }).finally(function(){
+      sendBtn.disabled = false;
+    });
+  });
+})();
+</script>
+</body>
+</html>

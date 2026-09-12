@@ -666,6 +666,35 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .maint-card-btn.fixed-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
 .maint-card{cursor:pointer}
+
+.guests-header{display:flex;align-items:center;gap:9px;padding:14px 20px 4px}
+.guests-header-icon{width:30px;height:30px;border-radius:9px;background:rgba(184,151,92,.14);color:#b8975c;display:flex;align-items:center;justify-content:center;flex:none}
+.guests-header-icon svg{width:15px;height:15px}
+.guests-feed{display:flex;flex-direction:column;gap:7px;padding:4px 20px 20px}
+.guest-card{position:relative;background:#fff;border-radius:12px;padding:11px 34px 12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.08);border-left:4px solid #e0902c}
+.guest-card.status-in_progress{border-left-color:var(--accent)}
+.guest-card.status-completed{border-left-color:#2f9a5c;opacity:.88}
+.guest-card.pinned{box-shadow:0 0 0 2px rgba(184,151,92,.55),0 1px 3px rgba(0,0,0,.08)}
+.guest-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:rgba(184,151,92,.18);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#b8975c;cursor:pointer}
+.guest-pin-btn svg{width:11px;height:11px}
+.guest-pin-btn.pinned{background:#b8975c;color:#fff}
+.guest-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px}
+.guest-card-room{font-size:10px;font-weight:800;color:#b8975c}
+.guest-status-pill{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.guest-status-pill.status-new{background:rgba(224,144,44,.14);color:#b5701f}
+.guest-status-pill.status-in_progress{background:rgba(24,119,242,.12);color:var(--accent)}
+.guest-status-pill.status-completed{background:rgba(47,154,92,.14);color:#2f9a5c}
+.guest-card-desc{font-size:13.5px;line-height:1.4;color:var(--text);margin-bottom:6px}
+.guest-card-meta{font-size:10px;color:var(--text-faint);margin-bottom:9px}
+.guest-reply-box{border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:var(--surface-2)}
+.guest-reply-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin-bottom:5px}
+.guest-reply-input{width:100%;border:none;background:none;font-size:12.5px;color:var(--text-dim);font-family:inherit;padding:0}
+.guest-reply-input::placeholder{color:var(--text-faint)}
+.guest-reply-text{font-size:12.5px;color:var(--text)}
+.guest-card-actions{display:flex;gap:7px}
+.guest-card-btn{flex:1;border:none;border-radius:9px;padding:9px 8px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
+.guest-card-btn.primary{background:linear-gradient(150deg,#d9bb8b,#b8975c);color:#2a2013}
+.guest-card-btn.complete-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
 .ticket-detail-modal{width:420px}
 #ticketDetailBody{position:relative;padding-top:2px}
 .ticket-detail-pin{top:0;right:0}
@@ -989,6 +1018,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <div class="maint-feed" id="maintFeed"></div>
     </div>
 
+    <div class="sb-page" id="guestsPage" hidden>
+      <div class="guests-header">
+        <div class="guests-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg>
+        </div>
+        <div>
+          <div class="sb-title">Guest requests</div>
+          <div class="sb-sub">Noir House &middot; Concierge</div>
+        </div>
+      </div>
+      <div class="sb-list-label">Today</div>
+      <div class="guests-feed" id="guestsFeed"></div>
+    </div>
+
     <div class="bottom-tabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button" aria-label="Profile" title="Profile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1006,6 +1049,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
         <span>Repairs</span>
         <span class="tab-badge" id="tabMaintBadge" hidden></span>
+      </button>
+      <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg>
+        <span>Guests</span>
+        <span class="tab-badge" id="tabGuestsBadge" hidden></span>
       </button>
     </div>
   </aside>
@@ -3386,9 +3434,11 @@ function enterApp(staff){
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
+  tabGuestsBtn.hidden = staff.departmentId !== "concierge" && !staff.isAdmin;
   boot();
   startPolling();
   refreshMaintenanceBadge();
+  if(staff.departmentId === "concierge" || staff.isAdmin) refreshGuestsBadge();
   checkPushPrompt();
 }
 
@@ -3761,26 +3811,32 @@ var profilePage = document.getElementById("profilePage");
 var chatPage = document.getElementById("chatPage");
 var eventsPage = document.getElementById("eventsPage");
 var maintenancePage = document.getElementById("maintenancePage");
+var guestsPage = document.getElementById("guestsPage");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
 var tabEventsBtn = document.getElementById("tabEventsBtn");
 var tabMaintBtn = document.getElementById("tabMaintBtn");
+var tabGuestsBtn = document.getElementById("tabGuestsBtn");
 function showTab(tab){
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
   eventsPage.hidden = tab !== "events";
   maintenancePage.hidden = tab !== "maintenance";
+  guestsPage.hidden = tab !== "guests";
   tabProfileBtn.classList.toggle("active", tab === "profile");
   tabChatBtn.classList.toggle("active", tab === "chat");
   tabEventsBtn.classList.toggle("active", tab === "events");
   tabMaintBtn.classList.toggle("active", tab === "maintenance");
+  tabGuestsBtn.classList.toggle("active", tab === "guests");
   if(tab === "events") openEventsTab();
   if(tab === "maintenance") openMaintenanceTab();
+  if(tab === "guests") openGuestsTab();
 }
 tabProfileBtn.addEventListener("click", function(){ showTab("profile"); });
 tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
 tabEventsBtn.addEventListener("click", function(){ showTab("events"); });
 tabMaintBtn.addEventListener("click", function(){ showTab("maintenance"); });
+tabGuestsBtn.addEventListener("click", function(){ showTab("guests"); });
 showTab("chat");
 
 (function setupTabBarDrag(){
@@ -4598,6 +4654,155 @@ function updateTicketStatus(id, status){
     renderMaintenanceBoard();
     showToast("Couldn't update that");
   });
+}
+
+/* ---- Guest concierge requests ---- */
+var guestsFeed = document.getElementById("guestsFeed");
+STATE.guestRequests = STATE.guestRequests || [];
+var GUEST_STATUS_LABEL = { new: "New", in_progress: "In progress", completed: "Completed" };
+var GUEST_STATUS_ORDER = { new: 0, in_progress: 1, completed: 2 };
+
+function openGuestsTab(){
+  guestsFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
+  refreshGuestsBadge();
+}
+
+function sortedGuestRequests(){
+  return (STATE.guestRequests || []).slice().sort(function(a, b){
+    if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    if(GUEST_STATUS_ORDER[a.status] !== GUEST_STATUS_ORDER[b.status]) return GUEST_STATUS_ORDER[a.status] - GUEST_STATUS_ORDER[b.status];
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+function refreshGuestsBadge(){
+  apiGet('/api/guest-requests').then(function(res){
+    STATE.guestRequests = res.requests;
+    var n = res.requests.filter(function(r){ return r.status !== "completed"; }).length;
+    tabGuestsBadge.hidden = n === 0;
+    tabGuestsBadge.textContent = n > 99 ? "99+" : String(n);
+    if(!guestsPage.hidden) renderGuestsBoard();
+  }).catch(function(){});
+}
+
+function renderGuestsBoard(){
+  var requests = sortedGuestRequests();
+  guestsFeed.innerHTML = "";
+  if(!requests.length){
+    guestsFeed.innerHTML = '<div class="maint-col-empty">No guest requests yet</div>';
+    return;
+  }
+  requests.forEach(function(r){ guestsFeed.appendChild(buildGuestCard(r)); });
+}
+
+function toggleGuestRequestPin(id){
+  var r = STATE.guestRequests.find(function(x){ return x.id === id; });
+  var wasPinned = r ? !!r.pinned : false;
+  if(r) r.pinned = !wasPinned;
+  renderGuestsBoard();
+  apiSend('/api/guest-requests/' + encodeURIComponent(id) + '/pin', 'POST', {}).then(function(res){
+    var idx = STATE.guestRequests.findIndex(function(x){ return x.id === id; });
+    if(idx !== -1) STATE.guestRequests[idx] = res.request;
+    renderGuestsBoard();
+  }).catch(function(){
+    if(r) r.pinned = wasPinned;
+    renderGuestsBoard();
+    showToast("Couldn't update pin");
+  });
+}
+
+function updateGuestRequestStatus(id, status, replyText){
+  var r = STATE.guestRequests.find(function(x){ return x.id === id; });
+  var prevStatus = r ? r.status : null;
+  if(r) r.status = status;
+  renderGuestsBoard();
+  var payload = { status: status };
+  if(replyText !== undefined) payload.replyText = replyText;
+  apiSend('/api/guest-requests/' + encodeURIComponent(id) + '/status', 'POST', payload).then(function(res){
+    var idx = STATE.guestRequests.findIndex(function(x){ return x.id === id; });
+    if(idx !== -1) STATE.guestRequests[idx] = res.request;
+    renderGuestsBoard();
+    refreshGuestsBadge();
+    showToast(GUEST_STATUS_LABEL[status]);
+  }).catch(function(){
+    if(r && prevStatus) r.status = prevStatus;
+    renderGuestsBoard();
+    showToast("Couldn't update that");
+  });
+}
+
+function buildGuestCard(r){
+  var card = document.createElement("div");
+  card.className = "guest-card status-" + r.status + (r.pinned ? " pinned" : "");
+
+  var pinBtn = document.createElement("button");
+  pinBtn.type = "button";
+  pinBtn.className = "guest-pin-btn" + (r.pinned ? " pinned" : "");
+  pinBtn.setAttribute("aria-label", r.pinned ? "Unpin request" : "Pin request");
+  pinBtn.innerHTML = PIN_SVG;
+  pinBtn.addEventListener("click", function(){ toggleGuestRequestPin(r.id); });
+  card.appendChild(pinBtn);
+
+  var head = document.createElement("div");
+  head.className = "guest-card-head";
+  head.innerHTML = '<span class="guest-card-room">' + esc(r.roomNumber) + '</span>' +
+    '<span class="guest-status-pill status-' + r.status + '">' + GUEST_STATUS_LABEL[r.status] + '</span>';
+  card.appendChild(head);
+
+  var desc = document.createElement("div");
+  desc.className = "guest-card-desc";
+  desc.textContent = "“" + r.text + "”";
+  card.appendChild(desc);
+
+  var meta = document.createElement("div");
+  meta.className = "guest-card-meta";
+  meta.textContent = (r.status === "completed" ? "Completed " : "Requested ") + fmtNoteTime(r.status === "completed" ? r.completedAt : r.createdAt);
+  card.appendChild(meta);
+
+  if(r.status === "new"){
+    var startBtn = document.createElement("button");
+    startBtn.type = "button";
+    startBtn.className = "guest-card-btn primary";
+    startBtn.textContent = "Start on it";
+    startBtn.addEventListener("click", function(){ updateGuestRequestStatus(r.id, "in_progress"); });
+    var row = document.createElement("div");
+    row.className = "guest-card-actions";
+    row.appendChild(startBtn);
+    card.appendChild(row);
+  } else if(r.status === "in_progress"){
+    var noteWrap = document.createElement("div");
+    noteWrap.className = "guest-reply-box";
+    noteWrap.innerHTML = '<div class="guest-reply-label">Note back to guest (optional)</div>' +
+      '<input type="text" class="guest-reply-input" placeholder="e.g. “On its way up now—congratulations!”" maxlength="300">';
+    card.appendChild(noteWrap);
+    var replyInput = noteWrap.querySelector(".guest-reply-input");
+
+    var row2 = document.createElement("div");
+    row2.className = "guest-card-actions";
+    var backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "guest-card-btn";
+    backBtn.textContent = "Back to new";
+    backBtn.addEventListener("click", function(){ updateGuestRequestStatus(r.id, "new"); });
+    row2.appendChild(backBtn);
+    var completeBtn = document.createElement("button");
+    completeBtn.type = "button";
+    completeBtn.className = "guest-card-btn complete-btn";
+    completeBtn.textContent = "Mark complete";
+    completeBtn.addEventListener("click", function(){ updateGuestRequestStatus(r.id, "completed", replyInput.value.trim()); });
+    row2.appendChild(completeBtn);
+    card.appendChild(row2);
+  } else {
+    if(r.replyText){
+      var replyBox = document.createElement("div");
+      replyBox.className = "guest-reply-box";
+      replyBox.innerHTML = '<div class="guest-reply-label">Your reply</div>' +
+        '<div class="guest-reply-text">“' + esc(r.replyText) + '”</div>';
+      card.appendChild(replyBox);
+    }
+  }
+
+  return card;
 }
 
 newMaintPhoto.addEventListener("change", function(){

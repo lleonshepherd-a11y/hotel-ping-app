@@ -10,6 +10,7 @@ const MAINT_STATUSES = ["reported", "in_progress", "fixed"];
 const MAINT_PRIORITIES = ["safety", "guest", "problem", "routine"];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const GUEST_REQUEST_STATUSES = ["new", "in_progress", "completed"];
 
 function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
@@ -288,6 +289,19 @@ function rowToTicket(row) {
 function rowToTicketReply(row) {
   return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
 }
+function rowToGuestRequest(row) {
+  return {
+    id: row.id,
+    roomNumber: row.room_number,
+    text: row.request_text,
+    status: row.status,
+    replyText: row.reply_text || undefined,
+    pinned: !!row.pinned_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at || undefined,
+  };
+}
 function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
 }
@@ -415,6 +429,41 @@ export default {
         ).bind(idempotencyKey, row.id, new Date().toISOString()).run();
 
         return json({ ok: true, duplicate: false, messageId: row.id }, 201);
+      }
+
+      // ---- Guest concierge requests (public, no staff session — reached via a room QR code) ----
+      if (method === "POST" && p === "/api/guest-requests") {
+        const body = await readJsonBody(request);
+        const roomNumber = String(body.roomNumber || "").trim();
+        const text = String(body.text || "").trim();
+        if (!roomNumber) return json({ error: "Room number is required" }, 400);
+        if (roomNumber.length > 20) return json({ error: "Room number is too long" }, 400);
+        if (!text) return json({ error: "Please describe what you need" }, 400);
+        if (text.length > 500) return json({ error: "Message is too long" }, 400);
+
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO guest_requests (id, room_number, request_text, status, created_at, updated_at) VALUES (?, ?, ?, 'new', ?, ?)"
+        ).bind(id, roomNumber, text, now, now).run();
+        const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+
+        const notifyPromise = notifyDepartment(env, "concierge", {
+          title: "🛎️ Guest request — Room " + roomNumber,
+          body: text,
+          url: "/",
+          tag: "hotel-ping-guest-request-" + id,
+        }, null).catch(function(e){ console.error("notifyDepartment (guest request) error:", e && e.stack || e); });
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
+        return json({ request: rowToGuestRequest(row) }, 201);
+      }
+
+      if (method === "GET" && p.startsWith("/api/guest-requests/") && !p.endsWith("/status") && !p.endsWith("/pin")) {
+        const id = decodeURIComponent(p.slice("/api/guest-requests/".length));
+        const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+        if (!row) return json({ error: "Not found" }, 404);
+        return json({ request: rowToGuestRequest(row) });
       }
 
       // ---- Auth gate ----
@@ -1203,6 +1252,50 @@ export default {
         }
         await env.DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
         return json({ ok: true });
+      }
+
+      if (method === "GET" && p === "/api/guest-requests") {
+        const requester = request._staff;
+        if (requester.department_id !== "concierge" && !requester.is_admin) {
+          return json({ error: "Concierge access required" }, 403);
+        }
+        const rows = await env.DB.prepare("SELECT * FROM guest_requests ORDER BY created_at DESC").all();
+        return json({ requests: rows.results.map(rowToGuestRequest) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/status")) {
+        const requester = request._staff;
+        if (requester.department_id !== "concierge" && !requester.is_admin) {
+          return json({ error: "Concierge access required" }, 403);
+        }
+        const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/status".length));
+        const body = await readJsonBody(request);
+        const status = body.status;
+        if (!GUEST_REQUEST_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
+        const existing = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Request not found" }, 404);
+        const replyText = body.replyText !== undefined ? (String(body.replyText).trim() || null) : existing.reply_text;
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "UPDATE guest_requests SET status = ?, reply_text = ?, updated_at = ?, completed_at = ? WHERE id = ?"
+        ).bind(status, replyText, now, status === "completed" ? now : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+        return json({ request: rowToGuestRequest(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/pin")) {
+        const requester = request._staff;
+        if (requester.department_id !== "concierge" && !requester.is_admin) {
+          return json({ error: "Concierge access required" }, 403);
+        }
+        const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/pin".length));
+        const existing = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Request not found" }, 404);
+        const now = new Date().toISOString();
+        const newPinned = existing.pinned_at ? null : now;
+        await env.DB.prepare("UPDATE guest_requests SET pinned_at = ? WHERE id = ?").bind(newPinned, id).run();
+        const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
+        return json({ request: rowToGuestRequest(row) });
       }
 
       if (method === "POST" && p === "/api/escalations/check") {
