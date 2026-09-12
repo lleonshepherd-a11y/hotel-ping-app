@@ -75,7 +75,11 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     broadcastId: row.broadcast_id || undefined,
     roomNumber: row.room_number || undefined,
     taskStatus: row.task_status || undefined,
+    groupId: row.group_id || undefined,
   };
+}
+function rowToGroup(row, members) {
+  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
 }
 
 const ESCALATION_MINUTES = 10;
@@ -98,14 +102,21 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?)
   `).run(
-    id, opts.from, opts.to, opts.type,
+    id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null
   );
-  return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  if (opts.groupId) {
+    const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(opts.groupId);
+    for (const m of members) {
+      if (m.department_id !== opts.from) console.log('[group notify]', m.department_id, 'new message in group', opts.groupId);
+    }
+  }
+  return row;
 }
 
 function getDepartments() {
@@ -351,6 +362,91 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
     }
 
+    if (req.method === 'GET' && p === '/api/groups') {
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const requester = staffFromToken(req);
+      const groupRows = db.prepare('SELECT * FROM groups ORDER BY created_at DESC').all();
+      const groups = groupRows.map((g) => {
+        const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(g.id).map((m) => m.department_id);
+        const isMember = members.includes(self);
+        const last = db.prepare('SELECT * FROM messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1').get(g.id);
+        const readRow = db.prepare('SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?').get(g.id, self);
+        const since = readRow ? readRow.last_read_at : '1970-01-01T00:00:00.000Z';
+        const unread = db.prepare(
+          'SELECT COUNT(*) AS n FROM messages WHERE group_id = ? AND from_dept != ? AND created_at > ? AND deleted_at IS NULL'
+        ).get(g.id, self, since);
+        return {
+          id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
+          members, isMember,
+          lastMessage: last ? rowToMessage(last, self, requester.is_admin) : null,
+          unreadCount: isMember ? unread.n : 0,
+        };
+      });
+      return send(res, 200, { groups });
+    }
+
+    if (req.method === 'POST' && p === '/api/groups') {
+      const body = await readJsonBody(req);
+      const self = body.self;
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const name = String(body.name || '').trim();
+      if (!name) return send(res, 400, { error: 'Group name is required' });
+      const memberIds = Array.isArray(body.memberDepartmentIds) ? body.memberDepartmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+      const allMembers = Array.from(new Set([self, ...memberIds]));
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO groups (id, name, created_by, created_at) VALUES (?, ?, ?, ?)').run(id, name, self, now);
+      for (const deptId of allMembers) {
+        db.prepare('INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)').run(id, deptId, now);
+      }
+      const row = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      return send(res, 201, { group: rowToGroup(row, allMembers) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/join')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/join'.length));
+      const body = await readJsonBody(req);
+      const self = body.self;
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Group not found' });
+      db.prepare('INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)').run(id, self, new Date().toISOString());
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/leave')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/leave'.length));
+      const body = await readJsonBody(req);
+      const self = body.self;
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      db.prepare('DELETE FROM group_members WHERE group_id = ? AND department_id = ?').run(id, self);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/groups/') && p.endsWith('/messages')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/messages'.length));
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const requester = staffFromToken(req);
+      const member = db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(id, self);
+      if (!member && !requester.is_admin) return send(res, 403, { error: 'Not a member of this group' });
+      const rows = db.prepare('SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC').all(id);
+      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/read')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/read'.length));
+      const body = await readJsonBody(req);
+      const self = body.self;
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO group_reads (group_id, department_id, last_read_at) VALUES (?, ?, ?) ON CONFLICT(group_id, department_id) DO UPDATE SET last_read_at = excluded.last_read_at'
+      ).run(id, self, now);
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'GET' && p === '/api/feed') {
       const requester = staffFromToken(req);
       if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
@@ -389,8 +485,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
-      if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
+      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
+      if (!DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
+      if (groupId) {
+        const member = db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(groupId, from);
+        if (!member) return send(res, 403, { error: 'Not a member of this group' });
+      } else if (!DEPT_IDS.has(to)) {
+        return send(res, 400, { error: 'Unknown department' });
+      }
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
       if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
@@ -409,7 +511,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const row = insertMessage({
-        from, to, type,
+        from, to: groupId ? null : to, groupId: groupId || null, type,
         body: text?.trim() || null,
         fileName: fileName || null, filePath: filePathOnDisk, fileSize,
         duration: duration || null, transcript: transcript?.trim() || null,
@@ -439,7 +541,8 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Message not found' });
       const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
       if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
       const nextPinned = !existing.pinned_at;
       db.prepare('UPDATE messages SET pinned_at = ? WHERE id = ?').run(nextPinned ? new Date().toISOString() : null, id);
@@ -452,7 +555,8 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Message not found' });
       const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
       if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
       const nextCompleted = !existing.completed_at;
       db.prepare('UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?').run(
@@ -490,7 +594,8 @@ const server = http.createServer(async (req, res) => {
       if (!existing) return send(res, 404, { error: 'Message not found' });
       if (existing.deleted_at) return send(res, 400, { error: "Can't forward a deleted message" });
       const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
       if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
       const body = await readJsonBody(req);
       const to = body.to;

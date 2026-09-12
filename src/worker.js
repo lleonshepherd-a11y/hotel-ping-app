@@ -218,25 +218,38 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?)`
   ).bind(
-    id, opts.from, opts.to, opts.type,
+    id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
 
   const previewMap = { text: opts.body || "", image: "📷 Photo", file: "📎 " + (opts.fileName || "File"), audio: "🎤 Voice message" };
   const notifyBody = opts.urgent ? "🔴 Urgent: " + (previewMap[opts.type] || "New message") : (previewMap[opts.type] || "New message");
-  const notifyPromise = notifyDepartment(env, opts.to, {
-    title: DEPT_NAMES[opts.from] || opts.from,
-    body: notifyBody,
-    url: "/",
-    tag: "hotel-ping-" + opts.to,
-    icon: "/avatars/" + opts.from + ".png",
-  }, opts.from).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
+  let notifyPromise;
+  if (opts.groupId) {
+    const members = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(opts.groupId).all();
+    const others = members.results.map((m) => m.department_id).filter((d) => d !== opts.from);
+    notifyPromise = Promise.all(others.map((deptId) => notifyDepartment(env, deptId, {
+      title: DEPT_NAMES[opts.from] || opts.from,
+      body: notifyBody,
+      url: "/",
+      tag: "hotel-ping-group-" + opts.groupId,
+      icon: "/avatars/" + opts.from + ".png",
+    }, opts.from))).catch(function(e){ console.error("notifyDepartment (group) top-level error:", e && e.stack || e); });
+  } else {
+    notifyPromise = notifyDepartment(env, opts.to, {
+      title: DEPT_NAMES[opts.from] || opts.from,
+      body: notifyBody,
+      url: "/",
+      tag: "hotel-ping-" + opts.to,
+      icon: "/avatars/" + opts.from + ".png",
+    }, opts.from).catch(function(e){ console.error("notifyDepartment top-level error:", e && e.stack || e); });
+  }
   if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
   return row;
@@ -247,6 +260,9 @@ function rowToHandoverNote(row) {
 }
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
+}
+function rowToGroup(row, members) {
+  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
 }
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
@@ -280,6 +296,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     broadcastId: row.broadcast_id || undefined,
     roomNumber: row.room_number || undefined,
     taskStatus: row.task_status || undefined,
+    groupId: row.group_id || undefined,
   };
 }
 function rowToStaff(row) {
@@ -555,6 +572,92 @@ export default {
         return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }
 
+      // ---- Groups ----
+      if (method === "GET" && p === "/api/groups") {
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const groupRows = await env.DB.prepare("SELECT * FROM groups ORDER BY created_at DESC").all();
+        const groups = [];
+        for (const g of groupRows.results) {
+          const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
+          const members = memberRows.results.map((m) => m.department_id);
+          const isMember = members.includes(self);
+          const last = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1").bind(g.id).first();
+          const readRow = await env.DB.prepare("SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?").bind(g.id, self).first();
+          const since = readRow ? readRow.last_read_at : "1970-01-01T00:00:00.000Z";
+          const unread = await env.DB.prepare(
+            "SELECT COUNT(*) AS n FROM messages WHERE group_id = ? AND from_dept != ? AND created_at > ? AND deleted_at IS NULL"
+          ).bind(g.id, self, since).first();
+          groups.push({
+            id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
+            members, isMember,
+            lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
+            unreadCount: isMember ? unread.n : 0,
+          });
+        }
+        return json({ groups });
+      }
+
+      if (method === "POST" && p === "/api/groups") {
+        const body = await readJsonBody(request);
+        const self = body.self;
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const name = String(body.name || "").trim();
+        if (!name) return json({ error: "Group name is required" }, 400);
+        const memberIds = Array.isArray(body.memberDepartmentIds) ? body.memberDepartmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+        const allMembers = Array.from(new Set([self, ...memberIds]));
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare("INSERT INTO groups (id, name, created_by, created_at) VALUES (?, ?, ?, ?)").bind(id, name, self, now).run();
+        for (const deptId of allMembers) {
+          await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, deptId, now).run();
+        }
+        const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        return json({ group: rowToGroup(row, allMembers) }, 201);
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/join")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/join".length));
+        const body = await readJsonBody(request);
+        const self = body.self;
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Group not found" }, 404);
+        await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, self, new Date().toISOString()).run();
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/leave")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/leave".length));
+        const body = await readJsonBody(request);
+        const self = body.self;
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        await env.DB.prepare("DELETE FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).run();
+        return json({ ok: true });
+      }
+
+      if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/messages")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/messages".length));
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
+        if (!member && !request._staff.is_admin) return json({ error: "Not a member of this group" }, 403);
+        const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
+        return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/read")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/read".length));
+        const body = await readJsonBody(request);
+        const self = body.self;
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO group_reads (group_id, department_id, last_read_at) VALUES (?, ?, ?) ON CONFLICT(group_id, department_id) DO UPDATE SET last_read_at = excluded.last_read_at"
+        ).bind(id, self, now).run();
+        return json({ ok: true });
+      }
+
       if (method === "GET" && p === "/api/feed") {
         const requester = request._staff;
         if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
@@ -587,8 +690,14 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
-        if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
+        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
+        if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
+        if (groupId) {
+          const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(groupId, from).first();
+          if (!member) return json({ error: "Not a member of this group" }, 403);
+        } else if (!DEPT_IDS.has(to)) {
+          return json({ error: "Unknown department" }, 400);
+        }
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
@@ -609,7 +718,7 @@ export default {
         }
 
         const row = await insertMessage(env, ctx, {
-          from, to, type,
+          from, to: groupId ? null : to, groupId: groupId || null, type,
           body: text && text.trim() ? text.trim() : null,
           fileName: fileName || null, filePath: filePathOnDisk, fileSize,
           duration: duration || null, transcript: transcript && transcript.trim() ? transcript.trim() : null,
@@ -640,7 +749,8 @@ export default {
         const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Message not found" }, 404);
         const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextPinned = !existing.pinned_at;
         await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
@@ -653,7 +763,8 @@ export default {
         const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Message not found" }, 404);
         const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextCompleted = !existing.completed_at;
         await env.DB.prepare("UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?")
@@ -690,7 +801,8 @@ export default {
         if (!existing) return json({ error: "Message not found" }, 404);
         if (existing.deleted_at) return json({ error: "Can't forward a deleted message" }, 400);
         const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const body = await readJsonBody(request);
         const to = body.to;

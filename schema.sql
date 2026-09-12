@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS departments (
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY,
   from_dept TEXT NOT NULL,
-  to_dept TEXT NOT NULL,
+  to_dept TEXT,
   type TEXT NOT NULL CHECK(type IN ('text','image','file','audio')),
   body TEXT,
   file_name TEXT,
@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS messages (
   broadcast_id TEXT,
   room_number TEXT,
   read_at TEXT,
-  task_status TEXT
+  task_status TEXT,
+  group_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
@@ -90,6 +91,29 @@ CREATE TABLE IF NOT EXISTS handover_notes (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_handover_dept ON handover_notes(department_id, created_at);
+
+CREATE TABLE IF NOT EXISTS groups (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  joined_at TEXT NOT NULL,
+  PRIMARY KEY (group_id, department_id)
+);
+CREATE INDEX IF NOT EXISTS idx_group_members_dept ON group_members(department_id);
+CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
+
+CREATE TABLE IF NOT EXISTS group_reads (
+  group_id TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  last_read_at TEXT NOT NULL,
+  PRIMARY KEY (group_id, department_id)
+);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),

@@ -90,6 +90,47 @@ if (!messageColumns.includes('read_at')) {
 if (!messageColumns.includes('task_status')) {
   db.exec('ALTER TABLE messages ADD COLUMN task_status TEXT');
 }
+if (!messageColumns.includes('group_id')) {
+  db.exec('ALTER TABLE messages ADD COLUMN group_id TEXT');
+}
+
+const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
+if (toDeptCol && toDeptCol.notnull) {
+  db.exec(`
+    CREATE TABLE messages_new (
+      id TEXT PRIMARY KEY,
+      from_dept TEXT NOT NULL,
+      to_dept TEXT,
+      type TEXT NOT NULL CHECK(type IN ('text','image','file','audio')),
+      body TEXT,
+      file_name TEXT,
+      file_path TEXT,
+      file_size INTEGER,
+      duration REAL,
+      transcript TEXT,
+      urgent INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'delivered',
+      created_at TEXT NOT NULL,
+      deleted_at TEXT,
+      reply_to_id TEXT,
+      pinned_at TEXT,
+      completed_at TEXT,
+      completed_by TEXT,
+      escalated_at TEXT,
+      broadcast_id TEXT,
+      room_number TEXT,
+      read_at TEXT,
+      task_status TEXT,
+      group_id TEXT
+    );
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id FROM messages;
+    DROP TABLE messages;
+    ALTER TABLE messages_new RENAME TO messages;
+    CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
+  `);
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (
@@ -115,6 +156,29 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_handover_dept ON handover_notes(department_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS group_members (
+    group_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    joined_at TEXT NOT NULL,
+    PRIMARY KEY (group_id, department_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_group_members_dept ON group_members(department_id);
+  CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS group_reads (
+    group_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    last_read_at TEXT NOT NULL,
+    PRIMARY KEY (group_id, department_id)
+  );
 `);
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);

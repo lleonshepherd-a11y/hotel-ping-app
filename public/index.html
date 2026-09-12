@@ -529,6 +529,51 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
 .admin-modal-head-actions{display:flex;align-items:center;gap:4px}
+.event-palette{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 16px;scrollbar-width:none}
+.event-palette::-webkit-scrollbar{display:none}
+.event-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.event-chip.dragging{opacity:.35}
+.event-chip-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 6px rgba(15,15,20,.18)}
+.event-chip-avatar svg{width:19px;height:19px}
+.event-chip-label{font-size:10px;font-weight:700;color:var(--text-dim);white-space:nowrap}
+.event-new-form{display:flex;gap:8px;margin:0 0 18px}
+#newEventName{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2)}
+.event-list{display:flex;flex-direction:column;gap:12px}
+.event-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0}
+.event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .15s ease,background .15s ease}
+.event-card.drag-over{background:rgba(24,119,242,.14);box-shadow:0 0 0 2px var(--accent)}
+.event-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.event-card-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+.event-card-badge{background:var(--urgent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 7px}
+.event-card-open{border:none;background:none;color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;gap:3px;padding:4px 2px}
+.event-card-open svg{width:14px;height:14px}
+.event-card-members{display:flex;gap:10px;flex-wrap:wrap;min-height:40px}
+.event-member-chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.event-member-chip.dragging{opacity:.35}
+.event-member-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.event-member-avatar svg{width:15px;height:15px}
+.event-member-label{font-size:9px;font-weight:700;color:var(--text-faint);white-space:nowrap}
+.event-card-hint{font-size:11px;color:var(--text-faint);padding:2px 2px}
+.event-drop-zone{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(140%);opacity:0;
+  background:var(--urgent);color:#fff;font-weight:700;font-size:13px;padding:14px 24px;border-radius:999px;
+  box-shadow:0 10px 28px -8px rgba(20,20,16,.45);pointer-events:none;
+  transition:transform .2s cubic-bezier(.32,1.4,.4,1),opacity .2s ease,background .15s ease;z-index:200;
+}
+.event-drop-zone.show{transform:translateX(-50%) translateY(0);opacity:1}
+.event-drop-zone.hover{background:#a8281c;transform:translateX(-50%) translateY(0) scale(1.08)}
+.drag-ghost{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.35))}
+
+.group-thread-modal{display:flex;flex-direction:column;padding:0;height:72vh;max-height:640px;overflow:hidden}
+.group-thread-modal .admin-modal-head{padding:20px 20px 14px;margin:0}
+.group-thread-members{display:flex;gap:8px;padding:0 20px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex:none}
+.group-thread-member-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.group-thread-member-avatar svg{width:12px;height:12px}
+.group-thread-scroll{flex:1;overflow-y:auto;padding:14px 20px;min-height:0}
+.group-thread-composer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex:none}
+#groupThreadInput{flex:1;border:1.5px solid var(--border);border-radius:20px;padding:9px 14px;font-size:14px;background:var(--surface-2)}
+#groupThreadInput:focus-visible{outline:none;border-color:var(--accent)}
+
 .resp-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .resp-row{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;background:var(--surface-2)}
 .resp-dot{width:10px;height:10px;border-radius:50%;flex:none;background:#3bb54a}
@@ -702,6 +747,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="sb-menu-row" id="handoverBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M9 13h6M9 17h4"/></svg></span>
         <span class="sb-menu-label">Shift handover</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <button class="sb-menu-row" id="eventsBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg></span>
+        <span class="sb-menu-label">Events</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
     </div>
@@ -954,6 +1004,48 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </button>
     </div>
     <div class="files-grid" id="filesGrid"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="eventsOverlay" hidden>
+  <div class="admin-modal events-modal">
+    <div class="admin-modal-head">
+      <h2>Events</h2>
+      <button class="admin-close" id="eventsClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
+
+    <div class="event-palette" id="eventPalette"></div>
+
+    <form class="event-new-form" id="newEventForm">
+      <input type="text" id="newEventName" placeholder="Event name, e.g. Smith Wedding" required maxlength="60">
+      <button type="submit" class="admin-add-btn">Create event</button>
+    </form>
+    <div class="admin-add-error" id="eventError"></div>
+
+    <div class="event-list" id="eventList"></div>
+    <div class="event-drop-zone" id="eventDropZone">Drop here to leave the event</div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="groupThreadOverlay" hidden>
+  <div class="admin-modal group-thread-modal">
+    <div class="admin-modal-head">
+      <h2 id="groupThreadName">Event</h2>
+      <button class="admin-close" id="groupThreadClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="group-thread-members" id="groupThreadMembers"></div>
+    <div class="group-thread-scroll" id="groupThreadScroll"></div>
+    <form class="group-thread-composer" id="groupThreadForm">
+      <input type="text" id="groupThreadInput" placeholder="Message…" required autocomplete="off">
+      <button type="submit" class="send-btn ready" id="groupThreadSendBtn" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
+      </button>
+    </form>
   </div>
 </div>
 
@@ -3446,6 +3538,267 @@ responseBtn.addEventListener("click", function(){
 });
 responseClose.addEventListener("click", function(){ responseOverlay.hidden = true; });
 responseOverlay.addEventListener("click", function(e){ if(e.target === responseOverlay) responseOverlay.hidden = true; });
+
+/* ---------------- Events (ad-hoc group chats) ---------------- */
+var eventsBtn = document.getElementById("eventsBtn");
+var eventsOverlay = document.getElementById("eventsOverlay");
+var eventsClose = document.getElementById("eventsClose");
+var eventPalette = document.getElementById("eventPalette");
+var eventList = document.getElementById("eventList");
+var eventError = document.getElementById("eventError");
+var eventDropZone = document.getElementById("eventDropZone");
+var newEventForm = document.getElementById("newEventForm");
+var newEventName = document.getElementById("newEventName");
+
+STATE.groups = [];
+STATE.activeGroupId = null;
+STATE.groupMessages = {};
+
+function loadGroups(){
+  return apiGet('/api/groups?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    STATE.groups = res.groups;
+  }).catch(function(){});
+}
+
+function pointOverDropZone(x, y){
+  var r = eventDropZone.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+function beginChipDrag(e, chipEl, onDrop, opts){
+  if(e.button !== undefined && e.button !== 0) return;
+  e.preventDefault();
+  var pointerId = e.pointerId;
+  var ghost = chipEl.cloneNode(true);
+  ghost.classList.add("drag-ghost");
+  ghost.style.width = chipEl.offsetWidth + "px";
+  document.body.appendChild(ghost);
+  chipEl.classList.add("dragging");
+  function moveGhost(x, y){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; }
+  moveGhost(e.clientX, e.clientY);
+  if(opts && opts.isMember) eventDropZone.classList.add("show");
+
+  function clearCardHighlights(){
+    eventList.querySelectorAll(".event-card.drag-over").forEach(function(c){ c.classList.remove("drag-over"); });
+  }
+  function onMove(ev){
+    if(ev.pointerId !== pointerId) return;
+    moveGhost(ev.clientX, ev.clientY);
+    if(opts && opts.isMember){
+      eventDropZone.classList.toggle("hover", pointOverDropZone(ev.clientX, ev.clientY));
+    } else {
+      var el = document.elementFromPoint(ev.clientX, ev.clientY);
+      var cardEl = el && el.closest ? el.closest(".event-card") : null;
+      clearCardHighlights();
+      if(cardEl) cardEl.classList.add("drag-over");
+    }
+  }
+  function onUp(ev){
+    if(ev.pointerId !== pointerId) return;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
+    chipEl.classList.remove("dragging");
+    ghost.remove();
+    if(opts && opts.isMember){
+      var overZone = pointOverDropZone(ev.clientX, ev.clientY);
+      eventDropZone.classList.remove("show");
+      eventDropZone.classList.remove("hover");
+      if(overZone) onDrop();
+    } else {
+      var el = document.elementFromPoint(ev.clientX, ev.clientY);
+      var cardEl = el && el.closest ? el.closest(".event-card") : null;
+      clearCardHighlights();
+      if(cardEl) onDrop(cardEl.getAttribute("data-group-id"));
+    }
+  }
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
+function joinGroup(groupId, deptId){
+  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/join', 'POST', { self: deptId }).then(function(){
+    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " joined");
+    return loadGroups();
+  }).then(renderEventList).catch(function(){ showToast("Couldn't add them"); });
+}
+function leaveGroup(groupId, deptId){
+  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/leave', 'POST', { self: deptId }).then(function(){
+    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " left the event");
+    return loadGroups();
+  }).then(renderEventList).catch(function(){ showToast("Couldn't remove them"); });
+}
+
+function renderEventPalette(){
+  eventPalette.innerHTML = "";
+  DEPT_ORDER.forEach(function(id){
+    var chip = document.createElement("div");
+    chip.className = "event-chip";
+    chip.innerHTML =
+      '<div class="event-chip-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
+      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].name : id).split(" ")[0])+'</div>';
+    chip.addEventListener("pointerdown", function(e){
+      beginChipDrag(e, chip, function(groupId){
+        if(groupId) joinGroup(groupId, id);
+      }, { isMember: false });
+    });
+    eventPalette.appendChild(chip);
+  });
+}
+
+function renderEventList(){
+  eventList.innerHTML = "";
+  if(!STATE.groups.length){
+    eventList.innerHTML = '<div class="event-empty">No events yet. Create one above.</div>';
+    return;
+  }
+  STATE.groups.forEach(function(g){
+    var card = document.createElement("div");
+    card.className = "event-card";
+    card.setAttribute("data-group-id", g.id);
+    var membersHtml = g.members.map(function(deptId){
+      return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
+        '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
+        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].name : deptId).split(" ")[0])+'</div>'+
+      '</div>';
+    }).join("");
+    card.innerHTML =
+      '<div class="event-card-head">'+
+        '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
+        '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
+        '</button>'+
+      '</div>'+
+      '<div class="event-card-members">'+membersHtml+'</div>'+
+      (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
+    eventList.appendChild(card);
+
+    card.querySelectorAll(".event-member-chip").forEach(function(chip){
+      var deptId = chip.getAttribute("data-dept-id");
+      chip.addEventListener("pointerdown", function(e){
+        beginChipDrag(e, chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true });
+      });
+    });
+    card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
+  });
+}
+
+newEventForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var name = newEventName.value.trim();
+  if(!name) return;
+  eventError.textContent = "";
+  apiSend('/api/groups', 'POST', { self: STATE.self, name: name, memberDepartmentIds: [] }).then(function(){
+    newEventName.value = "";
+    return loadGroups();
+  }).then(renderEventList).catch(function(err){
+    eventError.textContent = err.message || "Couldn't create the event";
+  });
+});
+
+eventsBtn.addEventListener("click", function(){
+  eventsOverlay.hidden = false;
+  renderEventPalette();
+  eventList.innerHTML = '<div class="event-empty">Loading…</div>';
+  loadGroups().then(renderEventList);
+});
+eventsClose.addEventListener("click", function(){ eventsOverlay.hidden = true; });
+eventsOverlay.addEventListener("click", function(e){ if(e.target === eventsOverlay) eventsOverlay.hidden = true; });
+
+/* ---- Group thread view ---- */
+var groupThreadOverlay = document.getElementById("groupThreadOverlay");
+var groupThreadClose = document.getElementById("groupThreadClose");
+var groupThreadName = document.getElementById("groupThreadName");
+var groupThreadMembers = document.getElementById("groupThreadMembers");
+var groupThreadScroll = document.getElementById("groupThreadScroll");
+var groupThreadForm = document.getElementById("groupThreadForm");
+var groupThreadInput = document.getElementById("groupThreadInput");
+
+function renderGroupThread(groupId){
+  var msgs = STATE.groupMessages[groupId] || [];
+  groupThreadScroll.innerHTML = "";
+  if(!msgs.length){
+    groupThreadScroll.innerHTML = '<div class="handover-empty">No messages yet.</div>';
+    return;
+  }
+  var prevDay = null;
+  var msgsById = {};
+  msgs.forEach(function(m){ msgsById[m.id] = m; });
+  msgs.forEach(function(m, i){
+    if(!prevDay || !sameDay(prevDay, m.t)){
+      var div = document.createElement("div");
+      div.className = "day-div";
+      div.textContent = new Date(m.t).toLocaleDateString([], {weekday:"long", month:"short", day:"numeric"});
+      groupThreadScroll.appendChild(div);
+      prevDay = m.t;
+    }
+    var next = msgs[i+1];
+    var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
+    groupThreadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById));
+  });
+  groupThreadScroll.scrollTop = groupThreadScroll.scrollHeight;
+}
+
+function openGroupThread(groupId){
+  var g = STATE.groups.find(function(x){ return x.id === groupId; });
+  if(!g) return;
+  STATE.activeGroupId = groupId;
+  eventsOverlay.hidden = true;
+  groupThreadOverlay.hidden = false;
+  groupThreadName.textContent = g.name;
+  groupThreadMembers.innerHTML = g.members.map(function(deptId){
+    return '<div class="group-thread-member-avatar" style="background:'+avatarGradient(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+iconSvg(deptId)+'</div>';
+  }).join("");
+  groupThreadScroll.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    STATE.groupMessages[groupId] = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+    renderGroupThread(groupId);
+    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/read', 'POST', { self: STATE.self }).catch(function(){});
+  }).catch(function(){
+    groupThreadScroll.innerHTML = '<div class="handover-empty">Couldn\'t load messages.</div>';
+  });
+  setTimeout(function(){ groupThreadInput.focus(); }, 30);
+}
+
+groupThreadForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var text = groupThreadInput.value.trim();
+  if(!text) return;
+  if(containsProfanity(text)){ showToast("Let's keep it professional."); return; }
+  var groupId = STATE.activeGroupId;
+  if(!groupId) return;
+  groupThreadInput.value = "";
+  apiSend('/api/messages', 'POST', { from: STATE.self, groupId: groupId, type: "text", text: text }).then(function(res){
+    STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+    STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+    if(STATE.activeGroupId === groupId) renderGroupThread(groupId);
+  }).catch(function(){ showToast("That didn't send. Check your connection."); });
+});
+groupThreadClose.addEventListener("click", function(){ groupThreadOverlay.hidden = true; STATE.activeGroupId = null; });
+groupThreadOverlay.addEventListener("click", function(e){
+  if(e.target === groupThreadOverlay){ groupThreadOverlay.hidden = true; STATE.activeGroupId = null; }
+});
+
+function pollGroupsQuiet(){
+  if(!AUTH.staff) return;
+  loadGroups().then(function(){
+    if(!eventsOverlay.hidden) renderEventList();
+    var groupId = STATE.activeGroupId;
+    if(!groupId) return;
+    apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
+      var mapped = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+      if(mapped.length !== (STATE.groupMessages[groupId] || []).length){
+        STATE.groupMessages[groupId] = mapped;
+        if(STATE.activeGroupId === groupId){
+          renderGroupThread(groupId);
+          apiSend('/api/groups/' + encodeURIComponent(groupId) + '/read', 'POST', { self: STATE.self }).catch(function(){});
+        }
+      }
+    }).catch(function(){});
+  });
+}
+setInterval(pollGroupsQuiet, 4000);
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", function(){
