@@ -619,6 +619,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-new-form{display:flex;flex-direction:column;gap:8px;margin:0 20px 12px}
 .maint-new-form input[type=text],.maint-new-form textarea{border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2);font-family:inherit;resize:none}
 .maint-form-row{display:flex;align-items:center;gap:8px}
+.maint-priority-row{display:flex;gap:6px;flex-wrap:wrap}
+.maint-priority-chip{border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-dim);border-radius:20px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer}
+.maint-priority-chip.active{border-color:transparent;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
+.maint-priority-chip[data-priority="safety"].active{background:linear-gradient(150deg,#e02c2c,#c62828)}
+.maint-priority-chip[data-priority="guest"].active{background:linear-gradient(150deg,#e0902c,#b5701f)}
+.maint-priority-chip[data-priority="routine"].active{background:var(--text-dim)}
+.maint-extra-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--text-dim)}
+.maint-checkbox{display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer}
+.maint-deadline-label{display:flex;align-items:center;gap:6px;font-weight:600}
+.maint-deadline-label input[type=time]{border:1.5px solid var(--border);border-radius:8px;padding:5px 7px;font-size:12.5px;background:var(--surface-2);font-family:inherit;color:var(--text)}
 .maint-photo-btn{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--accent);border:1.5px dashed var(--accent);border-radius:10px;padding:8px 12px;cursor:pointer;flex:none;white-space:nowrap}
 .maint-photo-btn svg{width:16px;height:16px}
 .maint-new-form .admin-add-btn{flex:none;margin-left:auto}
@@ -642,6 +652,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card-room{font-size:10px;font-weight:800;color:var(--accent);display:block;margin-bottom:1px}
 .maint-card-desc{font-size:13px;color:var(--text);line-height:1.3;margin-bottom:1px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
 .maint-card-meta{font-size:10px;color:var(--text-faint)}
+.maint-card-tags{display:flex;flex-wrap:wrap;gap:4px;margin:3px 0}
+.maint-tag{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:2px 6px;border-radius:6px;white-space:nowrap}
+.tag-safety{background:rgba(224,44,44,.14);color:#c62828}
+.tag-guest{background:rgba(224,144,44,.14);color:#b5701f}
+.tag-routine{background:var(--surface-3);color:var(--text-dim)}
+.tag-present{background:rgba(24,119,242,.12);color:var(--accent)}
+.tag-deadline{background:var(--surface-3);color:var(--text-dim)}
+.tag-overdue{background:rgba(224,44,44,.14);color:#c62828}
+.ticket-detail-tags{margin-bottom:10px}
 .maint-card-actions{display:flex;gap:6px}
 .maint-card-btn{flex:1;border:none;border-radius:8px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
 .maint-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
@@ -665,6 +684,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ticket-detail-nav .maint-card-btn{flex:none;padding:8px 14px}
 .ticket-detail-nav .maint-card-btn:disabled{opacity:.35;cursor:default}
 .ticket-detail-pos{font-size:12px;color:var(--text-faint);font-weight:600}
+.ticket-replies{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.ticket-replies-list{display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;margin-bottom:10px}
+.ticket-replies-empty,.ticket-replies-loading{font-size:12px;color:var(--text-faint);text-align:center;padding:8px 0}
+.ticket-reply{background:var(--surface-2);border-radius:10px;padding:8px 10px}
+.ticket-reply-head{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--text-dim);margin-bottom:2px}
+.ticket-reply-head b{color:var(--text)}
+.ticket-reply-text{font-size:13px;color:var(--text);white-space:pre-wrap}
+.ticket-reply-row{display:flex;gap:8px}
+.ticket-reply-row input{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:10px;padding:8px 10px;font-size:13px;background:var(--surface-2);color:var(--text)}
+.ticket-reply-row button{border:none;border-radius:10px;padding:8px 14px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;cursor:pointer}
 
 .h-group-avatars{display:flex;align-items:center;margin-left:2px;cursor:pointer}
 .h-group-avatars .group-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px #fff;margin-left:-6px;transition:margin-left .22s cubic-bezier(.32,1.4,.4,1)}
@@ -930,6 +959,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <form class="maint-new-form" id="newMaintForm">
         <input type="text" id="newMaintRoom" placeholder="Location (optional) — room, corridor, kitchen…" maxlength="40">
         <textarea id="newMaintDesc" placeholder="What's wrong? e.g. AC not cooling in 214" required maxlength="300" rows="2"></textarea>
+        <div class="maint-priority-row" id="maintPriorityRow">
+          <button type="button" class="maint-priority-chip" data-priority="safety">⚠ Safety</button>
+          <button type="button" class="maint-priority-chip" data-priority="guest">Guest impact</button>
+          <button type="button" class="maint-priority-chip active" data-priority="problem">Problem</button>
+          <button type="button" class="maint-priority-chip" data-priority="routine">Routine</button>
+        </div>
+        <div class="maint-extra-row">
+          <label class="maint-checkbox"><input type="checkbox" id="newMaintGuestPresent"> Guest in room</label>
+          <label class="maint-deadline-label">Needed by <input type="time" id="newMaintDeadline"></label>
+        </div>
         <div class="maint-form-row">
           <label class="maint-photo-btn" for="newMaintPhoto">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/></svg>
@@ -4235,6 +4274,16 @@ var maintPhotoPreviewVideo = document.getElementById("maintPhotoPreviewVideo");
 var maintPhotoRemove = document.getElementById("maintPhotoRemove");
 var maintError = document.getElementById("maintError");
 var maintPhotoFile = null;
+var newMaintGuestPresent = document.getElementById("newMaintGuestPresent");
+var newMaintDeadline = document.getElementById("newMaintDeadline");
+var maintSelectedPriority = "problem";
+var maintPriorityChips = document.querySelectorAll(".maint-priority-chip");
+maintPriorityChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    maintSelectedPriority = chip.getAttribute("data-priority");
+    maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
+  });
+});
 STATE.tickets = STATE.tickets || [];
 
 function openMaintenanceTab(){
@@ -4242,13 +4291,35 @@ function openMaintenanceTab(){
   refreshMaintenanceBadge();
 }
 
+var MAINT_PRIORITY_ORDER = { safety: 0, guest: 1, problem: 2, routine: 3 };
 function sortedTickets(){
   var order = { reported: 0, in_progress: 1, fixed: 2 };
   return (STATE.tickets || []).slice().sort(function(a, b){
     if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    var aDeadline = a.status !== "fixed" && a.deadline;
+    var bDeadline = b.status !== "fixed" && b.deadline;
+    if(!!aDeadline !== !!bDeadline) return aDeadline ? -1 : 1;
+    if(aDeadline && bDeadline && a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
+    var pa = MAINT_PRIORITY_ORDER[a.priority] != null ? MAINT_PRIORITY_ORDER[a.priority] : 2;
+    var pb = MAINT_PRIORITY_ORDER[b.priority] != null ? MAINT_PRIORITY_ORDER[b.priority] : 2;
+    if(pa !== pb) return pa - pb;
     if(order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+}
+function fmtDeadline(hhmm){
+  var parts = hhmm.split(":");
+  var h = +parts[0], m = parts[1];
+  var period = h >= 12 ? "PM" : "AM";
+  var h12 = h % 12; if(h12 === 0) h12 = 12;
+  return h12 + ":" + m + " " + period;
+}
+function isTicketOverdue(t){
+  if(!t.deadline || t.status === "fixed") return false;
+  var d = new Date();
+  var hh = (d.getHours()<10?"0":"")+d.getHours();
+  var mm = (d.getMinutes()<10?"0":"")+d.getMinutes();
+  return (hh+":"+mm) > t.deadline;
 }
 
 function togglePinTicket(id){
@@ -4337,6 +4408,13 @@ function buildMaintCard(t){
   var infoHtml = "";
   if(t.roomNumber) infoHtml += '<span class="maint-card-room">' + esc(t.roomNumber) + '</span>';
   infoHtml += '<div class="maint-card-desc">' + esc(t.description) + '</div>';
+  var tagsHtml = "";
+  if(t.priority === "safety") tagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
+  else if(t.priority === "guest") tagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';
+  else if(t.priority === "routine") tagsHtml += '<span class="maint-tag tag-routine">Routine</span>';
+  if(t.guestPresent) tagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
+  if(t.deadline) tagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
+  if(tagsHtml) infoHtml += '<div class="maint-card-tags">' + tagsHtml + '</div>';
   infoHtml += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   info.innerHTML = infoHtml;
   top.appendChild(info);
@@ -4378,6 +4456,13 @@ function renderTicketDetail(){
   if(!t){ closeTicketDetail(); return; }
 
   var html = '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
+  var detailTagsHtml = "";
+  if(t.priority === "safety") detailTagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
+  else if(t.priority === "guest") detailTagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';
+  else if(t.priority === "routine") detailTagsHtml += '<span class="maint-tag tag-routine">Routine</span>';
+  if(t.guestPresent) detailTagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
+  if(t.deadline) detailTagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
+  if(detailTagsHtml) html += '<div class="maint-card-tags ticket-detail-tags">' + detailTagsHtml + '</div>';
   if(t.roomNumber){
     html += '<div class="ticket-detail-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
   }
@@ -4410,9 +4495,48 @@ function renderTicketDetail(){
     ticketDetailBody.appendChild(delBtn);
   }
 
+  var repliesWrap = document.createElement("div");
+  repliesWrap.className = "ticket-replies";
+  repliesWrap.innerHTML = '<div class="ticket-replies-list" id="ticketRepliesList"><div class="ticket-replies-loading">Loading…</div></div>' +
+    '<div class="ticket-reply-row"><input type="text" id="ticketReplyInput" placeholder="Reply about this job…" maxlength="500"><button type="button" id="ticketReplySendBtn">Send</button></div>';
+  ticketDetailBody.appendChild(repliesWrap);
+  loadAndRenderTicketReplies(t.id);
+  document.getElementById("ticketReplySendBtn").addEventListener("click", function(){ sendTicketReply(t.id); });
+  document.getElementById("ticketReplyInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); sendTicketReply(t.id); } });
+
   ticketDetailPos.textContent = (STATE.ticketDetailIndex + 1) + " of " + STATE.ticketDetailQueue.length + " · " + MAINT_STATUS_LABEL[t.status];
   ticketDetailPrev.disabled = STATE.ticketDetailIndex <= 0;
   ticketDetailNext.disabled = STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length - 1;
+}
+function renderTicketReplies(list){
+  var el = document.getElementById("ticketRepliesList");
+  if(!el) return;
+  if(!list.length){ el.innerHTML = '<div class="ticket-replies-empty">No replies yet</div>'; return; }
+  el.innerHTML = list.map(function(r){
+    var name = DEPTS[r.from] ? DEPTS[r.from].name : r.from;
+    return '<div class="ticket-reply"><div class="ticket-reply-head"><b>'+esc(name)+'</b><span>'+fmtClock(new Date(r.createdAt).getTime())+'</span></div><div class="ticket-reply-text">'+esc(r.text)+'</div></div>';
+  }).join("");
+  el.scrollTop = el.scrollHeight;
+}
+function loadAndRenderTicketReplies(ticketId){
+  apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies').then(function(res){
+    STATE.ticketReplies = STATE.ticketReplies || {};
+    STATE.ticketReplies[ticketId] = res.replies;
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(res.replies);
+  }).catch(function(){});
+}
+function sendTicketReply(ticketId){
+  var input = document.getElementById("ticketReplyInput");
+  if(!input) return;
+  var text = input.value.trim();
+  if(!text) return;
+  input.value = "";
+  apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies', 'POST', { text: text }).then(function(res){
+    STATE.ticketReplies = STATE.ticketReplies || {};
+    STATE.ticketReplies[ticketId] = STATE.ticketReplies[ticketId] || [];
+    STATE.ticketReplies[ticketId].push(res.reply);
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(STATE.ticketReplies[ticketId]);
+  }).catch(function(){ showToast("Couldn't send that"); });
 }
 ticketDetailClose.addEventListener("click", closeTicketDetail);
 ticketDetailOverlay.addEventListener("click", function(e){ if(e.target === ticketDetailOverlay) closeTicketDetail(); });
@@ -4508,7 +4632,13 @@ newMaintForm.addEventListener("submit", function(e){
   maintError.textContent = "";
   var description = newMaintDesc.value.trim();
   if(!description) return;
-  var payload = { description: description, roomNumber: newMaintRoom.value.trim() || undefined };
+  var payload = {
+    description: description,
+    roomNumber: newMaintRoom.value.trim() || undefined,
+    priority: maintSelectedPriority,
+    guestPresent: newMaintGuestPresent.checked,
+    deadline: newMaintDeadline.value || undefined,
+  };
   var submitBtn = newMaintForm.querySelector(".admin-add-btn");
   submitBtn.disabled = true;
   var sendPromise = maintPhotoFile
@@ -4519,7 +4649,12 @@ newMaintForm.addEventListener("submit", function(e){
       })
     : apiSend('/api/maintenance', 'POST', payload);
   sendPromise.then(function(res){
-    STATE.tickets.unshift(res.ticket);
+    if(res.merged){
+      var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
+      if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
+    } else {
+      STATE.tickets.unshift(res.ticket);
+    }
     renderMaintenanceBoard();
     newMaintDesc.value = "";
     newMaintRoom.value = "";
@@ -4527,7 +4662,11 @@ newMaintForm.addEventListener("submit", function(e){
     newMaintPhoto.value = "";
     maintPhotoPreview.hidden = true;
     maintPhotoPreviewVideo.src = "";
-    showToast("Reported");
+    newMaintGuestPresent.checked = false;
+    newMaintDeadline.value = "";
+    maintSelectedPriority = "problem";
+    maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "problem"); });
+    showToast(res.merged ? "Already reported — added your note to it" : "Reported");
   }).catch(function(err){
     maintError.textContent = err.message || "Couldn't report that issue.";
   }).finally(function(){ submitBtn.disabled = false; });

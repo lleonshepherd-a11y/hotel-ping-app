@@ -16,6 +16,9 @@ DEPT_NAMES.dashboard = 'Dashboard';
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
+const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
+const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
+const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -55,12 +58,18 @@ function rowToTicket(row) {
     description: row.description,
     photoUrl: row.photo_path ? '/uploads/' + row.photo_path : undefined,
     status: row.status,
+    priority: row.priority || 'problem',
+    guestPresent: !!row.guest_present,
+    deadline: row.deadline || undefined,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || undefined,
     pinned: !!row.pinned_at,
   };
+}
+function rowToTicketReply(row) {
+  return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
 }
 
 function rowToMessage(row, viewerDeptId, isAdmin) {
@@ -816,6 +825,37 @@ const server = http.createServer(async (req, res) => {
       if (!description) return send(res, 400, { error: 'A description is required' });
       const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
       if (roomNumber && roomNumber.length > 40) return send(res, 400, { error: 'Location is too long' });
+      const priority = MAINT_PRIORITIES.includes(body.priority) ? body.priority : 'problem';
+      const guestPresent = !!body.guestPresent;
+      let deadline = body.deadline ? String(body.deadline).trim() : null;
+      if (deadline && !DEADLINE_RE.test(deadline)) deadline = null;
+
+      if (roomNumber) {
+        const dup = db.prepare(
+          "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND LOWER(TRIM(room_number)) = LOWER(?) ORDER BY created_at DESC LIMIT 1"
+        ).get(roomNumber);
+        if (dup) {
+          const replyId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const noteText = 'Also reported by ' + (DEPT_NAMES[requester.department_id] || requester.department_id) + ': ' + description;
+          db.prepare('INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)')
+            .run(replyId, dup.id, requester.department_id, noteText, now);
+
+          const mergedPriority = MAINT_PRIORITY_RANK[priority] < MAINT_PRIORITY_RANK[dup.priority] ? priority : dup.priority;
+          const mergedGuestPresent = guestPresent || !!dup.guest_present;
+          const mergedDeadline = deadline && (!dup.deadline || deadline < dup.deadline) ? deadline : dup.deadline;
+          if (mergedPriority !== dup.priority || mergedGuestPresent !== !!dup.guest_present || mergedDeadline !== dup.deadline) {
+            db.prepare('UPDATE maintenance_tickets SET priority = ?, guest_present = ?, deadline = ?, updated_at = ? WHERE id = ?')
+              .run(mergedPriority, mergedGuestPresent ? 1 : 0, mergedDeadline, now, dup.id);
+          }
+          const mergedRow = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(dup.id);
+
+          if (dup.created_by !== requester.department_id) {
+            console.log('[maintenance notify] maintenance department: Same job reported again -', noteText);
+          }
+          return send(res, 200, { ticket: rowToTicket(mergedRow), merged: true });
+        }
+      }
 
       let photoPath = null;
       if (body.photoBase64) {
@@ -830,11 +870,42 @@ const server = http.createServer(async (req, res) => {
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       db.prepare(
-        "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?)"
-      ).run(id, roomNumber, description, photoPath, requester.department_id, now, now);
+        "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
+      ).run(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
-      console.log('[maintenance notify] maintenance department:', (roomNumber ? 'Room ' + roomNumber + ': ' : '') + description);
+      let notifyBody = (roomNumber ? 'Room ' + roomNumber + ': ' : '') + description;
+      if (guestPresent) notifyBody += ' · Guest in room';
+      if (deadline) notifyBody += ' · Needed by ' + deadline;
+      console.log('[maintenance notify] maintenance department:', notifyBody);
       return send(res, 201, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.endsWith('/replies')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
+      const rows = db.prepare('SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC').all(id);
+      return send(res, 200, { replies: rows.map(rowToTicketReply) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/replies')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
+      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim();
+      if (!text) return send(res, 400, { error: 'Message is required' });
+      const requester = staffFromToken(req);
+      const replyId = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)')
+        .run(replyId, id, requester.department_id, text, now);
+      const row = db.prepare('SELECT * FROM maintenance_replies WHERE id = ?').get(replyId);
+
+      const notifyTarget = requester.department_id === 'maintenance' ? existing.created_by : 'maintenance';
+      if (notifyTarget !== requester.department_id) {
+        console.log('[maintenance reply notify]', notifyTarget, ':', text);
+      }
+
+      return send(res, 201, { reply: rowToTicketReply(row) });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/status')) {

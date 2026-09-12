@@ -195,6 +195,9 @@ db.exec(`
     description TEXT NOT NULL,
     photo_path TEXT,
     status TEXT NOT NULL DEFAULT 'reported' CHECK(status IN ('reported','in_progress','fixed')),
+    priority TEXT NOT NULL DEFAULT 'problem' CHECK(priority IN ('safety','guest','problem','routine')),
+    guest_present INTEGER NOT NULL DEFAULT 0,
+    deadline TEXT,
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -208,11 +211,29 @@ db.exec(`
     message_id TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS maintenance_replies (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    from_dept TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);
 if (!maintenanceColumns.includes('pinned_at')) {
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN pinned_at TEXT');
+}
+if (!maintenanceColumns.includes('priority')) {
+  db.exec("ALTER TABLE maintenance_tickets ADD COLUMN priority TEXT NOT NULL DEFAULT 'problem'");
+}
+if (!maintenanceColumns.includes('guest_present')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN guest_present INTEGER NOT NULL DEFAULT 0');
+}
+if (!maintenanceColumns.includes('deadline')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN deadline TEXT');
 }
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);

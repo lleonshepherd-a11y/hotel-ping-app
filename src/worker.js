@@ -7,6 +7,9 @@ const DEPT_NAMES = {
 const PIN_RE = /^\d{4,6}$/;
 const TASK_STATUSES = ["not_started", "in_progress", "completed"];
 const MAINT_STATUSES = ["reported", "in_progress", "fixed"];
+const MAINT_PRIORITIES = ["safety", "guest", "problem", "routine"];
+const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
+const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
@@ -272,12 +275,18 @@ function rowToTicket(row) {
     description: row.description,
     photoUrl: row.photo_path ? "/uploads/" + row.photo_path : undefined,
     status: row.status,
+    priority: row.priority || "problem",
+    guestPresent: !!row.guest_present,
+    deadline: row.deadline || undefined,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || undefined,
     pinned: !!row.pinned_at,
   };
+}
+function rowToTicketReply(row) {
+  return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
 }
 function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
@@ -1037,6 +1046,45 @@ export default {
         if (!description) return json({ error: "A description is required" }, 400);
         const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
         if (roomNumber && roomNumber.length > 40) return json({ error: "Location is too long" }, 400);
+        const priority = MAINT_PRIORITIES.includes(body.priority) ? body.priority : "problem";
+        const guestPresent = !!body.guestPresent;
+        let deadline = body.deadline ? String(body.deadline).trim() : null;
+        if (deadline && !DEADLINE_RE.test(deadline)) deadline = null;
+
+        if (roomNumber) {
+          const dup = await env.DB.prepare(
+            "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND LOWER(TRIM(room_number)) = LOWER(?) ORDER BY created_at DESC LIMIT 1"
+          ).bind(roomNumber).first();
+          if (dup) {
+            const replyId = crypto.randomUUID();
+            const now = new Date().toISOString();
+            const noteText = "Also reported by " + (DEPT_NAMES[requester.department_id] || requester.department_id) + ": " + description;
+            await env.DB.prepare(
+              "INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)"
+            ).bind(replyId, dup.id, requester.department_id, noteText, now).run();
+
+            const mergedPriority = MAINT_PRIORITY_RANK[priority] < MAINT_PRIORITY_RANK[dup.priority] ? priority : dup.priority;
+            const mergedGuestPresent = guestPresent || !!dup.guest_present;
+            const mergedDeadline = deadline && (!dup.deadline || deadline < dup.deadline) ? deadline : dup.deadline;
+            if (mergedPriority !== dup.priority || mergedGuestPresent !== !!dup.guest_present || mergedDeadline !== dup.deadline) {
+              await env.DB.prepare(
+                "UPDATE maintenance_tickets SET priority = ?, guest_present = ?, deadline = ?, updated_at = ? WHERE id = ?"
+              ).bind(mergedPriority, mergedGuestPresent ? 1 : 0, mergedDeadline, now, dup.id).run();
+            }
+            const mergedRow = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(dup.id).first();
+
+            if (dup.created_by !== requester.department_id) {
+              const notifyPromise = notifyDepartment(env, "maintenance", {
+                title: "🔧 Same job reported again",
+                body: noteText,
+                url: "/",
+                tag: "hotel-ping-maintenance-" + dup.id,
+              }, requester.department_id).catch(function(e){ console.error("notifyDepartment (dup maintenance) error:", e && e.stack || e); });
+              if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+            }
+            return json({ ticket: rowToTicket(mergedRow), merged: true }, 200);
+          }
+        }
 
         let photoPath = null;
         if (body.photoBase64) {
@@ -1053,19 +1101,57 @@ export default {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.DB.prepare(
-          "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?)"
-        ).bind(id, roomNumber, description, photoPath, requester.department_id, now, now).run();
+          "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
+        ).bind(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now).run();
         const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
 
+        let notifyBody = (roomNumber ? "Room " + roomNumber + ": " : "") + description;
+        if (guestPresent) notifyBody += " · Guest in room";
+        if (deadline) notifyBody += " · Needed by " + deadline;
         const notifyPromise = notifyDepartment(env, "maintenance", {
-          title: "🔧 New maintenance ticket",
-          body: (roomNumber ? "Room " + roomNumber + ": " : "") + description,
+          title: priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
+          body: notifyBody,
           url: "/",
           tag: "hotel-ping-maintenance-" + id,
         }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maintenance) error:", e && e.stack || e); });
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
         return json({ ticket: rowToTicket(row) }, 201);
+      }
+
+      if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
+        const rows = await env.DB.prepare("SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC").bind(id).all();
+        return json({ replies: rows.results.map(rowToTicketReply) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
+        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        const body = await readJsonBody(request);
+        const text = String(body.text || "").trim();
+        if (!text) return json({ error: "Message is required" }, 400);
+        const requester = request._staff;
+        const replyId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(replyId, id, requester.department_id, text, now).run();
+        const row = await env.DB.prepare("SELECT * FROM maintenance_replies WHERE id = ?").bind(replyId).first();
+
+        const notifyTarget = requester.department_id === "maintenance" ? existing.created_by : "maintenance";
+        if (notifyTarget !== requester.department_id) {
+          const notifyPromise = notifyDepartment(env, notifyTarget, {
+            title: (DEPT_NAMES[requester.department_id] || requester.department_id) + " · job reply",
+            body: text,
+            url: "/",
+            tag: "hotel-ping-maint-reply-" + id,
+          }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maint reply) error:", e && e.stack || e); });
+          if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+        }
+
+        return json({ reply: rowToTicketReply(row) }, 201);
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/status")) {

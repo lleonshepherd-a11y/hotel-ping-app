@@ -124,6 +124,9 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   description TEXT NOT NULL,
   photo_path TEXT,
   status TEXT NOT NULL DEFAULT 'reported' CHECK(status IN ('reported','in_progress','fixed')),
+  priority TEXT NOT NULL DEFAULT 'problem' CHECK(priority IN ('safety','guest','problem','routine')),
+  guest_present INTEGER NOT NULL DEFAULT 0,
+  deadline TEXT,
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -137,6 +140,15 @@ CREATE TABLE IF NOT EXISTS external_notifications (
   message_id TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS maintenance_replies (
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT NOT NULL,
+  from_dept TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
