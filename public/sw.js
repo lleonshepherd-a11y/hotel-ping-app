@@ -1,4 +1,4 @@
-const CACHE = "hotel-ping-static-v2";
+const CACHE = "hotel-ping-static-v3";
 const STATIC_ASSETS = [
   "/manifest.json",
   "/icon-192.png",
