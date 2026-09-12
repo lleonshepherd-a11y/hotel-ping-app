@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS messages (
   completed_by TEXT,
   escalated_at TEXT,
   broadcast_id TEXT,
-  room_number TEXT
+  room_number TEXT,
+  read_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 

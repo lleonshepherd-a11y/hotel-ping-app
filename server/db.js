@@ -84,6 +84,9 @@ if (!messageColumns.includes('broadcast_id')) {
 if (!messageColumns.includes('room_number')) {
   db.exec('ALTER TABLE messages ADD COLUMN room_number TEXT');
 }
+if (!messageColumns.includes('read_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN read_at TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (

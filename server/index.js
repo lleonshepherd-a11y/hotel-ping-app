@@ -138,7 +138,7 @@ function getConversations(self, isAdmin) {
 }
 
 function markThreadRead(self, other) {
-  db.prepare(`UPDATE messages SET status = 'read' WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).run(self, other);
+  db.prepare(`UPDATE messages SET status = 'read', read_at = ? WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).run(new Date().toISOString(), self, other);
 }
 
 function rowToStaff(row) {
@@ -355,6 +355,27 @@ const server = http.createServer(async (req, res) => {
       const limit = Math.min(parseInt(url.searchParams.get('limit') || '60', 10) || 60, 200);
       const rows = db.prepare('SELECT * FROM messages ORDER BY created_at DESC LIMIT ?').all(limit);
       return send(res, 200, { messages: rows.map((r) => rowToMessage(r, r.from_dept, true)).filter(Boolean) });
+    }
+
+    if (req.method === 'GET' && p === '/api/response-times') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const rows = db.prepare(
+        `SELECT to_dept, created_at, read_at FROM messages
+         WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?`
+      ).all(cutoff);
+      const byDept = {};
+      for (const r of rows) {
+        const seconds = (new Date(r.read_at).getTime() - new Date(r.created_at).getTime()) / 1000;
+        if (!byDept[r.to_dept]) byDept[r.to_dept] = { total: 0, count: 0 };
+        byDept[r.to_dept].total += seconds;
+        byDept[r.to_dept].count += 1;
+      }
+      const departments = Object.keys(byDept).map((deptId) => ({
+        deptId, avgSeconds: byDept[deptId].total / byDept[deptId].count, count: byDept[deptId].count,
+      }));
+      return send(res, 200, { departments });
     }
 
     if (req.method === 'POST' && p === '/api/messages/read') {

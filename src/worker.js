@@ -566,8 +566,21 @@ export default {
       if (method === "POST" && p === "/api/messages/read") {
         const body = await readJsonBody(request);
         if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return json({ error: "Unknown department" }, 400);
-        await env.DB.prepare(`UPDATE messages SET status = 'read' WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).bind(body.self, body.with).run();
+        await env.DB.prepare(`UPDATE messages SET status = 'read', read_at = ? WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).bind(new Date().toISOString(), body.self, body.with).run();
         return json({ ok: true });
+      }
+
+      if (method === "GET" && p === "/api/response-times") {
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const rows = await env.DB.prepare(
+          `SELECT to_dept, AVG((julianday(read_at) - julianday(created_at)) * 86400) AS avg_seconds, COUNT(*) AS n
+           FROM messages
+           WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?
+           GROUP BY to_dept`
+        ).bind(cutoff).all();
+        return json({ departments: rows.results.map((r) => ({ deptId: r.to_dept, avgSeconds: r.avg_seconds, count: r.n })) });
       }
 
       if (method === "POST" && p === "/api/messages") {
