@@ -170,6 +170,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-avatar{width:44px;height:44px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 6px rgba(15,15,20,.18)}
 .t-avatar svg{width:19px;height:19px}
 .t-avatar.urgent-ring::before{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--urgent);animation:ringPulse 1.8s ease-in-out infinite}
+.t-duty-dot{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid var(--surface);background:var(--text-faint)}
+.t-duty-dot.on{background:#3bb54a}
 @keyframes ringPulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
 .t-body{flex:1;min-width:0}
 .t-row1{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
@@ -342,6 +344,24 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   border-radius:24px;padding:6px 7px 6px 12px;
   transition:background .15s ease;
 }
+.qr-wrap{position:relative;flex:none}
+.qr-btn.open{background:var(--surface-3);color:var(--text)}
+.qr-menu{
+  position:absolute;bottom:calc(100% + 10px);left:0;
+  display:flex;flex-direction:column;gap:4px;padding:8px;min-width:150px;
+  background:var(--surface);border-radius:16px;
+  box-shadow:0 10px 28px -8px rgba(20,20,16,.28), 0 2px 8px rgba(20,20,16,.08), inset 0 0 0 1px var(--border);
+  transform-origin:20px 100%;
+  transform:scale(.4);opacity:0;pointer-events:none;
+  transition:transform .22s cubic-bezier(.32,1.5,.4,1), opacity .16s ease;
+}
+.qr-menu.open{transform:scale(1);opacity:1;pointer-events:auto}
+.qr-chip{
+  border:none;background:none;color:var(--text);text-align:left;
+  font-size:13.5px;font-weight:600;padding:8px 12px;border-radius:10px;white-space:nowrap;
+}
+.qr-chip:hover{background:var(--surface-3)}
+.qr-chip:active{background:rgba(24,119,242,.12);color:var(--accent)}
 .composer.urgent-mode .composer-pill{background:var(--urgent-tint)}
 .icon-btn{flex:none;width:34px;height:34px;border-radius:50%;border:none;background:none;color:var(--text-dim);display:flex;align-items:center;justify-content:center;transition:background .12s ease,color .12s ease,transform .1s ease}
 .icon-btn:active{transform:scale(.9)}
@@ -781,6 +801,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z" stroke-width="1.7"/><path d="M12 9v4.3" stroke-width="1.7"/><circle cx="12" cy="16.6" r="1" fill="currentColor" stroke="none"/></svg></span>
                   <span class="plus-opt-label">Urgent</span>
                 </button>
+              </div>
+            </div>
+            <div class="qr-wrap">
+              <button class="icon-btn qr-btn" id="qrBtn" type="button" aria-label="Quick replies" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5z"/><path d="M8 9.5h8M8 13h5"/></svg>
+              </button>
+              <div class="qr-menu" id="qrMenu">
+                <button type="button" class="qr-chip" data-text="On it">On it</button>
+                <button type="button" class="qr-chip" data-text="Done">Done</button>
+                <button type="button" class="qr-chip" data-text="5 mins">5 mins</button>
+                <button type="button" class="qr-chip" data-text="On my way">On my way</button>
+                <button type="button" class="qr-chip" data-text="Noted">Noted</button>
               </div>
             </div>
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
@@ -1331,7 +1363,7 @@ function renderList(){
     var el = document.createElement("button");
     el.className = "thread-item" + (id === STATE.active ? " active" : "") + (unread ? " unread" : "");
     el.innerHTML =
-      '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
+      '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'<span class="t-duty-dot '+(isOnDuty(id)?'on':'off')+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'"></span></div>'+
       '<div class="t-body">'+
         '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
@@ -2198,6 +2230,36 @@ document.addEventListener("click", function(e){
   }
 });
 
+var qrBtn = document.getElementById("qrBtn");
+var qrMenu = document.getElementById("qrMenu");
+function closeQrMenu(){
+  qrMenu.classList.remove("open");
+  qrBtn.classList.remove("open");
+  qrBtn.setAttribute("aria-expanded", "false");
+}
+function openQrMenu(){
+  qrMenu.classList.add("open");
+  qrBtn.classList.add("open");
+  qrBtn.setAttribute("aria-expanded", "true");
+}
+qrBtn.addEventListener("click", function(){
+  if(qrMenu.classList.contains("open")) closeQrMenu(); else openQrMenu();
+});
+qrMenu.addEventListener("click", function(e){
+  var chip = e.target.closest(".qr-chip");
+  if(!chip) return;
+  closeQrMenu();
+  msgInput.value = chip.getAttribute("data-text");
+  autoGrow();
+  refreshSendState();
+  doSend();
+});
+document.addEventListener("click", function(e){
+  if(!qrMenu.contains(e.target) && e.target !== qrBtn && !qrBtn.contains(e.target)){
+    closeQrMenu();
+  }
+});
+
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
 micQuickBtn.addEventListener("click", function(){ startRecording(); });
@@ -2601,7 +2663,12 @@ function refreshNow(){
     prevIds[id] = {};
     (STATE.data[id] || []).forEach(function(m){ prevIds[id][m.id] = true; });
   });
-  return buildData(STATE.self).then(function(data){
+  var dutyBefore = {};
+  Object.keys(DEPT_META).forEach(function(id){ dutyBefore[id] = isOnDuty(id); });
+  return loadDepartmentMeta().then(function(){
+    var dutyChanged = Object.keys(DEPT_META).some(function(id){ return dutyBefore[id] !== isOnDuty(id); });
+    if(dutyChanged){ renderList(); renderHeader(); }
+  }).then(function(){ return buildData(STATE.self); }).then(function(data){
     var hasNew = false, hasUrgent = false, changed = false;
     Object.keys(data).forEach(function(id){
       var oldMsgs = STATE.data[id] || [];
