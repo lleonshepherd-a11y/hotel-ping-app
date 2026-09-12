@@ -330,6 +330,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #taskTagClose{color:var(--accent)}
 .room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
+.mention-popover{position:absolute;left:20px;right:20px;bottom:100%;margin-bottom:6px;max-width:640px;margin-left:auto;margin-right:auto;background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.18);overflow:hidden;max-height:220px;overflow-y:auto;z-index:25}
+.mention-popover-opt{display:flex;align-items:center;gap:9px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font:inherit;font-size:14px;cursor:pointer;color:var(--text)}
+.mention-popover-opt:active{background:var(--surface-2)}
+.mention-tag{font-weight:700;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px}
+.bubble.mentioned-for-me{box-shadow:0 0 0 2px #ff9f0a}
 .room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
 .task-msg-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px 3px 7px;border-radius:20px;margin-bottom:5px;border:none;color:var(--text-dim);background:var(--surface-3)}
 .task-msg-tag.in_progress{color:var(--accent);background:rgba(24,119,242,.12)}
@@ -909,6 +914,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </button>
       </div>
 
+      <div class="mention-popover" id="mentionPopover" hidden></div>
+
       <div class="reply-preview-bar" id="editBar" hidden>
         <div class="reply-preview-bar-accent"></div>
         <div class="reply-preview-bar-body">
@@ -1268,7 +1275,8 @@ function mapServerMessage(row, self){
     broadcastId: row.broadcastId || undefined,
     roomNumber: row.roomNumber || undefined,
     taskStatus: row.taskStatus || undefined,
-    edited: !!row.editedAt
+    edited: !!row.editedAt,
+    mentions: row.mentions || undefined
   };
 }
 
@@ -1319,6 +1327,15 @@ function fmtBytes(n){
 }
 function lastOf(arr){ return arr && arr.length ? arr[arr.length-1] : null; }
 function esc(s){ return (s||"").replace(/[&<>]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
+function highlightMentions(text, mentions){
+  var escaped = esc(text);
+  mentions.forEach(function(deptId){
+    var name = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+    var re = new RegExp("@" + esc(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    escaped = escaped.replace(re, '<span class="mention-tag">@' + esc(name) + '</span>');
+  });
+  return escaped;
+}
 
 var cachedVoice = null;
 function pickBestVoice(){
@@ -1565,7 +1582,7 @@ function markRead(deptId){
 }
 
 function openThread(deptId){
-  if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); }
+  if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; }
   STATE.active = deptId;
   STATE.activeGroupId = null;
   markRead(deptId);
@@ -2239,8 +2256,13 @@ function buildMessageRow(m, groupEnd, msgsById){
   var bubble;
   if(m.type === "text"){
     bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.textContent = m.text;
+    var iMentioned = m.mentions && AUTH.staff && m.mentions.indexOf(AUTH.staff.departmentId) !== -1;
+    bubble.className = "bubble" + (iMentioned ? " mentioned-for-me" : "");
+    if(m.mentions && m.mentions.length){
+      bubble.innerHTML = highlightMentions(m.text, m.mentions);
+    } else {
+      bubble.textContent = m.text;
+    }
     if(window.speechSynthesis && m.text){
       var speakBtn = document.createElement("button");
       speakBtn.type = "button";
@@ -2496,13 +2518,67 @@ function autoGrow(){
   msgInput.style.height = "auto";
   msgInput.style.height = Math.min(120, msgInput.scrollHeight) + "px";
 }
-msgInput.addEventListener("input", function(){ autoGrow(); refreshSendState(); notifyTyping(); });
+msgInput.addEventListener("input", function(){ autoGrow(); refreshSendState(); notifyTyping(); updateMentionPopover(); });
 msgInput.addEventListener("keydown", function(e){
   if(e.key === "Enter" && !e.shiftKey){
     e.preventDefault();
     doSend();
   }
 });
+msgInput.addEventListener("click", updateMentionPopover);
+msgInput.addEventListener("blur", function(){ setTimeout(function(){ mentionPopover.hidden = true; }, 150); });
+
+var mentionPopover = document.getElementById("mentionPopover");
+function updateMentionPopover(){
+  if(!STATE.activeGroupId){ mentionPopover.hidden = true; return; }
+  var val = msgInput.value;
+  var caret = msgInput.selectionStart;
+  var uptoCaret = val.slice(0, caret);
+  var match = uptoCaret.match(/@([a-zA-Z ]*)$/);
+  if(!match){ mentionPopover.hidden = true; return; }
+  var term = match[1].toLowerCase();
+  var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
+  if(!g){ mentionPopover.hidden = true; return; }
+  var candidates = g.members.filter(function(id){ return id !== STATE.self; }).map(function(id){
+    return { id: id, name: DEPTS[id] ? DEPTS[id].name : id };
+  }).filter(function(c){ return c.name.toLowerCase().indexOf(term) !== -1; });
+  if(!candidates.length){ mentionPopover.hidden = true; return; }
+  mentionPopover.innerHTML = candidates.map(function(c){
+    return '<button type="button" class="mention-popover-opt" data-dept="'+c.id+'">'+
+      '<span class="fwd-avatar" style="background:'+avatarGradient(c.id)+'">'+iconSvg(c.id)+'</span>'+esc(c.name)+'</button>';
+  }).join("");
+  mentionPopover.hidden = false;
+  mentionPopover.querySelectorAll(".mention-popover-opt").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var deptId = btn.getAttribute("data-dept");
+      var name = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+      var before = val.slice(0, caret - match[0].length);
+      var after = val.slice(caret);
+      var inserted = "@" + name + " ";
+      msgInput.value = before + inserted + after;
+      var newCaret = before.length + inserted.length;
+      msgInput.focus();
+      msgInput.setSelectionRange(newCaret, newCaret);
+      autoGrow();
+      refreshSendState();
+      mentionPopover.hidden = true;
+    });
+  });
+}
+
+function extractMentions(text, groupId){
+  if(!groupId || !text) return [];
+  var g = STATE.groups.find(function(x){ return x.id === groupId; });
+  if(!g) return [];
+  var lower = text.toLowerCase();
+  var mentions = [];
+  g.members.forEach(function(deptId){
+    if(deptId === STATE.self) return;
+    var name = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+    if(lower.indexOf("@" + name.toLowerCase()) !== -1) mentions.push(deptId);
+  });
+  return mentions;
+}
 
 function refreshSendState(){
   var ready = msgInput.value.trim().length > 0 || !!STATE.attachment;
@@ -2732,6 +2808,7 @@ function doSend(){
   var text = msgInput.value.trim();
   if(!text && !STATE.attachment) return;
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
+  mentionPopover.hidden = true;
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
@@ -2748,7 +2825,7 @@ function doSend(){
   refreshSendState();
 
   var payload = { from: STATE.self, urgent: wasUrgent };
-  if(groupId) payload.groupId = groupId; else payload.to = deptId;
+  if(groupId){ payload.groupId = groupId; payload.mentions = extractMentions(text, groupId); } else payload.to = deptId;
   if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
   clearReplyBar();
   var roomTag = roomTagInput.value.trim();
@@ -3939,6 +4016,7 @@ function openGroupThread(groupId){
   if(!g) return;
   clearReplyBar();
   clearEditBar();
+  mentionPopover.hidden = true;
   STATE.active = null;
   STATE.activeGroupId = groupId;
   updateComposerLock();
