@@ -543,6 +543,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .pin-indicator svg{width:10px;height:10px}
 .done-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#2f9a5c;margin-bottom:2px}
 .done-indicator svg{width:10px;height:10px}
+.broadcast-status-tag{font-size:10.5px;font-weight:700;color:var(--text-dim);margin-bottom:2px}
 .msg-row.pending .bubble{opacity:.6}
 .pending-label{font-style:italic;color:var(--text-faint)}
 .broadcast-hint{font-size:12.5px;color:var(--text-dim);line-height:1.5;margin:0 0 16px}
@@ -1033,7 +1034,8 @@ function mapServerMessage(row, self){
     pinned: !!row.pinned,
     completed: !!row.completed,
     completedAt: row.completedAt ? new Date(row.completedAt).getTime() : undefined,
-    completedBy: row.completedBy || undefined
+    completedBy: row.completedBy || undefined,
+    broadcastId: row.broadcastId || undefined
   };
 }
 
@@ -1500,6 +1502,16 @@ function renderThread(){
   threadScroll.scrollTop = threadScroll.scrollHeight;
 }
 
+var broadcastStatusCache = {};
+function loadBroadcastStatus(broadcastId){
+  var cached = broadcastStatusCache[broadcastId];
+  if(cached && Date.now() - cached.at < 15000) return Promise.resolve(cached.data);
+  return apiGet('/api/broadcast/' + encodeURIComponent(broadcastId) + '/status').then(function(res){
+    broadcastStatusCache[broadcastId] = { at: Date.now(), data: res };
+    return res;
+  });
+}
+
 function messagePreviewLabel(m){
   if(!m) return "";
   if(m.deleted && !m.text && !m.url && !m.transcript) return "Deleted message";
@@ -1802,6 +1814,16 @@ function buildMessageRow(m, groupEnd, msgsById){
     pinTag.className = "pin-indicator";
     pinTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> Pinned';
     wrap.appendChild(pinTag);
+  }
+
+  if(m.broadcastId && out){
+    var bcTag = document.createElement("div");
+    bcTag.className = "broadcast-status-tag";
+    bcTag.textContent = "📢 Broadcast";
+    wrap.appendChild(bcTag);
+    loadBroadcastStatus(m.broadcastId).then(function(s){
+      bcTag.textContent = "📢 Broadcast · " + s.readCount + "/" + s.total + " read";
+    }).catch(function(){});
   }
 
   if(m.completed){

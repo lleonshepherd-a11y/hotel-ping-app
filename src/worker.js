@@ -211,12 +211,12 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -270,6 +270,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completed: !!row.completed_at,
     completedAt: row.completed_at || undefined,
     completedBy: row.completed_by || undefined,
+    broadcastId: row.broadcast_id || undefined,
   };
 }
 function rowToStaff(row) {
@@ -662,12 +663,24 @@ export default {
         if (!text) return json({ error: "Message text is required" }, 400);
         const from = requester.department_id;
         const targets = Array.from(DEPT_IDS).filter((id) => id !== from);
+        const broadcastId = crypto.randomUUID();
         const rows = [];
         for (const to of targets) {
-          const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent });
+          const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent, broadcastId });
           rows.push(row);
         }
         return json({ messages: rows.map((r) => rowToMessage(r, from, false)) }, 201);
+      }
+
+      if (method === "GET" && p.startsWith("/api/broadcast/") && p.endsWith("/status")) {
+        const broadcastId = decodeURIComponent(p.slice("/api/broadcast/".length, -"/status".length));
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const rows = await env.DB.prepare("SELECT to_dept, status FROM messages WHERE broadcast_id = ?").bind(broadcastId).all();
+        const total = rows.results.length;
+        const read = rows.results.filter((r) => r.status === "read").map((r) => r.to_dept);
+        const unread = rows.results.filter((r) => r.status !== "read").map((r) => r.to_dept);
+        return json({ total, readCount: read.length, read, unread });
       }
 
       if (method === "POST" && p === "/api/typing") {

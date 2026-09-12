@@ -24,8 +24,10 @@ CREATE TABLE IF NOT EXISTS messages (
   pinned_at TEXT,
   completed_at TEXT,
   completed_by TEXT,
-  escalated_at TEXT
+  escalated_at TEXT,
+  broadcast_id TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
 CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
 

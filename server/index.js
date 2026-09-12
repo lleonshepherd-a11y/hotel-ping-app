@@ -71,6 +71,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completed: !!row.completed_at,
     completedAt: row.completed_at || undefined,
     completedBy: row.completed_by || undefined,
+    broadcastId: row.broadcast_id || undefined,
   };
 }
 
@@ -94,12 +95,12 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?)
   `).run(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null
   );
   return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
 }
@@ -460,8 +461,20 @@ const server = http.createServer(async (req, res) => {
       if (!text) return send(res, 400, { error: 'Message text is required' });
       const from = requester.department_id;
       const targets = [...DEPT_IDS].filter((id) => id !== from);
-      const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent }));
+      const broadcastId = crypto.randomUUID();
+      const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent, broadcastId }));
       return send(res, 201, { messages: rows.map((r) => rowToMessage(r, from, false)) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/broadcast/') && p.endsWith('/status')) {
+      const broadcastId = decodeURIComponent(p.slice('/api/broadcast/'.length, -'/status'.length));
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const rows = db.prepare('SELECT to_dept, status FROM messages WHERE broadcast_id = ?').all(broadcastId);
+      const total = rows.length;
+      const read = rows.filter((r) => r.status === 'read').map((r) => r.to_dept);
+      const unread = rows.filter((r) => r.status !== 'read').map((r) => r.to_dept);
+      return send(res, 200, { total, readCount: read.length, read, unread });
     }
 
     if (req.method === 'POST' && p === '/api/typing') {
