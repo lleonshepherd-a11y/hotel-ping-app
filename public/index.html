@@ -517,6 +517,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .feed-text{font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .feed-text.deleted{font-style:italic;color:var(--text-faint)}
 .feed-time{flex:none;font-size:11px;color:var(--text-faint);white-space:nowrap;padding-top:2px}
+.files-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;max-height:420px;overflow-y:auto}
+.files-thumb{aspect-ratio:1;border-radius:12px;overflow:hidden;border:none;padding:0;background:var(--surface-2);position:relative}
+.files-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.files-thumb.doc,.files-thumb.audio{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;color:var(--text-dim)}
+.files-thumb.doc svg,.files-thumb.audio svg{width:26px;height:26px}
+.files-thumb-label{font-size:10px;font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .forward-dept-list{display:flex;flex-direction:column;gap:2px}
 .forward-dept-opt{display:flex;align-items:center;gap:12px;border:none;background:none;padding:10px 6px;border-radius:12px;text-align:left;font-size:14.5px;font-weight:600;color:var(--text)}
 .forward-dept-opt:hover{background:var(--surface-2)}
@@ -726,6 +732,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <span class="h-dot" id="hDot"></span><span id="hSub">Active now</span>
         </div>
       </div>
+      <button class="mute-btn" id="filesBtn" type="button" aria-label="Shared files" title="Shared files" style="right:54px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg>
+      </button>
       <button class="mute-btn" id="muteBtn" type="button" aria-label="Mute this conversation" title="Mute notifications for this conversation">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       </button>
@@ -844,6 +853,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button type="submit" class="admin-add-btn broadcast-send-btn" id="broadcastSendBtn">Send to all departments</button>
       <div class="admin-add-error" id="broadcastError"></div>
     </form>
+  </div>
+</div>
+
+<div class="admin-overlay" id="filesOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Shared files</h2>
+      <button class="admin-close" id="filesClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="files-grid" id="filesGrid"></div>
   </div>
 </div>
 
@@ -3028,6 +3049,55 @@ function showTab(tab){
 tabProfileBtn.addEventListener("click", function(){ showTab("profile"); });
 tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
 showTab("chat");
+
+var filesBtn = document.getElementById("filesBtn");
+var filesOverlay = document.getElementById("filesOverlay");
+var filesClose = document.getElementById("filesClose");
+var filesGrid = document.getElementById("filesGrid");
+
+function jumpToMessage(id){
+  filesOverlay.hidden = true;
+  var target = threadScroll.querySelector('[data-msg-id="'+id+'"]');
+  if(target){
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("flash-highlight");
+    setTimeout(function(){ target.classList.remove("flash-highlight"); }, 1200);
+  }
+}
+
+var FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg>';
+var AUDIO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+
+filesBtn.addEventListener("click", function(){
+  var msgs = (STATE.data[STATE.active] || []).filter(function(m){ return !m.deleted && (m.type === "image" || m.type === "file" || m.type === "audio"); });
+  msgs = msgs.slice().reverse();
+  if(!msgs.length){
+    filesGrid.innerHTML = '<div class="handover-empty" style="grid-column:1/-1">No shared files in this conversation.</div>';
+  } else {
+    filesGrid.innerHTML = "";
+    msgs.forEach(function(m){
+      var el = document.createElement("button");
+      el.type = "button";
+      if(m.type === "image"){
+        el.className = "files-thumb";
+        el.innerHTML = '<img src="'+(m.dataUrl || m.url)+'" alt="Shared photo">';
+        el.addEventListener("click", function(){ window.open(m.url || m.dataUrl, "_blank"); });
+      } else if(m.type === "file"){
+        el.className = "files-thumb doc";
+        el.innerHTML = FILE_ICON + '<span class="files-thumb-label">'+esc(m.fileName || "File")+'</span>';
+        el.addEventListener("click", function(){ if(m.url) window.open(m.url, "_blank"); });
+      } else {
+        el.className = "files-thumb audio";
+        el.innerHTML = AUDIO_ICON + '<span class="files-thumb-label">Voice note</span>';
+        el.addEventListener("click", function(){ jumpToMessage(m.id); });
+      }
+      filesGrid.appendChild(el);
+    });
+  }
+  filesOverlay.hidden = false;
+});
+filesClose.addEventListener("click", function(){ filesOverlay.hidden = true; });
+filesOverlay.addEventListener("click", function(e){ if(e.target === filesOverlay) filesOverlay.hidden = true; });
 
 var feedBtn = document.getElementById("feedBtn");
 var feedOverlay = document.getElementById("feedOverlay");
