@@ -710,6 +710,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.above-modal{bottom:auto;top:24px;transform:translateX(-50%) translateY(-10px)}
+.toast.above-modal.show{transform:translateX(-50%) translateY(0)}
 
 .pin-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--text-dim);margin-bottom:2px}
 .pin-indicator svg{width:10px;height:10px}
@@ -4272,10 +4274,12 @@ function openTicketDetail(ticketId){
   STATE.ticketDetailQueue = STATE.tickets.filter(function(x){ return x.status === t.status; }).map(function(x){ return x.id; });
   STATE.ticketDetailIndex = STATE.ticketDetailQueue.indexOf(ticketId);
   ticketDetailOverlay.hidden = false;
+  appToast.classList.add("above-modal");
   renderTicketDetail();
 }
 function closeTicketDetail(){
   ticketDetailOverlay.hidden = true;
+  appToast.classList.remove("above-modal");
   STATE.ticketDetailQueue = [];
   STATE.ticketDetailIndex = -1;
 }
