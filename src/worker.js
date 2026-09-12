@@ -623,7 +623,16 @@ export default {
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
         if (!group) return json({ error: "Group not found" }, 404);
+        const existingMember = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
         await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, self, new Date().toISOString()).run();
+        if (!existingMember) {
+          const requester = request._staff;
+          const actorId = requester.department_id;
+          const joinerName = DEPT_NAMES[self] || self;
+          const actorName = DEPT_NAMES[actorId] || actorId;
+          const noticeBody = actorId === self ? (joinerName + " joined the event") : (actorName + " added " + joinerName + " to the event");
+          await insertMessage(env, ctx, { from: actorId, groupId: id, type: "text", body: noticeBody });
+        }
         return json({ ok: true });
       }
 

@@ -10,6 +10,8 @@ const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
+const DEPT_NAMES = {};
+DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const loginAttempts = new Map();
 
@@ -411,7 +413,16 @@ const server = http.createServer(async (req, res) => {
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
       const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
       if (!group) return send(res, 404, { error: 'Group not found' });
+      const existingMember = db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(id, self);
       db.prepare('INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)').run(id, self, new Date().toISOString());
+      if (!existingMember) {
+        const requester = staffFromToken(req);
+        const actorId = requester ? requester.department_id : self;
+        const joinerName = DEPT_NAMES[self] || self;
+        const actorName = DEPT_NAMES[actorId] || actorId;
+        const noticeBody = actorId === self ? (joinerName + ' joined the event') : (actorName + ' added ' + joinerName + ' to the event');
+        insertMessage({ from: actorId, groupId: id, type: 'text', body: noticeBody });
+      }
       return send(res, 200, { ok: true });
     }
 
