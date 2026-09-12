@@ -1293,15 +1293,15 @@ function avatarGradient(deptId){
 }
 
 var DEPTS = {
-  gm:           { name:"General Manager",          initials:"GM", color:"#a3854f", short:"GM" },
-  foh:          { name:"Head Receptionist",   initials:"FH", color:"#4c6f92", short:"Reception" },
-  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8", short:"Concierge" },
-  restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f", short:"Restaurant" },
-  kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c", short:"Kitchen" },
-  bar:          { name:"Bar Manager",              initials:"BR", color:"#3f9d6c", short:"Bar" },
-  housekeeping: { name:"Head Housekeeper",         initials:"HK", color:"#2f9aa0", short:"Housekeep" },
-  maintenance:  { name:"Maintenance Manager",      initials:"MT", color:"#6c6d78", short:"Repairs" },
-  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66", short:"Dashboard" }
+  gm:           { name:"General Manager",          initials:"GM", color:"#a3854f" },
+  foh:          { name:"Head Receptionist",   initials:"FH", color:"#4c6f92" },
+  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8" },
+  restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f" },
+  kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c" },
+  bar:          { name:"Bar Manager",              initials:"BR", color:"#3f9d6c" },
+  housekeeping: { name:"Head Housekeeper",         initials:"HK", color:"#2f9aa0" },
+  maintenance:  { name:"Maintenance Manager",      initials:"MT", color:"#6c6d78" },
+  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
 
@@ -4153,7 +4153,7 @@ function renderEventPalette(){
     chip.className = "event-chip";
     chip.innerHTML =
       '<div class="event-chip-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
-      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].short : id))+'</div>';
+      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].initials : id))+'</div>';
     attachDragChip(chip, function(groupId){
       if(groupId) joinGroup(groupId, id);
     }, { isMember: false, scrollGuard: "horizontal" });
@@ -4174,7 +4174,7 @@ function renderEventList(){
     var membersHtml = g.members.map(function(deptId){
       return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
         '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
-        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].short : deptId))+'</div>'+
+        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
     var canDelete = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
