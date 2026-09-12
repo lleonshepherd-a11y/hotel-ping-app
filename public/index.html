@@ -89,7 +89,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   z-index:1;
 }
 .sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
-.bottom-tabs{flex:none;display:flex;gap:6px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:#fff}
+.bottom-tabs{flex:none;display:flex;gap:6px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));background:#fff}
 .bottom-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 6px;border:none;background:none;color:var(--text-dim);border-radius:20px}
 .bottom-tab svg{width:19px;height:19px}
 .bottom-tab span{font-size:13px;font-weight:600}
@@ -529,18 +529,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
 .admin-modal-head-actions{display:flex;align-items:center;gap:4px}
-.event-palette{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 16px;scrollbar-width:none}
+.events-hint{padding:0 20px;margin:0 0 14px}
+.event-palette{display:flex;gap:14px;overflow-x:auto;padding:4px 20px 16px;scrollbar-width:none}
 .event-palette::-webkit-scrollbar{display:none}
-.event-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
-.event-chip.dragging{opacity:.35}
+.event-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
+.event-chip.dragging{opacity:.3;transition:opacity .15s ease}
 .event-chip-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 6px rgba(15,15,20,.18)}
 .event-chip-avatar svg{width:19px;height:19px}
 .event-chip-label{font-size:10px;font-weight:700;color:var(--text-dim);white-space:nowrap}
-.event-new-form{display:flex;gap:8px;margin:0 0 18px}
+.event-new-form{display:flex;gap:8px;margin:0 20px 8px}
+#eventError{margin:0 20px 8px}
 #newEventName{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2)}
-.event-list{display:flex;flex-direction:column;gap:12px}
+.event-list{display:flex;flex-direction:column;gap:12px;padding:0 20px 20px}
 .event-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0}
-.event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .15s ease,background .15s ease}
+.event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .18s cubic-bezier(.32,1.4,.4,1),background .18s ease}
 .event-card.drag-over{background:rgba(24,119,242,.14);box-shadow:0 0 0 2px var(--accent)}
 .event-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .event-card-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
@@ -549,7 +551,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card-open svg{width:14px;height:14px}
 .event-card-members{display:flex;gap:10px;flex-wrap:wrap;min-height:40px}
 .event-member-chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
-.event-member-chip.dragging{opacity:.35}
+.event-member-chip.dragging{opacity:.3;transition:opacity .15s ease}
 .event-member-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .event-member-avatar svg{width:15px;height:15px}
 .event-member-label{font-size:9px;font-weight:700;color:var(--text-faint);white-space:nowrap}
@@ -562,7 +564,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .event-drop-zone.show{transform:translateX(-50%) translateY(0);opacity:1}
 .event-drop-zone.hover{background:#a8281c;transform:translateX(-50%) translateY(0) scale(1.08)}
-.drag-ghost{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.35))}
+.drag-ghost{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.35));animation:dragGhostPop .18s cubic-bezier(.32,1.5,.4,1)}
+@keyframes dragGhostPop{0%{transform:translate(-50%,-50%) scale(.85)}100%{transform:translate(-50%,-50%) scale(1.18)}}
 
 .group-thread-modal{display:flex;flex-direction:column;padding:0;height:72vh;max-height:640px;overflow:hidden}
 .group-thread-modal .admin-modal-head{padding:20px 20px 14px;margin:0}
@@ -749,11 +752,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <span class="sb-menu-label">Shift handover</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
-      <button class="sb-menu-row" id="eventsBtn" type="button">
-        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg></span>
-        <span class="sb-menu-label">Events</span>
-        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
-      </button>
     </div>
 
     <div class="sb-toolbar">
@@ -804,6 +802,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <div class="sb-empty" id="searchEmpty" hidden>No conversations match "<span id="searchEmptyTerm"></span>"</div>
     </div>
 
+    <div class="sb-page" id="eventsPage" hidden>
+      <div class="sb-list-label">Events</div>
+      <p class="broadcast-hint events-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
+      <div class="event-palette" id="eventPalette"></div>
+      <form class="event-new-form" id="newEventForm">
+        <input type="text" id="newEventName" placeholder="Event name, e.g. Smith Wedding" required maxlength="60">
+        <button type="submit" class="admin-add-btn">Create event</button>
+      </form>
+      <div class="admin-add-error" id="eventError"></div>
+      <div class="event-list" id="eventList"></div>
+    </div>
+    <div class="event-drop-zone" id="eventDropZone">Drop here to leave the event</div>
+
     <div class="bottom-tabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -812,6 +823,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="bottom-tab active" id="tabChatBtn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         <span>Chat</span>
+      </button>
+      <button class="bottom-tab" id="tabEventsBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg>
+        <span>Events</span>
       </button>
     </div>
   </aside>
@@ -1004,29 +1019,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </button>
     </div>
     <div class="files-grid" id="filesGrid"></div>
-  </div>
-</div>
-
-<div class="admin-overlay" id="eventsOverlay" hidden>
-  <div class="admin-modal events-modal">
-    <div class="admin-modal-head">
-      <h2>Events</h2>
-      <button class="admin-close" id="eventsClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <p class="broadcast-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
-
-    <div class="event-palette" id="eventPalette"></div>
-
-    <form class="event-new-form" id="newEventForm">
-      <input type="text" id="newEventName" placeholder="Event name, e.g. Smith Wedding" required maxlength="60">
-      <button type="submit" class="admin-add-btn">Create event</button>
-    </form>
-    <div class="admin-add-error" id="eventError"></div>
-
-    <div class="event-list" id="eventList"></div>
-    <div class="event-drop-zone" id="eventDropZone">Drop here to leave the event</div>
   </div>
 </div>
 
@@ -3369,16 +3361,22 @@ handoverForm.addEventListener("submit", function(e){
 
 var profilePage = document.getElementById("profilePage");
 var chatPage = document.getElementById("chatPage");
+var eventsPage = document.getElementById("eventsPage");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
+var tabEventsBtn = document.getElementById("tabEventsBtn");
 function showTab(tab){
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
+  eventsPage.hidden = tab !== "events";
   tabProfileBtn.classList.toggle("active", tab === "profile");
   tabChatBtn.classList.toggle("active", tab === "chat");
+  tabEventsBtn.classList.toggle("active", tab === "events");
+  if(tab === "events") openEventsTab();
 }
 tabProfileBtn.addEventListener("click", function(){ showTab("profile"); });
 tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
+tabEventsBtn.addEventListener("click", function(){ showTab("events"); });
 showTab("chat");
 
 var filesBtn = document.getElementById("filesBtn");
@@ -3540,9 +3538,6 @@ responseClose.addEventListener("click", function(){ responseOverlay.hidden = tru
 responseOverlay.addEventListener("click", function(e){ if(e.target === responseOverlay) responseOverlay.hidden = true; });
 
 /* ---------------- Events (ad-hoc group chats) ---------------- */
-var eventsBtn = document.getElementById("eventsBtn");
-var eventsOverlay = document.getElementById("eventsOverlay");
-var eventsClose = document.getElementById("eventsClose");
 var eventPalette = document.getElementById("eventPalette");
 var eventList = document.getElementById("eventList");
 var eventError = document.getElementById("eventError");
@@ -3565,24 +3560,49 @@ function pointOverDropZone(x, y){
   return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
 
-function beginChipDrag(e, chipEl, onDrop, opts){
-  if(e.button !== undefined && e.button !== 0) return;
-  e.preventDefault();
-  var pointerId = e.pointerId;
-  var ghost = chipEl.cloneNode(true);
-  ghost.classList.add("drag-ghost");
-  ghost.style.width = chipEl.offsetWidth + "px";
-  document.body.appendChild(ghost);
-  chipEl.classList.add("dragging");
-  function moveGhost(x, y){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; }
-  moveGhost(e.clientX, e.clientY);
-  if(opts && opts.isMember) eventDropZone.classList.add("show");
+function attachDragChip(chipEl, onDrop, opts){
+  var LONG_PRESS_MS = 200, MOVE_TOLERANCE = 9;
+  var timer = null, startX = 0, startY = 0, pointerId = null, dragging = false, ghost = null;
 
+  function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
   function clearCardHighlights(){
     eventList.querySelectorAll(".event-card.drag-over").forEach(function(c){ c.classList.remove("drag-over"); });
   }
+  function beginDrag(x, y){
+    dragging = true;
+    if(navigator.vibrate) navigator.vibrate(10);
+    ghost = chipEl.cloneNode(true);
+    ghost.classList.add("drag-ghost");
+    ghost.style.width = chipEl.offsetWidth + "px";
+    document.body.appendChild(ghost);
+    chipEl.classList.add("dragging");
+    moveGhost(x, y);
+    if(opts && opts.isMember) eventDropZone.classList.add("show");
+  }
+  function teardown(){
+    clearTimeout(timer);
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    pointerId = null;
+  }
+  function endDragVisuals(){
+    chipEl.classList.remove("dragging");
+    if(ghost){ ghost.remove(); ghost = null; }
+    eventDropZone.classList.remove("show");
+    eventDropZone.classList.remove("hover");
+    clearCardHighlights();
+    dragging = false;
+  }
   function onMove(ev){
     if(ev.pointerId !== pointerId) return;
+    if(!dragging){
+      if(Math.abs(ev.clientX - startX) > MOVE_TOLERANCE || Math.abs(ev.clientY - startY) > MOVE_TOLERANCE){
+        teardown();
+      }
+      return;
+    }
+    ev.preventDefault();
     moveGhost(ev.clientX, ev.clientY);
     if(opts && opts.isMember){
       eventDropZone.classList.toggle("hover", pointOverDropZone(ev.clientX, ev.clientY));
@@ -3593,28 +3613,38 @@ function beginChipDrag(e, chipEl, onDrop, opts){
       if(cardEl) cardEl.classList.add("drag-over");
     }
   }
+  function onCancel(ev){
+    if(ev.pointerId !== pointerId) return;
+    var wasDragging = dragging;
+    teardown();
+    if(wasDragging) endDragVisuals();
+  }
   function onUp(ev){
     if(ev.pointerId !== pointerId) return;
-    document.removeEventListener("pointermove", onMove);
-    document.removeEventListener("pointerup", onUp);
-    document.removeEventListener("pointercancel", onUp);
-    chipEl.classList.remove("dragging");
-    ghost.remove();
+    var wasDragging = dragging;
+    teardown();
+    if(!wasDragging) return;
     if(opts && opts.isMember){
       var overZone = pointOverDropZone(ev.clientX, ev.clientY);
-      eventDropZone.classList.remove("show");
-      eventDropZone.classList.remove("hover");
+      endDragVisuals();
       if(overZone) onDrop();
     } else {
       var el = document.elementFromPoint(ev.clientX, ev.clientY);
       var cardEl = el && el.closest ? el.closest(".event-card") : null;
-      clearCardHighlights();
+      endDragVisuals();
       if(cardEl) onDrop(cardEl.getAttribute("data-group-id"));
     }
   }
-  document.addEventListener("pointermove", onMove);
-  document.addEventListener("pointerup", onUp);
-  document.addEventListener("pointercancel", onUp);
+  chipEl.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    pointerId = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ beginDrag(startX, startY); }, LONG_PRESS_MS);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
+  });
 }
 
 function joinGroup(groupId, deptId){
@@ -3638,11 +3668,9 @@ function renderEventPalette(){
     chip.innerHTML =
       '<div class="event-chip-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
       '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].name : id).split(" ")[0])+'</div>';
-    chip.addEventListener("pointerdown", function(e){
-      beginChipDrag(e, chip, function(groupId){
-        if(groupId) joinGroup(groupId, id);
-      }, { isMember: false });
-    });
+    attachDragChip(chip, function(groupId){
+      if(groupId) joinGroup(groupId, id);
+    }, { isMember: false });
     eventPalette.appendChild(chip);
   });
 }
@@ -3676,9 +3704,7 @@ function renderEventList(){
 
     card.querySelectorAll(".event-member-chip").forEach(function(chip){
       var deptId = chip.getAttribute("data-dept-id");
-      chip.addEventListener("pointerdown", function(e){
-        beginChipDrag(e, chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true });
-      });
+      attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true });
     });
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
   });
@@ -3697,14 +3723,11 @@ newEventForm.addEventListener("submit", function(e){
   });
 });
 
-eventsBtn.addEventListener("click", function(){
-  eventsOverlay.hidden = false;
+function openEventsTab(){
   renderEventPalette();
   eventList.innerHTML = '<div class="event-empty">Loading…</div>';
   loadGroups().then(renderEventList);
-});
-eventsClose.addEventListener("click", function(){ eventsOverlay.hidden = true; });
-eventsOverlay.addEventListener("click", function(e){ if(e.target === eventsOverlay) eventsOverlay.hidden = true; });
+}
 
 /* ---- Group thread view ---- */
 var groupThreadOverlay = document.getElementById("groupThreadOverlay");
@@ -3744,7 +3767,6 @@ function openGroupThread(groupId){
   var g = STATE.groups.find(function(x){ return x.id === groupId; });
   if(!g) return;
   STATE.activeGroupId = groupId;
-  eventsOverlay.hidden = true;
   groupThreadOverlay.hidden = false;
   groupThreadName.textContent = g.name;
   groupThreadMembers.innerHTML = g.members.map(function(deptId){
@@ -3783,7 +3805,7 @@ groupThreadOverlay.addEventListener("click", function(e){
 function pollGroupsQuiet(){
   if(!AUTH.staff) return;
   loadGroups().then(function(){
-    if(!eventsOverlay.hidden) renderEventList();
+    if(!eventsPage.hidden) renderEventList();
     var groupId = STATE.activeGroupId;
     if(!groupId) return;
     apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
