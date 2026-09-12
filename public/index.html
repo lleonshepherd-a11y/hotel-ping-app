@@ -253,12 +253,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .off-duty-banner svg{width:15px;height:15px;flex:none;color:#e0902c}
 .off-duty-banner b{color:#8a5a14;font-weight:700}
 .event-notice{
-  flex:none;display:flex;align-items:flex-start;gap:8px;
-  margin:12px 22px 0;padding:9px 13px;border-radius:14px;
-  background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
-  font-size:12px;line-height:1.4;color:var(--text-dim);
+  flex:none;display:flex;align-items:center;gap:6px;
+  margin:10px 22px 0;
+  font-size:11.5px;line-height:1.4;color:var(--text-faint);
 }
-.event-notice svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--text-faint)}
+.event-notice svg{width:13px;height:13px;flex:none;color:var(--text-faint)}
 .composer-locked{
   display:flex;align-items:center;justify-content:center;gap:8px;
   max-width:640px;margin:0 auto;padding:12px 16px;border-radius:14px;
@@ -405,6 +404,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   transition:transform .22s cubic-bezier(.32,1.5,.4,1), opacity .16s ease;
 }
 .qr-menu.open{transform:scale(1);opacity:1;pointer-events:auto}
+.qr-menu-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:2px}
+.qr-menu-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint)}
+.qr-edit-toggle{border:none;background:none;color:var(--accent);font-size:11.5px;font-weight:700;padding:2px 4px}
+.qr-edit-toggle.active{color:var(--urgent)}
+.qr-chip-list{display:flex;flex-direction:column;gap:2px}
+.qr-chip-row{display:flex;align-items:center;gap:4px}
+.qr-chip-row .qr-chip{flex:1}
+.qr-chip-remove{flex:none;width:22px;height:22px;border:none;background:var(--urgent-tint);color:var(--urgent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;font-weight:700}
+.qr-add-chip{color:var(--accent);font-weight:700}
 .qr-chip{
   border:none;background:none;color:var(--text);text-align:left;
   font-size:13.5px;font-weight:600;padding:8px 12px;border-radius:10px;white-space:nowrap;
@@ -634,6 +642,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card-badge{background:var(--urgent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 7px}
 .event-card-actions{display:flex;align-items:center;gap:2px;flex:none}
 .event-card-end{border:none;background:none;color:var(--text-faint);font-weight:700;font-size:11px;padding:4px 6px}
+.event-card-delete{color:var(--urgent)}
 .event-card-open{border:none;background:none;color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;gap:3px;padding:4px 2px}
 .event-card-open svg{width:14px;height:14px}
 .event-card.past{background:var(--surface-3)}
@@ -647,7 +656,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-member-label{font-size:9px;font-weight:700;color:var(--text-faint);white-space:nowrap}
 .event-card-hint{font-size:11px;color:var(--text-faint);padding:2px 2px}
 .event-drop-zone{
-  position:absolute;left:50%;bottom:78px;transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
+  position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
   display:flex;flex-direction:column;align-items:center;gap:4px;
   background:var(--urgent);color:#fff;font-weight:700;font-size:11px;padding:14px 22px;border-radius:22px;
   box-shadow:0 10px 28px -8px rgba(20,20,16,.45);pointer-events:none;
@@ -1088,7 +1097,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </div>
     </div>
 
-    <div class="pull-refresh" id="listPullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></div>
+    <div class="pull-refresh" id="listPullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg></div>
     <div class="sb-list-label" id="listLabel">Conversations</div>
     <nav class="thread-list" id="threadList"></nav>
     <div class="sb-empty" id="searchEmpty" hidden>No conversations match "<span id="searchEmptyTerm"></span>"</div>
@@ -1172,7 +1181,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <span>Profile</span>
       </button>
       <button class="bottom-tab active" id="tabChatBtn" type="button" aria-label="Chat" title="Chat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span>Chat</span>
       </button>
       <button class="bottom-tab" id="tabEventsBtn" type="button" aria-label="Events" title="Events">
@@ -1220,7 +1229,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <span>Kept for training purposes.</span>
     </div>
 
-    <div class="pull-refresh" id="pullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></div>
+    <div class="pull-refresh" id="pullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg></div>
     <div class="thread-scroll" id="threadScroll"></div>
 
     <div class="composer-wrap">
@@ -1309,11 +1318,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5z"/><path d="M8 9.5h8M8 13h5"/></svg>
               </button>
               <div class="qr-menu" id="qrMenu">
-                <button type="button" class="qr-chip" data-text="On it">On it</button>
-                <button type="button" class="qr-chip" data-text="Done">Done</button>
-                <button type="button" class="qr-chip" data-text="5 mins">5 mins</button>
-                <button type="button" class="qr-chip" data-text="On my way">On my way</button>
-                <button type="button" class="qr-chip" data-text="Noted">Noted</button>
+                <div class="qr-menu-head">
+                  <span class="qr-menu-title">Quick replies</span>
+                  <button type="button" class="qr-edit-toggle" id="qrEditToggle">Edit</button>
+                </div>
+                <div class="qr-chip-list" id="qrChipList"></div>
+                <button type="button" class="qr-chip qr-add-chip" id="qrAddChip">+ Add your own</button>
               </div>
             </div>
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
@@ -1563,11 +1573,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 var ICONS = {
   gm: '<path d="M12 3l7 7-7 11-7-11z"/>',
   foh: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
-  concierge: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 20a2 2 0 0 1-3.46 0"/>',
+  concierge: '<path d="M4 16a8 8 0 0 1 16 0"/><path d="M3 16h18"/><path d="M12 16v-2.5"/><circle cx="12" cy="11" r="1.1" fill="currentColor" stroke="none"/>',
   restaurant: '<path d="M7 2v6a1 1 0 0 0 2 0V2"/><path d="M9 2v6a1 1 0 0 0 2 0V2"/><path d="M9 8v13"/><path d="M15 2c-1.5 0-2.5 1.6-2.5 4.2S13.5 10 15 10"/><path d="M15 2v19"/>',
-  kitchen: '<path d="M12 2.5c2.2 3.3-1.6 4.6-1.6 7.7a3.6 3.6 0 1 0 7.2 0c0-1.1-.5-2-1-2.7 1.4 4.7-1.4 7.4-4.6 7.4a5.6 5.6 0 0 1-5.6-5.6c0-3.6 3.4-4.7 5.6-6.8z"/>',
+  kitchen: '<path d="M7 18v-3.2c0-.5-.3-.9-.7-1.1a3.5 3.5 0 0 1 1.4-6.4 4.5 4.5 0 0 1 8.6 0 3.5 3.5 0 0 1 1.4 6.4c-.4.2-.7.6-.7 1.1V18"/><path d="M6 18h12"/>',
   bar: '<path d="M4 4h16l-8 9v7"/><path d="M8 20h8"/>',
-  housekeeping: '<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v3"/><path d="M21 18v3"/><path d="M3 12V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v3"/>',
+  housekeeping: '<path d="M3 18v-5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M11 15v-2a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5"/><path d="M3 18h18"/><path d="M3 18v2"/><path d="M21 18v2"/>',
   maintenance: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
   dashboard: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'
 };
@@ -3083,6 +3093,100 @@ document.addEventListener("click", function(e){
 
 var qrBtn = document.getElementById("qrBtn");
 var qrMenu = document.getElementById("qrMenu");
+var qrChipList = document.getElementById("qrChipList");
+var qrEditToggle = document.getElementById("qrEditToggle");
+var qrAddChip = document.getElementById("qrAddChip");
+var qrEditMode = false;
+STATE.quickReplies = [];
+
+function loadQuickReplies(){
+  return apiGet('/api/quick-replies').then(function(res){
+    STATE.quickReplies = res.replies;
+    renderQuickReplies();
+  }).catch(function(){});
+}
+
+function sendQuickReply(text){
+  closeQrMenu();
+  msgInput.value = text;
+  autoGrow();
+  refreshSendState();
+  doSend();
+}
+
+function editQuickReply(r){
+  var next = prompt("Edit quick reply", r.text);
+  if(next === null) return;
+  next = next.trim();
+  if(!next){ removeQuickReply(r.id); return; }
+  next = next.slice(0, 24);
+  apiSend('/api/quick-replies/' + encodeURIComponent(r.id), 'PATCH', { text: next }).then(function(res){
+    var idx = STATE.quickReplies.findIndex(function(x){ return x.id === r.id; });
+    if(idx !== -1) STATE.quickReplies[idx] = res.reply;
+    renderQuickReplies();
+  }).catch(function(err){ showToast(err.message || "Couldn't update that"); });
+}
+
+function removeQuickReply(id){
+  var idx = STATE.quickReplies.findIndex(function(x){ return x.id === id; });
+  var removed = idx !== -1 ? STATE.quickReplies.splice(idx, 1)[0] : null;
+  renderQuickReplies();
+  apiDelete('/api/quick-replies/' + encodeURIComponent(id)).catch(function(){
+    if(removed){ STATE.quickReplies.splice(idx, 0, removed); renderQuickReplies(); }
+    showToast("Couldn't remove that");
+  });
+}
+
+function renderQuickReplies(){
+  qrChipList.innerHTML = "";
+  STATE.quickReplies.forEach(function(r){
+    if(qrEditMode){
+      var row = document.createElement("div");
+      row.className = "qr-chip-row";
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "qr-chip";
+      chip.textContent = r.text;
+      chip.addEventListener("click", function(){ editQuickReply(r); });
+      var rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "qr-chip-remove";
+      rm.textContent = "−";
+      rm.setAttribute("aria-label", "Remove");
+      rm.addEventListener("click", function(e){ e.stopPropagation(); removeQuickReply(r.id); });
+      row.appendChild(chip);
+      row.appendChild(rm);
+      qrChipList.appendChild(row);
+    } else {
+      var plain = document.createElement("button");
+      plain.type = "button";
+      plain.className = "qr-chip";
+      plain.textContent = r.text;
+      plain.addEventListener("click", function(){ sendQuickReply(r.text); });
+      qrChipList.appendChild(plain);
+    }
+  });
+}
+
+qrAddChip.addEventListener("click", function(){
+  var text = prompt("Add a quick reply (max 24 characters)");
+  if(!text) return;
+  text = text.trim();
+  if(!text) return;
+  text = text.slice(0, 24);
+  apiSend('/api/quick-replies', 'POST', { text: text }).then(function(res){
+    STATE.quickReplies.push(res.reply);
+    renderQuickReplies();
+  }).catch(function(err){ showToast(err.message || "Couldn't add that"); });
+});
+
+qrEditToggle.addEventListener("click", function(){
+  qrEditMode = !qrEditMode;
+  qrEditToggle.textContent = qrEditMode ? "Done" : "Edit";
+  qrEditToggle.classList.toggle("active", qrEditMode);
+  renderQuickReplies();
+});
+
 function closeQrMenu(){
   qrMenu.classList.remove("open");
   qrBtn.classList.remove("open");
@@ -3092,18 +3196,10 @@ function openQrMenu(){
   qrMenu.classList.add("open");
   qrBtn.classList.add("open");
   qrBtn.setAttribute("aria-expanded", "true");
+  loadQuickReplies();
 }
 qrBtn.addEventListener("click", function(){
   if(qrMenu.classList.contains("open")) closeQrMenu(); else openQrMenu();
-});
-qrMenu.addEventListener("click", function(e){
-  var chip = e.target.closest(".qr-chip");
-  if(!chip) return;
-  closeQrMenu();
-  msgInput.value = chip.getAttribute("data-text");
-  autoGrow();
-  refreshSendState();
-  doSend();
 });
 document.addEventListener("click", function(e){
   if(!qrMenu.contains(e.target) && e.target !== qrBtn && !qrBtn.contains(e.target)){
@@ -4671,6 +4767,19 @@ function renderEventPalette(){
   });
 }
 
+function deleteEmptyEvent(groupId){
+  if(!confirm("Delete this event? There's nothing in it yet, so this can't be undone.")) return;
+  apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
+    return loadGroups();
+  }).then(function(){
+    if(STATE.activeGroupId === groupId){ STATE.activeGroupId = null; closeThreadView(); }
+    renderEventList();
+    showToast("Event deleted");
+  }).catch(function(err){
+    showToast(err.message || "Couldn't delete that event");
+  });
+}
+
 function archiveEvent(groupId){
   if(!confirm("End this event? It'll become read only and move to Past events, kept there for training.")) return;
   apiSend('/api/groups/' + encodeURIComponent(groupId) + '/archive', 'POST', {}).then(function(){
@@ -4715,12 +4824,14 @@ function renderEventList(){
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
-    var canEnd = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
+    var canManage = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
+    var isEmpty = !g.lastMessage;
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
         '<div class="event-card-actions">'+
-          (canEnd ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
+          (canManage && isEmpty ? '<button type="button" class="event-card-end event-card-delete" data-group-id="'+g.id+'">Delete</button>' : '')+
+          (canManage && !isEmpty ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
@@ -4734,7 +4845,10 @@ function renderEventList(){
       var deptId = chip.getAttribute("data-dept-id");
       attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true, dropLabel: "Drop to remove" });
     });
-    if(canEnd){
+    if(canManage && isEmpty){
+      card.querySelector(".event-card-delete").addEventListener("click", function(e){ e.stopPropagation(); deleteEmptyEvent(g.id); });
+    }
+    if(canManage && !isEmpty){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); archiveEvent(g.id); });
     }
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });

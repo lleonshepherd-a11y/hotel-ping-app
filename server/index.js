@@ -13,6 +13,7 @@ const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
 const DEPT_NAMES = {};
 DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
 DEPT_NAMES.dashboard = 'Dashboard';
+const DEFAULT_QUICK_REPLIES = ['On it', 'Done', '5 mins', 'On my way', 'Noted', 'Course away', 'Hold 10 mins', 'Ready for dessert'];
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
@@ -540,6 +541,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    if (req.method === 'DELETE' && p.startsWith('/api/groups/')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length));
+      const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Event not found' });
+      const requester = staffFromToken(req);
+      if (group.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department that created this event can delete it' });
+      }
+      const msgCount = db.prepare('SELECT COUNT(*) AS n FROM messages WHERE group_id = ?').get(id);
+      if (msgCount.n > 0) {
+        return send(res, 400, { error: "This event already has messages in it and can't be deleted. End it instead." });
+      }
+      db.prepare('UPDATE groups SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/archive')) {
       const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/archive'.length));
       const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
@@ -904,6 +921,53 @@ const server = http.createServer(async (req, res) => {
       }
       db.prepare('INSERT INTO muted_conversations (department_id, other_dept_id, muted_at) VALUES (?, ?, ?)').run(self, other, new Date().toISOString());
       return send(res, 200, { muted: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/quick-replies') {
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      let rows = db.prepare('SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC').all(dept);
+      if (rows.length === 0) {
+        const now = new Date().toISOString();
+        DEFAULT_QUICK_REPLIES.forEach((text, i) => {
+          db.prepare('INSERT INTO quick_replies (id, department_id, text, position, created_at) VALUES (?, ?, ?, ?, ?)').run(crypto.randomUUID(), dept, text, i, now);
+        });
+        rows = db.prepare('SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC').all(dept);
+      }
+      return send(res, 200, { replies: rows.map((r) => ({ id: r.id, text: r.text })) });
+    }
+
+    if (req.method === 'POST' && p === '/api/quick-replies') {
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim().slice(0, 24);
+      if (!text) return send(res, 400, { error: 'Text is required' });
+      const maxPos = db.prepare('SELECT COALESCE(MAX(position), -1) AS m FROM quick_replies WHERE department_id = ?').get(dept);
+      const id = crypto.randomUUID();
+      db.prepare('INSERT INTO quick_replies (id, department_id, text, position, created_at) VALUES (?, ?, ?, ?, ?)').run(id, dept, text, maxPos.m + 1, new Date().toISOString());
+      return send(res, 201, { reply: { id, text } });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/quick-replies/')) {
+      const id = decodeURIComponent(p.slice('/api/quick-replies/'.length));
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      const existing = db.prepare('SELECT 1 FROM quick_replies WHERE id = ? AND department_id = ?').get(id, dept);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim().slice(0, 24);
+      if (!text) return send(res, 400, { error: 'Text is required' });
+      db.prepare('UPDATE quick_replies SET text = ? WHERE id = ?').run(text, id);
+      return send(res, 200, { reply: { id, text } });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/quick-replies/')) {
+      const id = decodeURIComponent(p.slice('/api/quick-replies/'.length));
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      db.prepare('DELETE FROM quick_replies WHERE id = ? AND department_id = ?').run(id, dept);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'GET' && p === '/api/handover') {
