@@ -161,7 +161,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     created_by TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    deleted_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS group_members (
@@ -180,6 +181,11 @@ db.exec(`
     PRIMARY KEY (group_id, department_id)
   );
 `);
+
+const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);
+if (!groupColumns.includes('deleted_at')) {
+  db.exec('ALTER TABLE groups ADD COLUMN deleted_at TEXT');
+}
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
 if (!staffColumns.includes('profile_complete')) {

@@ -366,7 +366,7 @@ const server = http.createServer(async (req, res) => {
       const self = url.searchParams.get('self');
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
-      const groupRows = db.prepare('SELECT * FROM groups ORDER BY created_at DESC').all();
+      const groupRows = db.prepare('SELECT * FROM groups WHERE deleted_at IS NULL ORDER BY created_at DESC').all();
       const groups = groupRows.map((g) => {
         const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(g.id).map((m) => m.department_id);
         const isMember = members.includes(self);
@@ -421,6 +421,18 @@ const server = http.createServer(async (req, res) => {
       const self = body.self;
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
       db.prepare('DELETE FROM group_members WHERE group_id = ? AND department_id = ?').run(id, self);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/groups/')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length));
+      const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Event not found' });
+      const requester = staffFromToken(req);
+      if (group.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department that created this event can delete it' });
+      }
+      db.prepare('UPDATE groups SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
       return send(res, 200, { ok: true });
     }
 

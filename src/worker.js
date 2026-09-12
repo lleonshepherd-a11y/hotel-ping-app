@@ -576,7 +576,7 @@ export default {
       if (method === "GET" && p === "/api/groups") {
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        const groupRows = await env.DB.prepare("SELECT * FROM groups ORDER BY created_at DESC").all();
+        const groupRows = await env.DB.prepare("SELECT * FROM groups WHERE deleted_at IS NULL ORDER BY created_at DESC").all();
         const groups = [];
         for (const g of groupRows.results) {
           const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
@@ -633,6 +633,18 @@ export default {
         const self = body.self;
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         await env.DB.prepare("DELETE FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).run();
+        return json({ ok: true });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/groups/")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length));
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        const requester = request._staff;
+        if (group.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that created this event can delete it" }, 403);
+        }
+        await env.DB.prepare("UPDATE groups SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         return json({ ok: true });
       }
 

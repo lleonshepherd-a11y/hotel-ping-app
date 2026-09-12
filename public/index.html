@@ -538,7 +538,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-chip-avatar svg{width:19px;height:19px}
 .event-chip-label{font-size:10px;font-weight:700;color:var(--text-dim);white-space:nowrap}
 .event-new-form{display:flex;gap:8px;margin:0 20px 8px}
-#eventError{margin:0 20px 8px}
+#eventError{width:auto;margin:0 20px 8px}
 #newEventName{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2)}
 .event-list{display:flex;flex-direction:column;gap:12px;padding:0 20px 20px}
 .event-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0}
@@ -547,7 +547,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .event-card-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
 .event-card-badge{background:var(--urgent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 7px}
+.event-card-actions{display:flex;align-items:center;gap:10px;flex:none}
 .event-card-open{border:none;background:none;color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;gap:3px;padding:4px 2px}
+.event-card-delete{border:none;background:none;color:var(--text-faint);padding:4px;display:flex;align-items:center}
+.event-card-delete:hover{color:var(--urgent)}
+.event-card-delete svg{width:15px;height:15px}
 .event-card-open svg{width:14px;height:14px}
 .event-card-members{display:flex;gap:10px;flex-wrap:wrap;min-height:40px}
 .event-member-chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
@@ -557,25 +561,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-member-label{font-size:9px;font-weight:700;color:var(--text-faint);white-space:nowrap}
 .event-card-hint{font-size:11px;color:var(--text-faint);padding:2px 2px}
 .event-drop-zone{
-  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(140%);opacity:0;
-  background:var(--urgent);color:#fff;font-weight:700;font-size:13px;padding:14px 24px;border-radius:999px;
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:var(--urgent);color:#fff;font-weight:700;font-size:11px;padding:14px 22px;border-radius:22px;
   box-shadow:0 10px 28px -8px rgba(20,20,16,.45);pointer-events:none;
   transition:transform .2s cubic-bezier(.32,1.4,.4,1),opacity .2s ease,background .15s ease;z-index:200;
 }
-.event-drop-zone.show{transform:translateX(-50%) translateY(0);opacity:1}
-.event-drop-zone.hover{background:#a8281c;transform:translateX(-50%) translateY(0) scale(1.08)}
+.event-drop-zone svg{width:22px;height:22px}
+.event-drop-zone.show{transform:translateX(-50%) translateY(0) scale(1);opacity:1}
+.event-drop-zone.hover{background:#a8281c;transform:translateX(-50%) translateY(0) scale(1.15)}
 .drag-ghost{position:fixed;z-index:300;pointer-events:none;transform:translate(-50%,-50%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.35));animation:dragGhostPop .18s cubic-bezier(.32,1.5,.4,1)}
 @keyframes dragGhostPop{0%{transform:translate(-50%,-50%) scale(.85)}100%{transform:translate(-50%,-50%) scale(1.18)}}
 
-.group-thread-modal{display:flex;flex-direction:column;padding:0;height:72vh;max-height:640px;overflow:hidden}
-.group-thread-modal .admin-modal-head{padding:20px 20px 14px;margin:0}
-.group-thread-members{display:flex;gap:8px;padding:0 20px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex:none}
-.group-thread-member-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
-.group-thread-member-avatar svg{width:12px;height:12px}
-.group-thread-scroll{flex:1;overflow-y:auto;padding:14px 20px;min-height:0}
-.group-thread-composer{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex:none}
-#groupThreadInput{flex:1;border:1.5px solid var(--border);border-radius:20px;padding:9px 14px;font-size:14px;background:var(--surface-2)}
-#groupThreadInput:focus-visible{outline:none;border-color:var(--accent)}
+.h-group-avatars{display:flex;align-items:center;margin-left:2px}
+.h-group-avatars .group-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px #fff;margin-left:-6px}
+.h-group-avatars .group-avatar:first-child{margin-left:0}
+.h-group-avatars .group-avatar svg{width:9px;height:9px}
 
 .resp-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .resp-row{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:14px;background:var(--surface-2)}
@@ -807,13 +808,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <p class="broadcast-hint events-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
       <div class="event-palette" id="eventPalette"></div>
       <form class="event-new-form" id="newEventForm">
-        <input type="text" id="newEventName" placeholder="Event name, e.g. Smith Wedding" required maxlength="60">
+        <input type="text" id="newEventName" placeholder="Event name, e.g. Wedding" required maxlength="60">
         <button type="submit" class="admin-add-btn">Create event</button>
       </form>
       <div class="admin-add-error" id="eventError"></div>
       <div class="event-list" id="eventList"></div>
     </div>
-    <div class="event-drop-zone" id="eventDropZone">Drop here to leave the event</div>
+    <div class="event-drop-zone" id="eventDropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+      <span>Drop to remove</span>
+    </div>
 
     <div class="bottom-tabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button">
@@ -842,6 +846,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <div class="h-sub">
           <span id="hContactWrap"></span>
           <span class="h-dot" id="hDot"></span><span id="hSub">Active now</span>
+          <span class="h-group-avatars" id="hGroupAvatars" hidden></span>
         </div>
       </div>
       <button class="mute-btn" id="filesBtn" type="button" aria-label="Shared files" title="Shared files" style="right:54px">
@@ -1019,25 +1024,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </button>
     </div>
     <div class="files-grid" id="filesGrid"></div>
-  </div>
-</div>
-
-<div class="admin-overlay" id="groupThreadOverlay" hidden>
-  <div class="admin-modal group-thread-modal">
-    <div class="admin-modal-head">
-      <h2 id="groupThreadName">Event</h2>
-      <button class="admin-close" id="groupThreadClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <div class="group-thread-members" id="groupThreadMembers"></div>
-    <div class="group-thread-scroll" id="groupThreadScroll"></div>
-    <form class="group-thread-composer" id="groupThreadForm">
-      <input type="text" id="groupThreadInput" placeholder="Message…" required autocomplete="off">
-      <button type="submit" class="send-btn ready" id="groupThreadSendBtn" aria-label="Send message">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
-      </button>
-    </form>
   </div>
 </div>
 
@@ -1558,6 +1544,7 @@ function markRead(deptId){
 function openThread(deptId){
   if(STATE.active !== deptId) clearReplyBar();
   STATE.active = deptId;
+  STATE.activeGroupId = null;
   markRead(deptId);
   renderList();
   renderHeader();
@@ -1573,6 +1560,7 @@ function openThread(deptId){
 function closeThreadView(){
   document.getElementById("sidebar").classList.remove("hide-mobile");
   document.querySelector(".main").classList.remove("show-mobile");
+  STATE.activeGroupId = null;
 }
 
 window.addEventListener("popstate", function(){
@@ -1584,6 +1572,7 @@ function hexToRgba(hex, a){
   return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";
 }
 var hContactWrap = document.getElementById("hContactWrap");
+var hGroupAvatars = document.getElementById("hGroupAvatars");
 
 var offDutyBanner = document.getElementById("offDutyBanner");
 var hDot = document.getElementById("hDot");
@@ -1608,6 +1597,31 @@ muteBtn.addEventListener("click", function(){
 });
 
 function renderHeader(){
+  if(STATE.activeGroupId){
+    var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
+    hAvatar.style.background = "linear-gradient(155deg, #2c2c30, #131315)";
+    hAvatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg>';
+    hName.textContent = g ? g.name : "Event";
+    hSub.textContent = g ? (g.members.length + (g.members.length === 1 ? " person" : " people")) : "";
+    hSub.classList.remove("typing");
+    hDot.hidden = true;
+    hContactWrap.innerHTML = "";
+    hGroupAvatars.hidden = false;
+    hGroupAvatars.innerHTML = g ? g.members.map(function(deptId){
+      return '<span class="group-avatar" style="background:'+avatarGradient(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+iconSvg(deptId)+'</span>';
+    }).join("") : "";
+    offDutyBanner.hidden = true;
+    muteBtn.hidden = true;
+    filesBtn.hidden = true;
+    optTask.hidden = true;
+    if(taskActive) setTaskActive(false);
+    return;
+  }
+  hDot.hidden = false;
+  hGroupAvatars.hidden = true;
+  muteBtn.hidden = false;
+  filesBtn.hidden = false;
+  optTask.hidden = false;
   var d = DEPTS[STATE.active];
   hAvatar.style.background = avatarGradient(STATE.active);
   hAvatar.innerHTML = iconSvg(STATE.active);
@@ -1727,7 +1741,11 @@ function fmtDur(s){
 
 function renderThread(){
   threadScroll.innerHTML = "";
-  var msgs = STATE.data[STATE.active];
+  var msgs = STATE.activeGroupId ? (STATE.groupMessages[STATE.activeGroupId] || []) : STATE.data[STATE.active];
+  if(STATE.activeGroupId && !msgs.length){
+    threadScroll.innerHTML = '<div class="handover-empty">No messages yet.</div>';
+    return;
+  }
   var prevDay = null;
   var msgsById = {};
   msgs.forEach(function(m){ msgsById[m.id] = m; });
@@ -1896,24 +1914,31 @@ function copyMessageContent(m){
   }
 }
 
+function currentMessagesArray(){
+  if(STATE.activeGroupId){
+    STATE.groupMessages[STATE.activeGroupId] = STATE.groupMessages[STATE.activeGroupId] || [];
+    return STATE.groupMessages[STATE.activeGroupId];
+  }
+  STATE.data[STATE.active] = STATE.data[STATE.active] || [];
+  return STATE.data[STATE.active];
+}
+
 function togglePinMessage(m){
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/pin', 'POST', {}).then(function(res){
-    var deptId = STATE.active;
-    var msgs = STATE.data[deptId] || [];
+    var msgs = currentMessagesArray();
     var idx = msgs.findIndex(function(x){ return x.id === m.id; });
     if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-    if(STATE.active === deptId) renderThread();
+    renderThread();
     showToast(res.message.pinned ? "Pinned" : "Unpinned");
   }).catch(function(){ showToast("Couldn't update pin"); });
 }
 
 function toggleCompleteMessage(m){
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/complete', 'POST', {}).then(function(res){
-    var deptId = STATE.active;
-    var msgs = STATE.data[deptId] || [];
+    var msgs = currentMessagesArray();
     var idx = msgs.findIndex(function(x){ return x.id === m.id; });
     if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-    if(STATE.active === deptId) renderThread();
+    renderThread();
     showToast(res.message.completed ? "Marked as done" : "Marked as not done");
   }).catch(function(){ showToast("Couldn't update that"); });
 }
@@ -1923,11 +1948,10 @@ var TASK_NEXT = { not_started: "in_progress", in_progress: "completed", complete
 function cycleTaskStatus(m){
   var nextStatus = TASK_NEXT[m.taskStatus] || "not_started";
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/task-status', 'POST', { status: nextStatus }).then(function(res){
-    var deptId = STATE.active;
-    var msgs = STATE.data[deptId] || [];
+    var msgs = currentMessagesArray();
     var idx = msgs.findIndex(function(x){ return x.id === m.id; });
     if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-    if(STATE.active === deptId) renderThread();
+    renderThread();
     showToast(TASK_LABELS[nextStatus]);
   }).catch(function(){ showToast("Couldn't update that"); });
 }
@@ -2257,8 +2281,7 @@ function buildMessageRow(m, groupEnd, msgsById){
 function confirmDeleteMessage(id){
   if(!confirm("Delete this message?\n\nIt will be hidden from this conversation, but it is not erased. Management can still see the original message.")) return;
   apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
-    var deptId = STATE.active;
-    var msgs = STATE.data[deptId] || [];
+    var msgs = currentMessagesArray();
     var idx = msgs.findIndex(function(x){ return x.id === id; });
     if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
     renderList();
@@ -2637,6 +2660,7 @@ function doSend(){
   if(!text && !STATE.attachment) return;
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
   var deptId = STATE.active;
+  var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
   var wasTask = taskActive;
@@ -2650,13 +2674,14 @@ function doSend(){
   composer.classList.remove("urgent-mode");
   refreshSendState();
 
-  var payload = { from: STATE.self, to: deptId, urgent: wasUrgent };
+  var payload = { from: STATE.self, urgent: wasUrgent };
+  if(groupId) payload.groupId = groupId; else payload.to = deptId;
   if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
   clearReplyBar();
   var roomTag = roomTagInput.value.trim();
   if(roomTag) payload.roomNumber = roomTag;
   clearRoomTagBar();
-  if(wasTask) payload.taskStatus = "not_started";
+  if(wasTask && !groupId) payload.taskStatus = "not_started";
   setTaskActive(false);
   var sendPromise;
   if(attachment && attachment.type === "image"){
@@ -2677,12 +2702,18 @@ function doSend(){
   }
 
   sendPromise.then(function(res){
-    STATE.data[deptId] = STATE.data[deptId] || [];
-    STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
-    renderList();
-    if(STATE.active === deptId) renderThread();
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
   }).catch(function(err){
-    if(!attachment && (err instanceof TypeError || !navigator.onLine)){
+    if(!attachment && !groupId && (err instanceof TypeError || !navigator.onLine)){
       queueOfflineMessage(deptId, payload);
       return;
     }
@@ -2836,6 +2867,7 @@ vpTrash.addEventListener("click", function(){
 vpSend.addEventListener("click", function(){
   if(!STATE.voice) return;
   var deptId = STATE.active;
+  var groupId = STATE.activeGroupId;
   var voice = STATE.voice;
   var replyToId = STATE.replyingTo ? STATE.replyingTo.id : null;
   clearReplyBar();
@@ -2845,18 +2877,25 @@ vpSend.addEventListener("click", function(){
   fetch(voice.url).then(function(r){ return r.blob(); }).then(function(blob){
     return blobToBase64(blob).then(function(b64){
       var payload = {
-        from: STATE.self, to: deptId, type: "audio",
+        from: STATE.self, type: "audio",
         fileBase64: b64, fileMime: blob.type || "audio/webm",
         duration: voice.duration, transcript: voice.transcript || null
       };
+      if(groupId) payload.groupId = groupId; else payload.to = deptId;
       if(replyToId) payload.replyToId = replyToId;
       return apiSend('/api/messages', 'POST', payload);
     });
   }).then(function(res){
-    STATE.data[deptId] = STATE.data[deptId] || [];
-    STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
-    renderList();
-    if(STATE.active === deptId) renderThread();
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
   }).catch(function(){
     composerHint.textContent = "That voice note didn't send. Check your connection and try again.";
   });
@@ -3659,6 +3698,16 @@ function leaveGroup(groupId, deptId){
     return loadGroups();
   }).then(renderEventList).catch(function(){ showToast("Couldn't remove them"); });
 }
+function deleteGroup(groupId){
+  apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
+    showToast("Event deleted");
+    if(STATE.activeGroupId === groupId){
+      STATE.activeGroupId = null;
+      closeThreadView();
+    }
+    return loadGroups();
+  }).then(renderEventList).catch(function(){ showToast("Couldn't delete the event"); });
+}
 
 function renderEventPalette(){
   eventPalette.innerHTML = "";
@@ -3691,12 +3740,18 @@ function renderEventList(){
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].name : deptId).split(" ")[0])+'</div>'+
       '</div>';
     }).join("");
+    var canDelete = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
-        '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
-        '</button>'+
+        '<span class="event-card-actions">'+
+          (canDelete ? '<button type="button" class="event-card-delete" aria-label="Delete event" title="Delete event">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'+
+          '</button>' : '')+
+          '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
+          '</button>'+
+        '</span>'+
       '</div>'+
       '<div class="event-card-members">'+membersHtml+'</div>'+
       (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
@@ -3706,6 +3761,13 @@ function renderEventList(){
       var deptId = chip.getAttribute("data-dept-id");
       attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true });
     });
+    if(canDelete){
+      card.querySelector(".event-card-delete").addEventListener("click", function(){
+        if(confirm('Delete "'+g.name+'"? This removes it for everyone and can\'t be undone.')){
+          deleteGroup(g.id);
+        }
+      });
+    }
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
   });
 }
@@ -3730,77 +3792,33 @@ function openEventsTab(){
 }
 
 /* ---- Group thread view ---- */
-var groupThreadOverlay = document.getElementById("groupThreadOverlay");
-var groupThreadClose = document.getElementById("groupThreadClose");
-var groupThreadName = document.getElementById("groupThreadName");
-var groupThreadMembers = document.getElementById("groupThreadMembers");
-var groupThreadScroll = document.getElementById("groupThreadScroll");
-var groupThreadForm = document.getElementById("groupThreadForm");
-var groupThreadInput = document.getElementById("groupThreadInput");
-
-function renderGroupThread(groupId){
-  var msgs = STATE.groupMessages[groupId] || [];
-  groupThreadScroll.innerHTML = "";
-  if(!msgs.length){
-    groupThreadScroll.innerHTML = '<div class="handover-empty">No messages yet.</div>';
-    return;
-  }
-  var prevDay = null;
-  var msgsById = {};
-  msgs.forEach(function(m){ msgsById[m.id] = m; });
-  msgs.forEach(function(m, i){
-    if(!prevDay || !sameDay(prevDay, m.t)){
-      var div = document.createElement("div");
-      div.className = "day-div";
-      div.textContent = new Date(m.t).toLocaleDateString([], {weekday:"long", month:"short", day:"numeric"});
-      groupThreadScroll.appendChild(div);
-      prevDay = m.t;
-    }
-    var next = msgs[i+1];
-    var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
-    groupThreadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById));
-  });
-  groupThreadScroll.scrollTop = groupThreadScroll.scrollHeight;
+function markGroupRead(groupId){
+  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/read', 'POST', { self: STATE.self }).catch(function(){});
 }
 
 function openGroupThread(groupId){
   var g = STATE.groups.find(function(x){ return x.id === groupId; });
   if(!g) return;
+  clearReplyBar();
+  STATE.active = null;
   STATE.activeGroupId = groupId;
-  groupThreadOverlay.hidden = false;
-  groupThreadName.textContent = g.name;
-  groupThreadMembers.innerHTML = g.members.map(function(deptId){
-    return '<div class="group-thread-member-avatar" style="background:'+avatarGradient(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+iconSvg(deptId)+'</div>';
-  }).join("");
-  groupThreadScroll.innerHTML = '<div class="handover-empty">Loading…</div>';
+  updateComposerLock();
+  renderHeader();
+  renderThread();
+  document.getElementById("sidebar").classList.add("hide-mobile");
+  document.querySelector(".main").classList.add("show-mobile");
+  focusInput();
+  if(window.innerWidth <= 720 && !(history.state && history.state.dashThread)){
+    history.pushState({ dashThread: true }, "");
+  }
+  threadScroll.innerHTML = '<div class="handover-empty">Loading…</div>';
   apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
     STATE.groupMessages[groupId] = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
-    renderGroupThread(groupId);
-    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/read', 'POST', { self: STATE.self }).catch(function(){});
+    if(STATE.activeGroupId === groupId){ renderThread(); markGroupRead(groupId); }
   }).catch(function(){
-    groupThreadScroll.innerHTML = '<div class="handover-empty">Couldn\'t load messages.</div>';
+    if(STATE.activeGroupId === groupId) threadScroll.innerHTML = '<div class="handover-empty">Couldn\'t load messages.</div>';
   });
-  setTimeout(function(){ groupThreadInput.focus(); }, 30);
 }
-
-groupThreadForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  var text = groupThreadInput.value.trim();
-  if(!text) return;
-  if(containsProfanity(text)){ showToast("Let's keep it professional."); return; }
-  var groupId = STATE.activeGroupId;
-  if(!groupId) return;
-  groupThreadInput.value = "";
-  apiSend('/api/messages', 'POST', { from: STATE.self, groupId: groupId, type: "text", text: text }).then(function(res){
-    STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
-    STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
-    if(STATE.activeGroupId === groupId) renderGroupThread(groupId);
-  }).catch(function(){ showToast("That didn't send. Check your connection."); });
-});
-groupThreadClose.addEventListener("click", function(){ groupThreadOverlay.hidden = true; STATE.activeGroupId = null; });
-groupThreadOverlay.addEventListener("click", function(e){
-  if(e.target === groupThreadOverlay){ groupThreadOverlay.hidden = true; STATE.activeGroupId = null; }
-});
 
 function pollGroupsQuiet(){
   if(!AUTH.staff) return;
@@ -3813,8 +3831,8 @@ function pollGroupsQuiet(){
       if(mapped.length !== (STATE.groupMessages[groupId] || []).length){
         STATE.groupMessages[groupId] = mapped;
         if(STATE.activeGroupId === groupId){
-          renderGroupThread(groupId);
-          apiSend('/api/groups/' + encodeURIComponent(groupId) + '/read', 'POST', { self: STATE.self }).catch(function(){});
+          renderThread();
+          markGroupRead(groupId);
         }
       }
     }).catch(function(){});
