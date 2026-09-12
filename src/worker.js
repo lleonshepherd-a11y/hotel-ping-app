@@ -1256,7 +1256,7 @@ export default {
 
       if (method === "GET" && p === "/api/guest-requests") {
         const requester = request._staff;
-        if (requester.department_id !== "concierge" && !requester.is_admin) {
+        if (requester.department_id !== "concierge") {
           return json({ error: "Concierge access required" }, 403);
         }
         const rows = await env.DB.prepare("SELECT * FROM guest_requests ORDER BY created_at DESC").all();
@@ -1265,7 +1265,7 @@ export default {
 
       if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/status")) {
         const requester = request._staff;
-        if (requester.department_id !== "concierge" && !requester.is_admin) {
+        if (requester.department_id !== "concierge") {
           return json({ error: "Concierge access required" }, 403);
         }
         const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/status".length));
@@ -1285,7 +1285,7 @@ export default {
 
       if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/pin")) {
         const requester = request._staff;
-        if (requester.department_id !== "concierge" && !requester.is_admin) {
+        if (requester.department_id !== "concierge") {
           return json({ error: "Concierge access required" }, 403);
         }
         const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/pin".length));

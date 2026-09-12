@@ -89,7 +89,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;
   z-index:1;
 }
-.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none}
+.sb-page::-webkit-scrollbar{display:none}
 .bottom-tabs{
   flex:none;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;touch-action:none;
   width:fit-content;max-width:calc(100% - 32px);
@@ -129,7 +130,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .sb-switcher{padding:16px 20px 8px}
 .sb-switcher-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:11px}
-.switcher-row{display:flex;gap:11px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.switcher-row{display:flex;gap:11px;overflow-x:auto;scrollbar-width:none;padding:5px 2px 7px}
 .switcher-row::-webkit-scrollbar{display:none}
 .sw-chip{flex:none;width:42px;height:42px;border-radius:50%;border:2.5px solid transparent;background:none;padding:0;position:relative;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.3,1.4,.4,1)}
 .sw-chip:hover{transform:translateY(-1px) scale(1.04)}
@@ -567,7 +568,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .events-hint{padding:0 20px;margin:0 0 14px}
 .event-palette{display:flex;gap:14px;overflow-x:auto;padding:4px 20px 16px;scrollbar-width:none}
 .event-palette::-webkit-scrollbar{display:none}
-.event-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;touch-action:pan-x;cursor:grab;user-select:none;-webkit-user-select:none}
+.event-chip{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 .event-chip.dragging{opacity:.3;transition:opacity .15s ease}
 .event-chip-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 6px rgba(15,15,20,.18)}
 .event-chip-avatar svg{width:19px;height:19px}
@@ -3434,11 +3435,11 @@ function enterApp(staff){
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
-  tabGuestsBtn.hidden = staff.departmentId !== "concierge" && !staff.isAdmin;
+  tabGuestsBtn.hidden = staff.departmentId !== "concierge";
   boot();
   startPolling();
   refreshMaintenanceBadge();
-  if(staff.departmentId === "concierge" || staff.isAdmin) refreshGuestsBadge();
+  if(staff.departmentId === "concierge") refreshGuestsBadge();
   checkPushPrompt();
 }
 
@@ -4065,7 +4066,7 @@ function pointOverDropZone(x, y){
 
 function attachDragChip(chipEl, onDrop, opts){
   var AXIS_THRESHOLD = 8;
-  var startX = 0, startY = 0, lastX = 0, lastY = 0, pointerId = null, dragging = false, aborted = false, axisPending = false, ghost = null;
+  var startX = 0, startY = 0, lastX = 0, lastY = 0, pointerId = null, dragging = false, aborted = false, axisPending = false, ghost = null, startScrollLeft = 0;
 
   function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
   function clearCardHighlights(){
@@ -4104,15 +4105,20 @@ function attachDragChip(chipEl, onDrop, opts){
     dragging = false;
   }
   function onMove(ev){
-    if(ev.pointerId !== pointerId || aborted) return;
+    if(ev.pointerId !== pointerId) return;
     lastX = ev.clientX; lastY = ev.clientY;
     var dx = ev.clientX - startX, dy = ev.clientY - startY;
+    if(aborted){
+      if(opts && opts.scrollContainer) opts.scrollContainer.scrollLeft = startScrollLeft - dx;
+      return;
+    }
     if(axisPending){
       if(Math.abs(dx) < AXIS_THRESHOLD && Math.abs(dy) < AXIS_THRESHOLD) return;
       axisPending = false;
       if(Math.abs(dx) > Math.abs(dy) * 1.6){
         aborted = true;
         endDragVisuals();
+        if(opts && opts.scrollContainer) opts.scrollContainer.scrollLeft = startScrollLeft - dx;
         return;
       }
       liftNow(ev.clientX, ev.clientY);
@@ -4168,6 +4174,7 @@ function attachDragChip(chipEl, onDrop, opts){
     pointerId = e.pointerId;
     startX = e.clientX; startY = e.clientY;
     aborted = false;
+    startScrollLeft = opts && opts.scrollContainer ? opts.scrollContainer.scrollLeft : 0;
     chipEl.classList.add("pressing");
     if(opts && opts.scrollGuard === "horizontal"){
       axisPending = true;
@@ -4251,7 +4258,7 @@ function renderEventPalette(){
       '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].initials : id))+'</div>';
     attachDragChip(chip, function(groupId){
       if(groupId) joinGroup(groupId, id);
-    }, { isMember: false, scrollGuard: "horizontal" });
+    }, { isMember: false, scrollGuard: "horizontal", scrollContainer: eventPalette });
     eventPalette.appendChild(chip);
   });
 }

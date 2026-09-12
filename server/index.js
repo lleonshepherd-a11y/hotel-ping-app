@@ -1003,7 +1003,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && p === '/api/guest-requests') {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+      if (requester.department_id !== 'concierge') {
         return send(res, 403, { error: 'Concierge access required' });
       }
       const rows = db.prepare('SELECT * FROM guest_requests ORDER BY created_at DESC').all();
@@ -1012,7 +1012,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/status')) {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+      if (requester.department_id !== 'concierge') {
         return send(res, 403, { error: 'Concierge access required' });
       }
       const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/status'.length));
@@ -1031,7 +1031,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/pin')) {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge' && !requester.is_admin) {
+      if (requester.department_id !== 'concierge') {
         return send(res, 403, { error: 'Concierge access required' });
       }
       const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/pin'.length));
