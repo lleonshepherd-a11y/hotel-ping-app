@@ -307,7 +307,7 @@ function rowToGuestRequest(row) {
   };
 }
 function rowToGroup(row, members) {
-  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [] };
+  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined };
 }
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
@@ -706,6 +706,7 @@ export default {
           ).bind(g.id, self, since).first();
           groups.push({
             id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
+            archivedAt: g.archived_at || undefined,
             members, isMember,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: isMember ? unread.n : 0,
@@ -777,12 +778,33 @@ export default {
         return json({ ok: true });
       }
 
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/archive")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/archive".length));
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        if (group.archived_at) return json({ error: "This event has already ended" }, 400);
+        const requester = request._staff;
+        if (group.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that created this event can end it" }, 403);
+        }
+        const now = new Date().toISOString();
+        await env.DB.prepare("UPDATE groups SET archived_at = ? WHERE id = ?").bind(now, id).run();
+        const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
+        await insertMessage(env, ctx, {
+          from: requester.department_id, groupId: id, type: "text",
+          body: actorName + " ended this event. It's kept here for training, anyone can look back through it.",
+        });
+        const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        return json({ group: rowToGroup(row) });
+      }
+
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/messages")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/messages".length));
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        const group = await env.DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(id).first();
         const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
-        if (!member && !request._staff.is_admin) return json({ error: "Not a member of this group" }, 403);
+        if (!member && !request._staff.is_admin && !(group && group.archived_at)) return json({ error: "Not a member of this group" }, 403);
         const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
         return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }
@@ -870,6 +892,8 @@ export default {
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         let validMembers = null;
         if (groupId) {
+          const group = await env.DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(groupId).first();
+          if (group && group.archived_at) return json({ error: "This event has ended and is now read only" }, 400);
           const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
           validMembers = new Set(memberRows.results.map((m) => m.department_id));
           if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);

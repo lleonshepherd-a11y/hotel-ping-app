@@ -253,6 +253,9 @@ const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.
 if (!groupColumns.includes('deleted_at')) {
   db.exec('ALTER TABLE groups ADD COLUMN deleted_at TEXT');
 }
+if (!groupColumns.includes('archived_at')) {
+  db.exec('ALTER TABLE groups ADD COLUMN archived_at TEXT');
+}
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
 if (!staffColumns.includes('profile_complete')) {

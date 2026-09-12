@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS groups (
   name TEXT NOT NULL,
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  deleted_at TEXT
+  deleted_at TEXT,
+  archived_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS group_members (

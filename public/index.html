@@ -252,6 +252,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .off-duty-banner svg{width:15px;height:15px;flex:none;color:#e0902c}
 .off-duty-banner b{color:#8a5a14;font-weight:700}
+.event-notice{
+  flex:none;display:flex;align-items:flex-start;gap:8px;
+  margin:12px 22px 0;padding:9px 13px;border-radius:14px;
+  background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
+  font-size:12px;line-height:1.4;color:var(--text-dim);
+}
+.event-notice svg{width:15px;height:15px;flex:none;margin-top:1px;color:var(--text-faint)}
 .composer-locked{
   display:flex;align-items:center;justify-content:center;gap:8px;
   max-width:640px;margin:0 auto;padding:12px 16px;border-radius:14px;
@@ -626,8 +633,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
 .event-card-name{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
 .event-card-badge{background:var(--urgent);color:#fff;border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 7px}
+.event-card-actions{display:flex;align-items:center;gap:2px;flex:none}
+.event-card-end{border:none;background:none;color:var(--text-faint);font-weight:700;font-size:11px;padding:4px 6px}
 .event-card-open{border:none;background:none;color:var(--accent);font-weight:700;font-size:12px;display:flex;align-items:center;gap:3px;padding:4px 2px}
 .event-card-open svg{width:14px;height:14px}
+.event-card.past{background:var(--surface-3)}
+.event-card.past .event-member-avatar{filter:grayscale(.5) opacity(.8)}
+.event-card-ended-pill{background:var(--surface-3);color:var(--text-faint);border-radius:20px;font-size:10.5px;font-weight:800;padding:2px 8px;box-shadow:inset 0 0 0 1px var(--border)}
 .event-card-members{display:flex;gap:10px;flex-wrap:wrap;min-height:40px}
 .event-member-chip{display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 .event-member-chip.dragging{opacity:.3;transition:opacity .15s ease}
@@ -1093,6 +1105,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </form>
       <div class="admin-add-error" id="eventError"></div>
       <div class="event-list" id="eventList"></div>
+      <div class="sb-list-label" id="pastEventsLabel" hidden>Past events</div>
+      <p class="broadcast-hint events-hint" id="pastEventsHint" hidden>Kept for training. Anyone can look back through these, they're read only now.</p>
+      <div class="event-list past-event-list" id="pastEventList"></div>
     </div>
     <div class="event-drop-zone" id="eventDropZone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
@@ -1201,6 +1216,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </header>
 
     <div class="off-duty-banner" id="offDutyBanner" hidden></div>
+    <div class="event-notice" id="eventNotice" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.6 17.3A1.8 1.8 0 0 0 4.2 20h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg>
+      <span>Kept here for training once this event ends, so anyone can learn from it later. Keep it professional.</span>
+    </div>
 
     <div class="pull-refresh" id="pullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></div>
     <div class="thread-scroll" id="threadScroll"></div>
@@ -2034,6 +2053,7 @@ hGroupAvatars.addEventListener("click", function(){
 });
 
 var offDutyBanner = document.getElementById("offDutyBanner");
+var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var muteBtn = document.getElementById("muteBtn");
 muteBtn.addEventListener("click", function(){
@@ -2071,12 +2091,14 @@ function renderHeader(){
       return '<span class="group-avatar" style="background:'+avatarGradient(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+iconSvg(deptId)+'</span>';
     }).join("") : "";
     offDutyBanner.hidden = true;
+    eventNotice.hidden = !!(g && g.archivedAt);
     muteBtn.hidden = true;
     filesBtn.hidden = true;
     optTask.hidden = true;
     if(taskActive) setTaskActive(false);
     return;
   }
+  eventNotice.hidden = true;
   hDot.hidden = false;
   hGroupAvatars.hidden = true;
   muteBtn.hidden = false;
@@ -2838,7 +2860,14 @@ function switchSelf(id){
   }).finally(function(){ STATE.loading = false; });
 }
 
+function activeGroupIsArchived(){
+  if(!STATE.activeGroupId) return false;
+  var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
+  return !!(g && g.archivedAt);
+}
+
 function isViewOnly(){
+  if(STATE.activeGroupId) return activeGroupIsArchived();
   return !!(AUTH.staff && AUTH.staff.isAdmin && STATE.self !== AUTH.staff.departmentId);
 }
 
@@ -2847,6 +2876,10 @@ function updateComposerLock(){
   composer.hidden = locked;
   composerLocked.hidden = !locked;
   if(locked){
+    if(STATE.activeGroupId){
+      composerLocked.innerHTML = "This event has ended and is now read only, kept here for training.";
+      return;
+    }
     var viewing = DEPTS[STATE.self] ? DEPTS[STATE.self].name : "this department";
     var home = DEPTS[AUTH.staff.departmentId] ? DEPTS[AUTH.staff.departmentId].name : "your department";
     composerLocked.innerHTML = "Viewing <b>" + esc(viewing) + "</b>'s messages (read only). Switch back to <b>" + esc(home) + "</b> to send.";
@@ -4435,6 +4468,9 @@ responseOverlay.addEventListener("click", function(e){ if(e.target === responseO
 /* ---------------- Events (ad-hoc group chats) ---------------- */
 var eventPalette = document.getElementById("eventPalette");
 var eventList = document.getElementById("eventList");
+var pastEventsLabel = document.getElementById("pastEventsLabel");
+var pastEventsHint = document.getElementById("pastEventsHint");
+var pastEventList = document.getElementById("pastEventList");
 var eventError = document.getElementById("eventError");
 var eventDropZone = document.getElementById("eventDropZone");
 var eventDropZoneLabel = document.getElementById("eventDropZoneLabel");
@@ -4463,7 +4499,7 @@ function attachDragChip(chipEl, onDrop, opts){
 
   function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
   function clearCardHighlights(){
-    eventList.querySelectorAll(".event-card.drag-over").forEach(function(c){ c.classList.remove("drag-over"); });
+    document.querySelectorAll(".event-card.drag-over").forEach(function(c){ c.classList.remove("drag-over"); });
   }
   function liftNow(x, y){
     dragging = true;
@@ -4522,7 +4558,7 @@ function attachDragChip(chipEl, onDrop, opts){
       eventDropZone.classList.toggle("hover", pointOverDropZone(ev.clientX, ev.clientY));
     } else {
       var el = document.elementFromPoint(ev.clientX, ev.clientY);
-      var cardEl = el && el.closest ? el.closest(".event-card") : null;
+      var cardEl = el && el.closest ? el.closest(".event-card[data-group-id]") : null;
       clearCardHighlights();
       if(cardEl) cardEl.classList.add("drag-over");
     }
@@ -4546,7 +4582,7 @@ function attachDragChip(chipEl, onDrop, opts){
       if(overZone) onDrop();
     } else {
       var el = document.elementFromPoint(dropX, dropY);
-      var cardEl = el && el.closest ? el.closest(".event-card") : null;
+      var cardEl = el && el.closest ? el.closest(".event-card[data-group-id]") : null;
       endDragVisuals();
       if(cardEl){
         if(navigator.vibrate) navigator.vibrate(18);
@@ -4656,13 +4692,28 @@ function renderEventPalette(){
   });
 }
 
+function archiveEvent(groupId){
+  if(!confirm("End this event? It'll become read only and move to Past events, kept there for training.")) return;
+  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/archive', 'POST', {}).then(function(){
+    return loadGroups();
+  }).then(function(){
+    renderEventList();
+    if(STATE.activeGroupId === groupId){ renderHeader(); updateComposerLock(); }
+    showToast("Event ended");
+  }).catch(function(err){
+    showToast(err.message || "Couldn't end that event");
+  });
+}
+
 function renderEventList(){
+  var active = STATE.groups.filter(function(g){ return !g.archivedAt; });
+  var past = STATE.groups.filter(function(g){ return !!g.archivedAt; });
+
   eventList.innerHTML = "";
-  if(!STATE.groups.length){
+  if(!active.length){
     eventList.innerHTML = '<div class="event-empty">No events yet. Create one above.</div>';
-    return;
   }
-  STATE.groups.forEach(function(g){
+  active.forEach(function(g){
     var card = document.createElement("div");
     card.className = "event-card" + (g.id === pendingLandedGroupId ? " landed" : "");
     card.setAttribute("data-group-id", g.id);
@@ -4676,9 +4727,12 @@ function renderEventList(){
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
-        '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
-        '</button>'+
+        '<div class="event-card-actions">'+
+          (canDelete ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
+          '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
+          '</button>'+
+        '</div>'+
       '</div>'+
       '<div class="event-card-members">'+membersHtml+'</div>'+
       (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
@@ -4692,9 +4746,37 @@ function renderEventList(){
       card.classList.add("deletable");
       attachDragChip(card, function(){ deleteGroup(g.id); }, {
         isMember: true, isCard: true, dropLabel: "Drop to delete event",
-        ignoreSelector: ".event-member-chip, .event-card-open"
+        ignoreSelector: ".event-member-chip, .event-card-open, .event-card-end"
       });
+      card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); archiveEvent(g.id); });
     }
+    card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
+  });
+
+  pastEventsLabel.hidden = !past.length;
+  pastEventsHint.hidden = !past.length;
+  pastEventList.innerHTML = "";
+  past.forEach(function(g){
+    var card = document.createElement("div");
+    card.className = "event-card past";
+    var membersHtml = g.members.map(function(deptId){
+      return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
+        '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
+        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
+      '</div>';
+    }).join("");
+    card.innerHTML =
+      '<div class="event-card-head">'+
+        '<span class="event-card-name">'+esc(g.name)+'</span>'+
+        '<div class="event-card-actions">'+
+          '<span class="event-card-ended-pill">Ended</span>'+
+          '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
+          '</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="event-card-members">'+membersHtml+'</div>';
+    pastEventList.appendChild(card);
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
   });
 }
