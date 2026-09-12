@@ -698,6 +698,7 @@ export default {
           const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
           const members = memberRows.results.map((m) => m.department_id);
           const isMember = members.includes(self);
+          if (g.archived_at && !isMember && !request._staff.is_admin) continue;
           const last = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1").bind(g.id).first();
           const readRow = await env.DB.prepare("SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?").bind(g.id, self).first();
           const since = readRow ? readRow.last_read_at : "1970-01-01T00:00:00.000Z";
@@ -762,22 +763,6 @@ export default {
         return json({ ok: true });
       }
 
-      if (method === "DELETE" && p.startsWith("/api/groups/")) {
-        const id = decodeURIComponent(p.slice("/api/groups/".length));
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        if (!group) return json({ error: "Event not found" }, 404);
-        const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
-          return json({ error: "Only the department that created this event can delete it" }, 403);
-        }
-        const memberCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM group_members WHERE group_id = ?").bind(id).first();
-        if (memberCount.n > 1 && !requester.is_admin) {
-          return json({ error: "Other departments have joined this event and it can't be deleted" }, 400);
-        }
-        await env.DB.prepare("UPDATE groups SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-        return json({ ok: true });
-      }
-
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/archive")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/archive".length));
         const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
@@ -792,19 +777,39 @@ export default {
         const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
         await insertMessage(env, ctx, {
           from: requester.department_id, groupId: id, type: "text",
-          body: actorName + " ended this event. It's kept here for training, anyone can look back through it.",
+          body: actorName + " ended this event. It's kept here for training.",
         });
         const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
         return json({ group: rowToGroup(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/share")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/share".length));
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        if (!group.archived_at) return json({ error: "End the event before sharing it" }, 400);
+        const now = new Date().toISOString();
+        for (const deptId of DEPT_IDS) {
+          await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, deptId, now).run();
+        }
+        const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
+        await insertMessage(env, ctx, {
+          from: requester.department_id, groupId: id, type: "text",
+          body: actorName + " shared this event with every department.",
+        });
+        const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(id).all();
+        const row2 = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        return json({ group: rowToGroup(row2, memberRows.results.map((m) => m.department_id)) });
       }
 
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/messages")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/messages".length));
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        const group = await env.DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(id).first();
         const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
-        if (!member && !request._staff.is_admin && !(group && group.archived_at)) return json({ error: "Not a member of this group" }, 403);
+        if (!member && !request._staff.is_admin) return json({ error: "Not a member of this group" }, 403);
         const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
         return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
       }

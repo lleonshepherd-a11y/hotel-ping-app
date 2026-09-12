@@ -623,7 +623,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-list{display:flex;flex-direction:column;gap:12px;padding:0 20px 20px}
 .event-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0}
 .event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .18s cubic-bezier(.32,1.4,.4,1),background .18s ease}
-.event-card.deletable{touch-action:none}
 .event-card.drag-over{background:rgba(24,119,242,.14);box-shadow:0 0 0 2px var(--accent)}
 .event-card.landed{animation:eventCardLanded .4s cubic-bezier(.32,1.4,.4,1)}
 @keyframes eventCardLanded{
@@ -1106,7 +1105,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <div class="admin-add-error" id="eventError"></div>
       <div class="event-list" id="eventList"></div>
       <div class="sb-list-label" id="pastEventsLabel" hidden>Past events</div>
-      <p class="broadcast-hint events-hint" id="pastEventsHint" hidden>Kept for training. Anyone can look back through these, they're read only now.</p>
+      <p class="broadcast-hint events-hint" id="pastEventsHint" hidden>Kept for training, read only now. Only the General Manager can see these unless one is shared with every department.</p>
       <div class="event-list past-event-list" id="pastEventList"></div>
     </div>
     <div class="event-drop-zone" id="eventDropZone">
@@ -1218,7 +1217,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <div class="off-duty-banner" id="offDutyBanner" hidden></div>
     <div class="event-notice" id="eventNotice" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.6 17.3A1.8 1.8 0 0 0 4.2 20h15.6a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg>
-      <span>Kept here for training once this event ends, so anyone can learn from it later. Keep it professional.</span>
+      <span>Kept here for training once this event ends. The General Manager can review it, and share it with department heads if needed. Keep it professional.</span>
     </div>
 
     <div class="pull-refresh" id="pullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></div>
@@ -4657,26 +4656,6 @@ function leaveGroup(groupId, deptId){
     showToast("Couldn't remove them");
   });
 }
-function deleteGroup(groupId){
-  var removedIdx = STATE.groups.findIndex(function(x){ return x.id === groupId; });
-  var removed = removedIdx !== -1 ? STATE.groups.splice(removedIdx, 1)[0] : null;
-  if(removed) renderEventList();
-  showToast("Event deleted");
-  if(STATE.activeGroupId === groupId){
-    STATE.activeGroupId = null;
-    closeThreadView();
-  }
-  apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
-    return loadGroups();
-  }).then(renderEventList).catch(function(err){
-    if(removed){
-      STATE.groups.splice(removedIdx, 0, removed);
-      renderEventList();
-    }
-    showToast(err.message || "Couldn't delete the event");
-  });
-}
-
 function renderEventPalette(){
   eventPalette.innerHTML = "";
   DEPT_ORDER.forEach(function(id){
@@ -4705,6 +4684,19 @@ function archiveEvent(groupId){
   });
 }
 
+function shareEvent(groupId){
+  if(!confirm("Share this event with every department head? They'll be able to read back through it.")) return;
+  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/share', 'POST', {}).then(function(){
+    return loadGroups();
+  }).then(function(){
+    renderEventList();
+    if(STATE.activeGroupId === groupId) renderHeader();
+    showToast("Shared with every department");
+  }).catch(function(err){
+    showToast(err.message || "Couldn't share that event");
+  });
+}
+
 function renderEventList(){
   var active = STATE.groups.filter(function(g){ return !g.archivedAt; });
   var past = STATE.groups.filter(function(g){ return !!g.archivedAt; });
@@ -4723,12 +4715,12 @@ function renderEventList(){
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
-    var canDelete = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
+    var canEnd = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
         '<div class="event-card-actions">'+
-          (canDelete ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
+          (canEnd ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
@@ -4742,12 +4734,7 @@ function renderEventList(){
       var deptId = chip.getAttribute("data-dept-id");
       attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true, dropLabel: "Drop to remove" });
     });
-    if(canDelete){
-      card.classList.add("deletable");
-      attachDragChip(card, function(){ deleteGroup(g.id); }, {
-        isMember: true, isCard: true, dropLabel: "Drop to delete event",
-        ignoreSelector: ".event-member-chip, .event-card-open, .event-card-end"
-      });
+    if(canEnd){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); archiveEvent(g.id); });
     }
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
@@ -4765,18 +4752,25 @@ function renderEventList(){
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
+    var alreadySharedToAll = DEPT_ORDER.every(function(d){ return g.members.indexOf(d) !== -1; });
+    var canShare = AUTH.staff && AUTH.staff.isAdmin && !alreadySharedToAll;
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+'</span>'+
         '<div class="event-card-actions">'+
           '<span class="event-card-ended-pill">Ended</span>'+
+          (canShare ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">Share</button>' : '')+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
         '</div>'+
       '</div>'+
-      '<div class="event-card-members">'+membersHtml+'</div>';
+      '<div class="event-card-members">'+membersHtml+'</div>'+
+      (canShare ? '<div class="event-card-hint">Only you can see this. Share to give every department head access.</div>' : '');
     pastEventList.appendChild(card);
+    if(canShare){
+      card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); shareEvent(g.id); });
+    }
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
   });
 }
