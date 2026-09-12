@@ -358,6 +358,11 @@ const server = http.createServer(async (req, res) => {
       }
       if (typeof body.pin === 'string' && body.pin) {
         if (!/^\d{4,6}$/.test(body.pin)) return send(res, 400, { error: 'PIN must be 4-6 digits' });
+        const currentPin = typeof body.currentPin === 'string' ? body.currentPin : '';
+        const existing = db.prepare('SELECT pin_hash, pin_salt FROM staff WHERE id = ?').get(requester.id);
+        if (!existing || hashPin(currentPin, existing.pin_salt) !== existing.pin_hash) {
+          return send(res, 400, { error: 'Current PIN is incorrect' });
+        }
         const salt = crypto.randomBytes(16).toString('hex');
         db.prepare('UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?').run(hashPin(body.pin, salt), salt, requester.id);
       }
@@ -579,12 +584,18 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && p === '/api/response-times') {
       const requester = staffFromToken(req);
-      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const mine = url.searchParams.get('mine') === '1';
+      if (!mine && !requester.is_admin) return send(res, 403, { error: 'Admin access required' });
       const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const rows = db.prepare(
-        `SELECT to_dept, created_at, read_at FROM messages
-         WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?`
-      ).all(cutoff);
+      const rows = mine
+        ? db.prepare(
+            `SELECT to_dept, created_at, read_at FROM messages
+             WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ? AND to_dept = ?`
+          ).all(cutoff, requester.department_id)
+        : db.prepare(
+            `SELECT to_dept, created_at, read_at FROM messages
+             WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?`
+          ).all(cutoff);
       const byDept = {};
       for (const r of rows) {
         const seconds = (new Date(r.read_at).getTime() - new Date(r.created_at).getTime()) / 1000;

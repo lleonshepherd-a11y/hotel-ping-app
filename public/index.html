@@ -127,7 +127,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-mark img{width:100%;height:100%;object-fit:contain;display:block;border-radius:14px;box-shadow:0 8px 20px -4px rgba(15,15,17,.5)}
 .sb-mark svg{width:21px;height:21px}
 .sb-title{font-family:Manrope,sans-serif;font-weight:800;font-size:17.5px;letter-spacing:-.015em}
-.sb-sub{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:1px}
+.sb-sub{font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 .sb-switcher{padding:16px 20px 8px}
 .sb-switcher-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:11px}
@@ -523,7 +523,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* ---------- Admin panel ---------- */
 .sb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 20px 18px}
 
-.sb-menu-list{margin:14px 20px 4px;background:var(--surface-2);border-radius:16px;overflow:hidden}
+.sb-menu-list{margin:14px 20px 4px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .sb-menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border)}
 .sb-menu-row:last-child{border-bottom:none}
 .sb-menu-row:hover{background:var(--surface-3)}
@@ -539,6 +539,21 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signed-in-row strong{color:var(--text);font-weight:700}
 .logout-btn{flex:none;width:32px;height:32px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;margin-left:auto}
 .logout-btn:hover{color:var(--urgent);background:var(--urgent-tint)}
+.duty-row-header{margin-left:auto;flex:none}
+.sb-menu-row-sub{padding-left:20px}
+.sb-menu-row-sub .sb-menu-icon{width:22px;height:22px}
+.sb-menu-row-sub .sb-menu-icon svg{width:16px;height:16px}
+.sb-menu-row-sub .sb-menu-label{font-size:13.5px}
+#moreOptionsBtn.open{background:var(--active-tint)}
+#moreOptionsBtn.open .sb-menu-label{color:var(--accent);font-weight:700}
+#moreOptionsBtn.open .sb-menu-icon,#moreOptionsBtn.open #moreOptionsChevron{color:var(--accent)}
+#moreOptionsChevron svg{transition:transform .2s ease}
+#moreOptionsBtn.open #moreOptionsChevron svg{transform:rotate(90deg)}
+.sb-menu-row-logout .sb-menu-label{color:var(--urgent)}
+.sb-menu-row-logout .sb-menu-icon{color:var(--urgent)}
+.mute-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:var(--surface-2)}
+.mute-row-name{font-size:14px;font-weight:600;color:var(--text)}
+.mute-row button{flex:none;border:none;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:700;background:var(--surface-3);color:var(--text-dim);cursor:pointer}
 .logout-btn svg{width:15px;height:15px}
 .admin-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
 .admin-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-pop);padding:24px}
@@ -878,13 +893,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <div class="sb-mark">
           <img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo">
         </div>
-        <div>
+        <div style="min-width:0;flex:1;overflow:hidden">
           <div class="sb-title">Hotel Ping</div>
           <div class="sb-sub" id="sbSub">Noir House · Department heads</div>
         </div>
-        <button class="logout-btn" id="logoutBtn" type="button" title="Sign out" aria-label="Sign out">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-        </button>
+        <div class="duty-row duty-row-header">
+          <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
+          <div class="duty-track" id="dutyTrack">
+            <div class="duty-knob" id="dutyKnob" role="switch" aria-checked="true" tabindex="0" aria-label="On duty. Slide or press Enter to turn the board off">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -919,17 +939,47 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <span class="sb-menu-label">Shift handover</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
-    </div>
-
-    <div class="sb-toolbar">
-      <div class="duty-row">
-        <span class="duty-status-pill" id="dutyStatusPill">On duty</span>
-        <div class="duty-track" id="dutyTrack">
-          <div class="duty-knob" id="dutyKnob" role="switch" aria-checked="true" tabindex="0" aria-label="On duty. Slide or press Enter to turn the board off">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>
-          </div>
-        </div>
+      <button class="sb-menu-row" id="moreOptionsBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        <span class="sb-menu-label">More options</span>
+        <span class="sb-menu-chevron" id="moreOptionsChevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <div id="moreOptionsSub" hidden>
+        <button class="sb-menu-row sb-menu-row-sub" id="changePinBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg></span>
+          <span class="sb-menu-label">Change your PIN</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="notifSettingsBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
+          <span class="sb-menu-label">Notification settings</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="pushEnableRowBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><circle cx="18" cy="6" r="4" fill="#e0902c" stroke="none"/></svg></span>
+          <span class="sb-menu-label">Re-enable push notifications</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="myActivityBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12.5" y="8" width="3" height="10"/><rect x="18" y="5" width="3" height="13"/></svg></span>
+          <span class="sb-menu-label">My activity</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="privacyBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/></svg></span>
+          <span class="sb-menu-label">Privacy &amp; data</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="helpSupportBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9a3 3 0 1 1 4.4 2.6c-.9.5-1.6 1-1.6 2.1"/><circle cx="12" cy="17" r=".3" fill="currentColor"/></svg></span>
+          <span class="sb-menu-label">Help &amp; support</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
       </div>
+      <button class="sb-menu-row sb-menu-row-logout" id="logoutBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>
+        <span class="sb-menu-label">Log out</span>
+      </button>
     </div>
     </div>
 
@@ -1311,6 +1361,74 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <div class="admin-add-error" id="handoverError"></div>
     </form>
     <div class="handover-list" id="handoverList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="changePinOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Change your PIN</h2>
+      <button class="admin-close" id="changePinClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <form class="admin-add-form" id="changePinForm">
+      <input type="password" inputmode="numeric" pattern="[0-9]*" name="currentPin" placeholder="Current PIN" maxlength="6" autocomplete="current-password" required>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" name="newPin" placeholder="New PIN (4-6 digits)" maxlength="6" autocomplete="new-password" required>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" name="confirmPin" placeholder="Confirm new PIN" maxlength="6" autocomplete="new-password" required>
+      <button type="submit" class="admin-add-btn" id="changePinSubmitBtn">Update PIN</button>
+      <div class="admin-add-error" id="changePinError"></div>
+    </form>
+  </div>
+</div>
+
+<div class="admin-overlay" id="notifSettingsOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Notification settings</h2>
+      <button class="admin-close" id="notifSettingsClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Conversations you've muted. Unmute one to start getting notified again.</p>
+    <div class="handover-list" id="notifSettingsList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="myActivityOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>My activity</h2>
+      <button class="admin-close" id="myActivityClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Your average time to read urgent messages, last 7 days.</p>
+    <div class="resp-list" id="myActivityList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="privacyOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Privacy &amp; data</h2>
+      <button class="admin-close" id="privacyClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Messages, photos and voice notes sent through Hotel Ping are stored securely in the hotel's database as part of normal business records. The General Manager and other admins can open any conversation at any time, including for training, coordination and resolving disputes. Please keep messages professional, and avoid sharing personal financial or medical details through this system.</p>
+  </div>
+</div>
+
+<div class="admin-overlay" id="helpSupportOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Help &amp; support</h2>
+      <button class="admin-close" id="helpSupportClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">If something in the app isn't working properly, or you need a feature that isn't here yet, let your General Manager know and they'll get it looked into.</p>
   </div>
 </div>
 
@@ -3809,6 +3927,138 @@ handoverForm.addEventListener("submit", function(e){
   }).finally(function(){ handoverSendBtn.disabled = false; });
 });
 
+/* ---- Profile: More options dropdown ---- */
+var moreOptionsBtn = document.getElementById("moreOptionsBtn");
+var moreOptionsSub = document.getElementById("moreOptionsSub");
+moreOptionsBtn.addEventListener("click", function(){
+  var open = moreOptionsSub.hidden;
+  moreOptionsSub.hidden = !open;
+  moreOptionsBtn.classList.toggle("open", open);
+});
+
+var changePinBtn = document.getElementById("changePinBtn");
+var changePinOverlay = document.getElementById("changePinOverlay");
+var changePinClose = document.getElementById("changePinClose");
+var changePinForm = document.getElementById("changePinForm");
+var changePinError = document.getElementById("changePinError");
+var changePinSubmitBtn = document.getElementById("changePinSubmitBtn");
+changePinBtn.addEventListener("click", function(){
+  changePinForm.reset();
+  changePinError.textContent = "";
+  changePinOverlay.hidden = false;
+});
+changePinClose.addEventListener("click", function(){ changePinOverlay.hidden = true; });
+changePinOverlay.addEventListener("click", function(e){ if(e.target === changePinOverlay) changePinOverlay.hidden = true; });
+changePinForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var currentPin = changePinForm.currentPin.value.trim();
+  var newPin = changePinForm.newPin.value.trim();
+  var confirmPin = changePinForm.confirmPin.value.trim();
+  changePinError.textContent = "";
+  if(!/^\d{4,6}$/.test(newPin)){ changePinError.textContent = "New PIN must be 4 to 6 digits."; return; }
+  if(newPin !== confirmPin){ changePinError.textContent = "New PIN and confirmation don't match."; return; }
+  changePinSubmitBtn.disabled = true;
+  apiSend('/api/profile', 'PATCH', { currentPin: currentPin, pin: newPin }).then(function(){
+    changePinOverlay.hidden = true;
+    showToast("PIN updated");
+  }).catch(function(err){
+    changePinError.textContent = err.message || "Couldn't update your PIN.";
+  }).finally(function(){ changePinSubmitBtn.disabled = false; });
+});
+
+var notifSettingsBtn = document.getElementById("notifSettingsBtn");
+var notifSettingsOverlay = document.getElementById("notifSettingsOverlay");
+var notifSettingsClose = document.getElementById("notifSettingsClose");
+var notifSettingsList = document.getElementById("notifSettingsList");
+function renderNotifSettings(mutedIds){
+  if(!mutedIds.length){
+    notifSettingsList.innerHTML = '<div class="handover-empty">You haven\'t muted any conversations.</div>';
+    return;
+  }
+  notifSettingsList.innerHTML = "";
+  mutedIds.forEach(function(deptId){
+    var row = document.createElement("div");
+    row.className = "mute-row";
+    var name = document.createElement("span");
+    name.className = "mute-row-name";
+    name.textContent = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+    row.appendChild(name);
+    var unmuteBtn = document.createElement("button");
+    unmuteBtn.type = "button";
+    unmuteBtn.textContent = "Unmute";
+    unmuteBtn.addEventListener("click", function(){
+      apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
+        STATE.muted[deptId] = res.muted;
+        if(STATE.active === deptId){ muteBtn.classList.toggle("active", res.muted); }
+        showToast("Unmuted");
+        loadNotifSettings();
+      }).catch(function(){ showToast("Couldn't unmute"); });
+    });
+    row.appendChild(unmuteBtn);
+    notifSettingsList.appendChild(row);
+  });
+}
+function loadNotifSettings(){
+  notifSettingsList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/muted?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    renderNotifSettings(res.muted || []);
+  }).catch(function(){
+    notifSettingsList.innerHTML = '<div class="handover-empty">Couldn\'t load notification settings.</div>';
+  });
+}
+notifSettingsBtn.addEventListener("click", function(){
+  notifSettingsOverlay.hidden = false;
+  loadNotifSettings();
+});
+notifSettingsClose.addEventListener("click", function(){ notifSettingsOverlay.hidden = true; });
+notifSettingsOverlay.addEventListener("click", function(e){ if(e.target === notifSettingsOverlay) notifSettingsOverlay.hidden = true; });
+
+var pushEnableRowBtn = document.getElementById("pushEnableRowBtn");
+pushEnableRowBtn.addEventListener("click", function(){
+  if(!pushSupported()){ showToast("Push isn't supported on this device"); return; }
+  if(Notification.permission === "denied"){
+    showToast("Notifications are blocked. Enable them in your device Settings.");
+    return;
+  }
+  pushEnableRowBtn.disabled = true;
+  Notification.requestPermission().then(function(perm){
+    if(perm !== "granted"){ showToast("Notifications weren't enabled"); return; }
+    return subscribeToPush().then(function(){ showToast("Notifications enabled"); });
+  }).catch(function(){
+    showToast("Couldn't enable notifications");
+  }).finally(function(){ pushEnableRowBtn.disabled = false; });
+});
+
+var myActivityBtn = document.getElementById("myActivityBtn");
+var myActivityOverlay = document.getElementById("myActivityOverlay");
+var myActivityClose = document.getElementById("myActivityClose");
+var myActivityList = document.getElementById("myActivityList");
+myActivityBtn.addEventListener("click", function(){
+  myActivityList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  myActivityOverlay.hidden = false;
+  apiGet('/api/response-times?mine=1').then(function(res){
+    renderResponseTimes(res.departments, myActivityList);
+  }).catch(function(){
+    myActivityList.innerHTML = '<div class="handover-empty">Couldn\'t load your activity.</div>';
+  });
+});
+myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
+myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
+
+var privacyBtn = document.getElementById("privacyBtn");
+var privacyOverlay = document.getElementById("privacyOverlay");
+var privacyClose = document.getElementById("privacyClose");
+privacyBtn.addEventListener("click", function(){ privacyOverlay.hidden = false; });
+privacyClose.addEventListener("click", function(){ privacyOverlay.hidden = true; });
+privacyOverlay.addEventListener("click", function(e){ if(e.target === privacyOverlay) privacyOverlay.hidden = true; });
+
+var helpSupportBtn = document.getElementById("helpSupportBtn");
+var helpSupportOverlay = document.getElementById("helpSupportOverlay");
+var helpSupportClose = document.getElementById("helpSupportClose");
+helpSupportBtn.addEventListener("click", function(){ helpSupportOverlay.hidden = false; });
+helpSupportClose.addEventListener("click", function(){ helpSupportOverlay.hidden = true; });
+helpSupportOverlay.addEventListener("click", function(e){ if(e.target === helpSupportOverlay) helpSupportOverlay.hidden = true; });
+
 var profilePage = document.getElementById("profilePage");
 var chatPage = document.getElementById("chatPage");
 var eventsPage = document.getElementById("eventsPage");
@@ -4006,13 +4256,14 @@ function fmtDuration(seconds){
   return hrs + "h " + (mins % 60) + "m";
 }
 
-function renderResponseTimes(departments){
+function renderResponseTimes(departments, targetEl){
+  targetEl = targetEl || responseList;
   if(!departments.length){
-    responseList.innerHTML = '<div class="handover-empty">No urgent messages read in the last 7 days.</div>';
+    targetEl.innerHTML = '<div class="handover-empty">No urgent messages read in the last 7 days.</div>';
     return;
   }
   departments.sort(function(a, b){ return b.avgSeconds - a.avgSeconds; });
-  responseList.innerHTML = "";
+  targetEl.innerHTML = "";
   departments.forEach(function(d){
     var slow = d.avgSeconds > RESPONSE_SLOW_SECONDS;
     var row = document.createElement("div");
@@ -4024,7 +4275,7 @@ function renderResponseTimes(departments){
         '<span class="resp-sub">'+d.count+' urgent message'+(d.count === 1 ? "" : "s")+'</span>'+
       '</span>'+
       '<span class="resp-time'+(slow?' slow':'')+'">'+fmtDuration(d.avgSeconds)+'</span>';
-    responseList.appendChild(row);
+    targetEl.appendChild(row);
   });
 }
 

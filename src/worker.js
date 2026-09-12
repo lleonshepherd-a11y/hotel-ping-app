@@ -559,6 +559,11 @@ export default {
         }
         if (typeof body.pin === "string" && body.pin) {
           if (!PIN_RE.test(body.pin)) return json({ error: "PIN must be 4-6 digits" }, 400);
+          const currentPin = typeof body.currentPin === "string" ? body.currentPin : "";
+          const existing = await env.DB.prepare("SELECT pin_hash, pin_salt FROM staff WHERE id = ?").bind(id).first();
+          if (!existing || (await hashPin(currentPin, existing.pin_salt)) !== existing.pin_hash) {
+            return json({ error: "Current PIN is incorrect" }, 400);
+          }
           const salt = randomSaltHex();
           await env.DB.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(await hashPin(body.pin, salt), salt, id).run();
         }
@@ -809,14 +814,16 @@ export default {
 
       if (method === "GET" && p === "/api/response-times") {
         const requester = request._staff;
-        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const mine = url.searchParams.get("mine") === "1";
+        if (!mine && !requester.is_admin) return json({ error: "Admin access required" }, 403);
         const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const rows = await env.DB.prepare(
-          `SELECT to_dept, AVG((julianday(read_at) - julianday(created_at)) * 86400) AS avg_seconds, COUNT(*) AS n
+        let query = `SELECT to_dept, AVG((julianday(read_at) - julianday(created_at)) * 86400) AS avg_seconds, COUNT(*) AS n
            FROM messages
-           WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?
-           GROUP BY to_dept`
-        ).bind(cutoff).all();
+           WHERE urgent = 1 AND read_at IS NOT NULL AND deleted_at IS NULL AND created_at > ?`;
+        const params = [cutoff];
+        if (mine) { query += " AND to_dept = ?"; params.push(requester.department_id); }
+        query += " GROUP BY to_dept";
+        const rows = await env.DB.prepare(query).bind(...params).all();
         return json({ departments: rows.results.map((r) => ({ deptId: r.to_dept, avgSeconds: r.avg_seconds, count: r.n })) });
       }
 
