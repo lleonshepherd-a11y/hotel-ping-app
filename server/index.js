@@ -810,7 +810,7 @@ const server = http.createServer(async (req, res) => {
       const description = String(body.description || '').trim();
       if (!description) return send(res, 400, { error: 'A description is required' });
       const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
-      if (roomNumber && roomNumber.length > 20) return send(res, 400, { error: 'Room number is too long' });
+      if (roomNumber && roomNumber.length > 40) return send(res, 400, { error: 'Location is too long' });
 
       let photoPath = null;
       if (body.photoBase64) {

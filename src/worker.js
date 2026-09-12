@@ -1031,7 +1031,7 @@ export default {
         const description = String(body.description || "").trim();
         if (!description) return json({ error: "A description is required" }, 400);
         const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
-        if (roomNumber && roomNumber.length > 20) return json({ error: "Room number is too long" }, 400);
+        if (roomNumber && roomNumber.length > 40) return json({ error: "Location is too long" }, 400);
 
         let photoPath = null;
         if (body.photoBase64) {
