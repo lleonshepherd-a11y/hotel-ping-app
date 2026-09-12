@@ -129,7 +129,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .sb-switcher{padding:16px 20px 8px}
 .sb-switcher-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:11px}
-.switcher-row{display:flex;flex-wrap:wrap;gap:9px}
+.switcher-row{display:flex;gap:11px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.switcher-row::-webkit-scrollbar{display:none}
 .sw-chip{flex:none;width:42px;height:42px;border-radius:50%;border:2.5px solid transparent;background:none;padding:0;position:relative;display:flex;align-items:center;justify-content:center;transition:transform .15s cubic-bezier(.3,1.4,.4,1)}
 .sw-chip:hover{transform:translateY(-1px) scale(1.04)}
 .sw-chip.active{border-color:var(--accent);box-shadow:0 0 0 3px var(--active-tint)}
@@ -493,21 +494,26 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 [hidden]{display:none !important}
 
 /* ---------- Login screen ---------- */
-.login-screen{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse 900px 600px at 50% 0%, #202020 0%, #0a0a0a 60%);color:#fff}
-.login-card{width:340px;max-width:calc(100vw - 40px);text-align:center}
-.login-mark{width:72px;height:72px;margin:0 auto 22px}
-.login-mark img{width:100%;height:100%;object-fit:contain;border-radius:18px;box-shadow:0 14px 34px -10px rgba(0,0,0,.75)}
-.login-title{font-family:Manrope,sans-serif;font-weight:800;font-size:22px;letter-spacing:-.01em;color:#fff}
-.login-sub{font-size:12.5px;color:rgba(255,255,255,.5);font-weight:600;margin-top:4px;margin-bottom:30px;text-transform:uppercase;letter-spacing:.08em}
+.login-screen{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(ellipse 900px 700px at 50% 8%, #232220 0%, #0a0a0a 62%);color:#fff}
+.login-glow{position:absolute;top:11%;left:50%;width:360px;height:360px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle, rgba(184,151,92,.32) 0%, rgba(184,151,92,0) 68%);filter:blur(6px);pointer-events:none}
+.login-brand-tag{position:absolute;top:calc(46px + env(safe-area-inset-top));left:0;right:0;text-align:center;font-size:11px;font-weight:700;letter-spacing:.22em;color:rgba(255,255,255,.34);text-transform:uppercase}
+.login-footer{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.3);font-weight:500}
+.login-card{position:relative;width:340px;max-width:calc(100vw - 40px);text-align:center}
+.login-mark{width:76px;height:76px;margin:0 auto 22px;position:relative}
+.login-mark img{width:100%;height:100%;object-fit:contain;border-radius:19px;box-shadow:0 16px 38px -10px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.08)}
+.login-title{font-family:Manrope,sans-serif;font-weight:800;font-size:24px;letter-spacing:-.015em;color:#fff}
+.login-sub{font-size:12.5px;color:rgba(255,255,255,.48);font-weight:600;margin-top:5px;margin-bottom:28px;text-transform:uppercase;letter-spacing:.1em}
+.login-panel{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:22px;padding:22px 20px 20px;backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);box-shadow:0 24px 60px -24px rgba(0,0,0,.65), inset 0 1px 1px rgba(255,255,255,.07)}
 .login-field{text-align:left;margin-bottom:14px}
 .login-field label{display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.4);margin-bottom:7px}
-.login-field input{width:100%;padding:13px 14px;border-radius:13px;border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);font-size:16px;color:#fff}
+.login-field input{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:13px;border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);font-size:16px;color:#fff;transition:border-color .15s ease,background .15s ease}
 .login-field input::placeholder{color:rgba(255,255,255,.28)}
-.login-field input:focus{outline:none;border-color:#fff;background:rgba(255,255,255,.1)}
+.login-field input:focus{outline:none;border-color:rgba(184,151,92,.85);background:rgba(255,255,255,.1);box-shadow:0 0 0 3px rgba(184,151,92,.16)}
 .login-pin-input{letter-spacing:.4em;font-weight:700;font-variant-numeric:tabular-nums}
-.login-btn{width:100%;margin-top:8px;padding:13px;border:none;border-radius:14px;background:#fff;color:#0a0a0a;font-size:14.5px;font-weight:800;letter-spacing:.01em;transition:opacity .15s ease}
+.login-btn{width:100%;margin-top:8px;padding:14px;border:none;border-radius:14px;background:#fff;color:#0a0a0a;font-size:14.5px;font-weight:800;letter-spacing:.01em;transition:opacity .15s ease,transform .1s ease}
 .login-btn:disabled{opacity:.4}
 .login-btn:not(:disabled):hover{opacity:.88}
+.login-btn:not(:disabled):active{transform:scale(.98)}
 .login-error{font-size:12.5px;color:#ff6a5c;font-weight:600;margin-top:14px;min-height:16px}
 .login-tip{margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.12);font-size:12px;line-height:1.5;color:rgba(255,255,255,.5);text-align:left}
 .login-tip b{color:rgba(255,255,255,.8)}
@@ -550,12 +556,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .staff-row-del{border:none;background:none;color:var(--text-faint);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .staff-row-del:hover{color:var(--urgent);background:var(--urgent-tint)}
 .staff-row-del svg{width:14px;height:14px}
-.admin-add-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
-.admin-add-form input,.admin-add-form select{padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px;transition:border-color .15s ease}
+.admin-add-form{display:flex;flex-direction:column;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+.admin-add-form input,.admin-add-form select{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px;transition:border-color .15s ease}
 .admin-add-form input:focus,.admin-add-form select:focus{outline:none}
-.admin-add-form input[name="name"]{flex:1;min-width:110px}
-.admin-add-form input[name="pin"]{width:90px}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
+.admin-add-form .admin-add-btn{width:100%;padding:10px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
 .admin-modal-head-actions{display:flex;align-items:center;gap:4px}
@@ -760,38 +765,47 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 <body>
 
 <div class="login-screen" id="loginScreen" hidden>
+  <div class="login-brand-tag">Noir House Hotel</div>
+  <div class="login-glow"></div>
   <div class="login-card">
     <div class="login-mark"><img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo"></div>
     <div class="login-title">Hotel Ping</div>
     <div class="login-sub">Staff sign in</div>
-    <form id="loginForm">
-      <div class="login-field">
-        <label for="loginName">Name</label>
-        <input type="text" id="loginName" autocomplete="username" placeholder="e.g. Dave" required>
-      </div>
-      <div class="login-field">
-        <label for="loginPin">PIN</label>
-        <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••" required>
-      </div>
-      <button type="submit" class="login-btn" id="loginBtn">Sign in</button>
-      <div class="login-error" id="loginError"></div>
-    </form>
+    <div class="login-panel">
+      <form id="loginForm">
+        <div class="login-field">
+          <label for="loginName">Name</label>
+          <input type="text" id="loginName" autocomplete="username" placeholder="e.g. Dave" required>
+        </div>
+        <div class="login-field">
+          <label for="loginPin">PIN</label>
+          <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••" required>
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn">Sign in</button>
+        <div class="login-error" id="loginError"></div>
+      </form>
+    </div>
   </div>
+  <div class="login-footer">Department messaging, one app for every head of department</div>
 </div>
 
 <div class="login-screen" id="setupScreen" hidden>
+  <div class="login-brand-tag">Noir House Hotel</div>
+  <div class="login-glow"></div>
   <div class="login-card">
     <div class="login-mark"><img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo"></div>
     <div class="login-title">Welcome</div>
     <div class="login-sub">Set up your profile</div>
-    <form id="setupForm">
-      <div class="login-field">
-        <label for="setupName">Your name</label>
-        <input type="text" id="setupName" autocomplete="name" placeholder="e.g. Sarah" required>
-      </div>
-      <button type="submit" class="login-btn" id="setupBtn">Continue to messages</button>
-      <div class="login-error" id="setupError"></div>
-    </form>
+    <div class="login-panel">
+      <form id="setupForm">
+        <div class="login-field">
+          <label for="setupName">Your name</label>
+          <input type="text" id="setupName" autocomplete="name" placeholder="e.g. Sarah" required>
+        </div>
+        <button type="submit" class="login-btn" id="setupBtn">Continue to messages</button>
+        <div class="login-error" id="setupError"></div>
+      </form>
+    </div>
     <div class="login-tip">Tip: use the <b>On duty</b> switch in the app whenever you're off shift. You won't be notified about new messages until you switch back on. Management can still send messages and reach your conversation history at any time. All messages may be reviewed by management.</div>
   </div>
 </div>
@@ -912,7 +926,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
 
     <div class="sb-page" id="maintenancePage" hidden>
-      <div class="sb-list-label">Maintenance</div>
+      <div class="sb-list-label">Repairs</div>
       <form class="maint-new-form" id="newMaintForm">
         <input type="text" id="newMaintRoom" placeholder="Location (optional) — room, corridor, kitchen…" maxlength="40">
         <textarea id="newMaintDesc" placeholder="What's wrong? e.g. AC not cooling in 214" required maxlength="300" rows="2"></textarea>
@@ -1279,15 +1293,15 @@ function avatarGradient(deptId){
 }
 
 var DEPTS = {
-  gm:           { name:"General Manager",          initials:"GM", color:"#a3854f" },
-  foh:          { name:"Head Receptionist",   initials:"FH", color:"#4c6f92" },
-  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8" },
-  restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f" },
-  kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c" },
-  bar:          { name:"Bar Manager",              initials:"BR", color:"#3f9d6c" },
-  housekeeping: { name:"Head Housekeeper",         initials:"HK", color:"#2f9aa0" },
-  maintenance:  { name:"Maintenance Manager",      initials:"MT", color:"#6c6d78" },
-  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66" }
+  gm:           { name:"General Manager",          initials:"GM", color:"#a3854f", short:"GM" },
+  foh:          { name:"Head Receptionist",   initials:"FH", color:"#4c6f92", short:"Reception" },
+  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8", short:"Concierge" },
+  restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f", short:"Restaurant" },
+  kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c", short:"Kitchen" },
+  bar:          { name:"Bar Manager",              initials:"BR", color:"#3f9d6c", short:"Bar" },
+  housekeeping: { name:"Head Housekeeper",         initials:"HK", color:"#2f9aa0", short:"Housekeep" },
+  maintenance:  { name:"Maintenance Manager",      initials:"MT", color:"#6c6d78", short:"Repairs" },
+  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66", short:"Dashboard" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
 
@@ -1913,8 +1927,8 @@ function fmtDur(s){
 function renderThread(){
   threadScroll.innerHTML = "";
   var msgs = STATE.activeGroupId ? (STATE.groupMessages[STATE.activeGroupId] || []) : STATE.data[STATE.active];
-  if(STATE.activeGroupId && !msgs.length){
-    threadScroll.innerHTML = '<div class="handover-empty">No messages yet.</div>';
+  if(!msgs.length){
+    threadScroll.innerHTML = '<div class="handover-empty">No messages yet. Say hello!</div>';
     return;
   }
   var prevDay = null;
@@ -4139,7 +4153,7 @@ function renderEventPalette(){
     chip.className = "event-chip";
     chip.innerHTML =
       '<div class="event-chip-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
-      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].name : id).split(" ")[0])+'</div>';
+      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].short : id))+'</div>';
     attachDragChip(chip, function(groupId){
       if(groupId) joinGroup(groupId, id);
     }, { isMember: false, scrollGuard: "horizontal" });
@@ -4160,7 +4174,7 @@ function renderEventList(){
     var membersHtml = g.members.map(function(deptId){
       return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
         '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
-        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].name : deptId).split(" ")[0])+'</div>'+
+        '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].short : deptId))+'</div>'+
       '</div>';
     }).join("");
     var canDelete = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
