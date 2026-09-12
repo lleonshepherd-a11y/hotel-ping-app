@@ -12,6 +12,8 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
 const DEPT_NAMES = {};
 DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
+DEPT_NAMES.dashboard = 'Dashboard';
+const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const loginAttempts = new Map();
@@ -216,6 +218,27 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200);
       fs.createReadStream(filePath).pipe(res);
       return;
+    }
+
+    // ---- External integration (own API-key auth, not a staff session) ----
+    if (req.method === 'POST' && p === '/api/external/notify') {
+      const apiKey = req.headers['x-api-key'] || '';
+      if (apiKey !== EXTERNAL_API_KEY) return send(res, 401, { error: 'Unauthorized' });
+      const body = await readJsonBody(req);
+      const idempotencyKey = String(body.idempotencyKey || '').trim();
+      const departmentId = body.departmentId;
+      const message = String(body.message || '').trim();
+      if (!idempotencyKey) return send(res, 400, { error: 'idempotencyKey is required' });
+      if (!DEPT_IDS.has(departmentId)) return send(res, 400, { error: 'Unknown department' });
+      if (!message) return send(res, 400, { error: 'message is required' });
+
+      const existing = db.prepare('SELECT message_id FROM external_notifications WHERE idempotency_key = ?').get(idempotencyKey);
+      if (existing) return send(res, 200, { ok: true, duplicate: true, messageId: existing.message_id });
+
+      const row = insertMessage({ from: 'dashboard', to: departmentId, type: 'text', body: message });
+      db.prepare('INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)')
+        .run(idempotencyKey, row.id, new Date().toISOString());
+      return send(res, 201, { ok: true, duplicate: false, messageId: row.id });
     }
 
     // ---- Auth gate: every /api/ route except login needs a valid session ----

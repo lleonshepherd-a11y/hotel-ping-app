@@ -131,12 +131,18 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 
+CREATE TABLE IF NOT EXISTS external_notifications (
+  idempotency_key TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
-  ('foh', 'Front of House', NULL, 1),
-  ('concierge', 'Concierge', NULL, 1),
-  ('restaurant', 'Restaurant', NULL, 1),
-  ('kitchen', 'Kitchen', 'Peter', 1),
-  ('bar', 'Bar', NULL, 1),
-  ('housekeeping', 'Housekeeping', NULL, 1),
-  ('maintenance', 'Maintenance', NULL, 1);
+  ('foh', 'Front of House Manager', NULL, 1),
+  ('concierge', 'Head Concierge', NULL, 1),
+  ('restaurant', 'Restaurant Manager', NULL, 1),
+  ('kitchen', 'Head Chef', 'Peter', 1),
+  ('bar', 'Bar Manager', NULL, 1),
+  ('housekeeping', 'Head Housekeeper', NULL, 1),
+  ('maintenance', 'Maintenance Manager', NULL, 1);

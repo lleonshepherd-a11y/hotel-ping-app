@@ -1,7 +1,8 @@
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
 const DEPT_NAMES = {
-  gm: "General Manager", foh: "Front of House", concierge: "Concierge", restaurant: "Restaurant",
-  kitchen: "Kitchen", bar: "Bar", housekeeping: "Housekeeping", maintenance: "Maintenance",
+  gm: "General Manager", foh: "Front of House Manager", concierge: "Head Concierge", restaurant: "Restaurant Manager",
+  kitchen: "Head Chef", bar: "Bar Manager", housekeeping: "Head Housekeeper", maintenance: "Maintenance Manager",
+  dashboard: "Dashboard",
 };
 const PIN_RE = /^\d{4,6}$/;
 const TASK_STATUSES = ["not_started", "in_progress", "completed"];
@@ -376,6 +377,35 @@ export default {
       }
 
       await ensureSeeded(env);
+
+      // ---- External integration (own API-key auth, not a staff session) ----
+      if (method === "POST" && p === "/api/external/notify") {
+        const apiKey = request.headers.get("x-api-key") || "";
+        if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
+          return json({ error: "Unauthorized" }, 401);
+        }
+        const body = await readJsonBody(request);
+        const idempotencyKey = String(body.idempotencyKey || "").trim();
+        const departmentId = body.departmentId;
+        const message = String(body.message || "").trim();
+        if (!idempotencyKey) return json({ error: "idempotencyKey is required" }, 400);
+        if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
+        if (!message) return json({ error: "message is required" }, 400);
+
+        const existing = await env.DB.prepare(
+          "SELECT message_id FROM external_notifications WHERE idempotency_key = ?"
+        ).bind(idempotencyKey).first();
+        if (existing) {
+          return json({ ok: true, duplicate: true, messageId: existing.message_id });
+        }
+
+        const row = await insertMessage(env, ctx, { from: "dashboard", to: departmentId, type: "text", body: message });
+        await env.DB.prepare(
+          "INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)"
+        ).bind(idempotencyKey, row.id, new Date().toISOString()).run();
+
+        return json({ ok: true, duplicate: false, messageId: row.id }, 201);
+      }
 
       // ---- Auth gate ----
       if (p !== "/api/auth/login") {

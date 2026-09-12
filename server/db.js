@@ -201,6 +201,12 @@ db.exec(`
     resolved_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
+
+  CREATE TABLE IF NOT EXISTS external_notifications (
+    idempotency_key TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);
@@ -216,19 +222,21 @@ if (!staffColumns.includes('profile_complete')) {
 
 const DEPARTMENTS = [
   { id: 'gm', name: 'General Manager', contact: 'Dave' },
-  { id: 'foh', name: 'Front of House', contact: null },
-  { id: 'concierge', name: 'Concierge', contact: null },
-  { id: 'restaurant', name: 'Restaurant', contact: null },
-  { id: 'kitchen', name: 'Kitchen', contact: 'Peter' },
-  { id: 'bar', name: 'Bar', contact: null },
-  { id: 'housekeeping', name: 'Housekeeping', contact: null },
-  { id: 'maintenance', name: 'Maintenance', contact: null },
+  { id: 'foh', name: 'Front of House Manager', contact: null },
+  { id: 'concierge', name: 'Head Concierge', contact: null },
+  { id: 'restaurant', name: 'Restaurant Manager', contact: null },
+  { id: 'kitchen', name: 'Head Chef', contact: 'Peter' },
+  { id: 'bar', name: 'Bar Manager', contact: null },
+  { id: 'housekeeping', name: 'Head Housekeeper', contact: null },
+  { id: 'maintenance', name: 'Maintenance Manager', contact: null },
 ];
 
 const insertDept = db.prepare(
   'INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES (?, ?, ?, 1)'
 );
 for (const d of DEPARTMENTS) insertDept.run(d.id, d.name, d.contact);
+const renameDept = db.prepare('UPDATE departments SET name = ? WHERE id = ?');
+for (const d of DEPARTMENTS) renameDept.run(d.name, d.id);
 
 const crypto = require('node:crypto');
 const staffCount = db.prepare('SELECT COUNT(*) AS n FROM staff').get().n;

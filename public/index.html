@@ -570,7 +570,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-member-label{font-size:9px;font-weight:700;color:var(--text-faint);white-space:nowrap}
 .event-card-hint{font-size:11px;color:var(--text-faint);padding:2px 2px}
 .event-drop-zone{
-  position:absolute;left:50%;bottom:28px;transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
+  position:absolute;left:50%;bottom:78px;transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
   display:flex;flex-direction:column;align-items:center;gap:4px;
   background:var(--urgent);color:#fff;font-weight:700;font-size:11px;padding:14px 22px;border-radius:22px;
   box-shadow:0 10px 28px -8px rgba(20,20,16,.45);pointer-events:none;
@@ -1208,7 +1208,8 @@ var ICONS = {
   kitchen: '<path d="M12 2.5c2.2 3.3-1.6 4.6-1.6 7.7a3.6 3.6 0 1 0 7.2 0c0-1.1-.5-2-1-2.7 1.4 4.7-1.4 7.4-4.6 7.4a5.6 5.6 0 0 1-5.6-5.6c0-3.6 3.4-4.7 5.6-6.8z"/>',
   bar: '<path d="M4 4h16l-8 9v7"/><path d="M8 20h8"/>',
   housekeeping: '<path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v3"/><path d="M21 18v3"/><path d="M3 12V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v3"/>',
-  maintenance: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>'
+  maintenance: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
+  dashboard: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'
 };
 function iconSvg(deptId){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+ICONS[deptId]+'</svg>';
@@ -1225,14 +1226,15 @@ function avatarGradient(deptId){
 }
 
 var DEPTS = {
-  gm:           { name:"General Manager", initials:"GM", color:"#a3854f" },
-  foh:          { name:"Front of House",  initials:"FH", color:"#4c6f92" },
-  concierge:    { name:"Concierge",       initials:"CN", color:"#7c62a8" },
-  restaurant:   { name:"Restaurant",      initials:"RS", color:"#b16a3f" },
-  kitchen:      { name:"Kitchen",         initials:"KT", color:"#c95a2c" },
-  bar:          { name:"Bar",             initials:"BR", color:"#3f9d6c" },
-  housekeeping: { name:"Housekeeping",    initials:"HK", color:"#2f9aa0" },
-  maintenance:  { name:"Maintenance",     initials:"MT", color:"#6c6d78" }
+  gm:           { name:"General Manager",          initials:"GM", color:"#a3854f" },
+  foh:          { name:"Front of House Manager",   initials:"FH", color:"#4c6f92" },
+  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8" },
+  restaurant:   { name:"Restaurant Manager",       initials:"RS", color:"#b16a3f" },
+  kitchen:      { name:"Head Chef",                initials:"KT", color:"#c95a2c" },
+  bar:          { name:"Bar Manager",              initials:"BR", color:"#3f9d6c" },
+  housekeeping: { name:"Head Housekeeper",         initials:"HK", color:"#2f9aa0" },
+  maintenance:  { name:"Maintenance Manager",      initials:"MT", color:"#6c6d78" },
+  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
 
