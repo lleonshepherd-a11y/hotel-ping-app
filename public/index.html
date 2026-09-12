@@ -91,9 +91,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
 .bottom-tabs{
-  flex:none;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;
+  flex:none;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;touch-action:none;
   width:fit-content;max-width:calc(100% - 32px);
-  margin:0 auto calc(12px + env(safe-area-inset-bottom));padding:5px;
+  margin:0 auto calc(12px + env(safe-area-inset-bottom));padding:6px 16px;
   background:rgba(255,255,255,.35);border-radius:999px;
   backdrop-filter:blur(22px) saturate(2.2);-webkit-backdrop-filter:blur(22px) saturate(2.2);
   box-shadow:0 10px 28px -10px rgba(20,20,16,.28), 0 2px 8px rgba(20,20,16,.08), inset 0 1px 1px rgba(255,255,255,.8), inset 0 0 0 1px rgba(255,255,255,.4);
@@ -113,6 +113,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   box-shadow:inset 0 1px 2px rgba(255,255,255,.95), inset 0 -1px 1px rgba(0,0,0,.06), 0 2px 6px rgba(20,20,16,.16);
 }
 #tabChatBtn.active{background:rgba(24,119,242,.22);color:var(--accent);box-shadow:inset 0 1px 2px rgba(255,255,255,.5), inset 0 -1px 1px rgba(0,40,100,.1), 0 2px 6px rgba(24,119,242,.25)}
+.bottom-tab.drag-hover{background:rgba(10,10,10,.88);color:#fff;transform:scale(1.08);box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .bottom-tab .tab-badge{
   position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;
   border-radius:10px;background:var(--urgent);color:#fff;font-size:10px;font-weight:800;
@@ -3726,6 +3727,47 @@ tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
 tabEventsBtn.addEventListener("click", function(){ showTab("events"); });
 tabMaintBtn.addEventListener("click", function(){ showTab("maintenance"); });
 showTab("chat");
+
+(function setupTabBarDrag(){
+  var bar = document.querySelector(".bottom-tabs");
+  var activePointerId = null;
+  var hoverEl = null;
+  var startEl = null;
+  function tabAt(x, y){
+    var el = document.elementFromPoint(x, y);
+    return el ? el.closest(".bottom-tab") : null;
+  }
+  function setHover(el){
+    if(hoverEl === el) return;
+    if(hoverEl) hoverEl.classList.remove("drag-hover");
+    hoverEl = el;
+    if(hoverEl) hoverEl.classList.add("drag-hover");
+  }
+  function endDrag(e){
+    if(e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    var el = hoverEl;
+    setHover(null);
+    if(el && el !== startEl){ if(navigator.vibrate) navigator.vibrate(8); el.click(); }
+    startEl = null;
+  }
+  bar.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    activePointerId = e.pointerId;
+    startEl = tabAt(e.clientX, e.clientY);
+  });
+  bar.addEventListener("pointermove", function(e){
+    if(e.pointerId !== activePointerId) return;
+    setHover(tabAt(e.clientX, e.clientY));
+  });
+  bar.addEventListener("pointerup", endDrag);
+  bar.addEventListener("pointercancel", function(e){
+    if(e.pointerId !== activePointerId) return;
+    activePointerId = null;
+    setHover(null);
+    startEl = null;
+  });
+})();
 
 var filesBtn = document.getElementById("filesBtn");
 var filesOverlay = document.getElementById("filesOverlay");
