@@ -135,6 +135,7 @@ function checkEscalations() {
     SELECT * FROM messages
     WHERE deleted_at IS NULL AND escalated_at IS NULL AND status != 'read'
       AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))
+      AND (to_dept IS NULL OR (SELECT on_duty FROM departments WHERE id = to_dept) = 1)
   `).all(urgentCutoff, normalCutoff);
   const now = new Date().toISOString();
   for (const row of rows) {

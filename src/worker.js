@@ -208,7 +208,8 @@ async function checkEscalations(env) {
   const rows = await env.DB.prepare(
     `SELECT * FROM messages
      WHERE deleted_at IS NULL AND escalated_at IS NULL AND status != 'read'
-       AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))`
+       AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))
+       AND (to_dept IS NULL OR (SELECT on_duty FROM departments WHERE id = to_dept) = 1)`
   ).bind(urgentCutoff, normalCutoff).all();
   for (const row of rows.results) {
     const preview = row.type === "text" ? row.body : (row.type === "image" ? "a photo" : row.type === "file" ? "a file" : "a voice message");

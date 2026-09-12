@@ -654,22 +654,38 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-chip.pressing,.event-member-chip.pressing{transform:scale(.9);transition:transform .1s ease}
 .event-card.pressing{transform:scale(.98);transition:transform .1s ease}
 
-.maint-new-form{display:flex;flex-direction:column;gap:8px;margin:0 20px 12px}
-.maint-new-form input[type=text],.maint-new-form textarea{border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2);font-family:inherit;resize:none}
+.maint-new-form{
+  display:flex;flex-direction:column;gap:10px;margin:0 20px 14px;padding:16px 16px 14px;
+  border-radius:20px;background:linear-gradient(165deg, rgba(255,255,255,.94), rgba(230,236,245,.7));
+  backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.8);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.9), 0 10px 24px -16px rgba(30,30,45,.35), 0 2px 6px rgba(30,30,45,.06);
+}
+.maint-new-form input[type=text],.maint-new-form textarea{
+  border:1px solid rgba(20,20,35,.09);border-radius:12px;padding:10px 13px;font-size:13.5px;
+  background:rgba(255,255,255,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  font-family:inherit;resize:none;box-shadow:inset 0 1px 2px rgba(20,20,35,.04);transition:box-shadow .15s ease,border-color .15s ease;
+}
+.maint-new-form input[type=text]:focus,.maint-new-form textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--active-tint), inset 0 1px 2px rgba(20,20,35,.04)}
 .maint-form-row{display:flex;align-items:center;gap:8px}
 .maint-priority-row{display:flex;gap:6px;flex-wrap:wrap}
-.maint-priority-chip{border:1.5px solid var(--border);background:var(--surface-2);color:var(--text-dim);border-radius:20px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer}
-.maint-priority-chip.active{border-color:transparent;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
-.maint-priority-chip[data-priority="safety"].active{background:linear-gradient(150deg,#e02c2c,#c62828)}
-.maint-priority-chip[data-priority="guest"].active{background:linear-gradient(150deg,#e0902c,#b5701f)}
-.maint-priority-chip[data-priority="routine"].active{background:var(--text-dim)}
+.maint-priority-chip{
+  border:1px solid rgba(20,20,35,.1);background:rgba(255,255,255,.68);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:var(--text-dim);border-radius:20px;padding:6px 11px;font-size:12px;font-weight:700;cursor:pointer;transition:transform .12s cubic-bezier(.3,1.4,.4,1)
+}
+.maint-priority-chip:active{transform:scale(.94)}
+.maint-priority-chip.active{border-color:transparent;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 3px 10px -4px rgba(24,119,242,.55)}
+.maint-priority-chip[data-priority="safety"].active{background:linear-gradient(150deg,#e02c2c,#c62828);box-shadow:0 3px 10px -4px rgba(224,44,44,.5)}
+.maint-priority-chip[data-priority="guest"].active{background:linear-gradient(150deg,#e0902c,#b5701f);box-shadow:0 3px 10px -4px rgba(224,144,44,.5)}
+.maint-priority-chip[data-priority="routine"].active{background:var(--text-dim);box-shadow:none}
 .maint-extra-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--text-dim)}
 .maint-checkbox{display:flex;align-items:center;gap:6px;font-weight:600;cursor:pointer}
 .maint-deadline-label{display:flex;align-items:center;gap:6px;font-weight:600}
-.maint-deadline-label input[type=time]{border:1.5px solid var(--border);border-radius:8px;padding:5px 7px;font-size:12.5px;background:var(--surface-2);font-family:inherit;color:var(--text)}
-.maint-photo-btn{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--accent);border:1.5px dashed var(--accent);border-radius:10px;padding:8px 12px;cursor:pointer;flex:none;white-space:nowrap}
+.maint-deadline-label input[type=time]{border:1px solid rgba(20,20,35,.09);border-radius:9px;padding:5px 7px;font-size:12.5px;background:rgba(255,255,255,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-family:inherit;color:var(--text)}
+.maint-photo-btn{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--accent);border:1.5px dashed rgba(24,119,242,.45);border-radius:10px;padding:8px 12px;cursor:pointer;flex:none;white-space:nowrap;background:rgba(255,255,255,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .12s ease}
+.maint-photo-btn:active{transform:scale(.96)}
 .maint-photo-btn svg{width:16px;height:16px}
-.maint-new-form .admin-add-btn{flex:none;margin-left:auto}
+.maint-new-form .admin-add-btn{flex:none;margin-left:auto;box-shadow:0 4px 14px -5px rgba(24,119,242,.55)}
 .maint-photo-preview{position:relative;width:84px}
 .maint-photo-preview img,.maint-photo-preview video{width:84px;height:84px;object-fit:cover;border-radius:10px;display:block;background:#000}
 .maint-photo-remove{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--urgent);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -1084,9 +1100,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
 
     <div class="sb-page" id="maintenancePage" hidden>
-      <div class="sb-list-label">Repairs</div>
+      <div class="sb-list-label">Maintenance repairs</div>
+      <div class="off-duty-banner" id="maintOffDutyBanner" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+        <span><b>Maintenance</b> is off duty right now. They'll still get this, just not until they're back on.</span>
+      </div>
       <form class="maint-new-form" id="newMaintForm">
-        <input type="text" id="newMaintRoom" placeholder="Location (optional) — room, corridor, kitchen…" maxlength="40">
+        <input type="text" id="newMaintRoom" placeholder="Location (optional), room, corridor, kitchen…" maxlength="40">
         <textarea id="newMaintDesc" placeholder="What's wrong? e.g. AC not cooling in 214" required maxlength="300" rows="2"></textarea>
         <div class="maint-priority-row" id="maintPriorityRow">
           <button type="button" class="maint-priority-chip" data-priority="safety">⚠ Safety</button>
@@ -1145,9 +1165,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg>
         <span>Events</span>
       </button>
-      <button class="bottom-tab" id="tabMaintBtn" type="button" aria-label="Repairs" title="Repairs">
+      <button class="bottom-tab" id="tabMaintBtn" type="button" aria-label="Maintenance repairs" title="Maintenance repairs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
-        <span>Repairs</span>
+        <span>Maintenance repairs</span>
         <span class="tab-badge" id="tabMaintBadge" hidden></span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
@@ -3517,7 +3537,7 @@ function refreshNow(){
   Object.keys(DEPT_META).forEach(function(id){ dutyBefore[id] = isOnDuty(id); });
   return loadDepartmentMeta().then(function(){
     var dutyChanged = Object.keys(DEPT_META).some(function(id){ return dutyBefore[id] !== isOnDuty(id); });
-    if(dutyChanged){ renderList(); renderHeader(); }
+    if(dutyChanged){ renderList(); renderHeader(); renderMaintOffDutyBanner(); }
   }).then(function(){ return buildData(STATE.self); }).then(function(data){
     var hasNew = false, hasUrgent = false, changed = false;
     Object.keys(data).forEach(function(id){
@@ -4722,9 +4742,15 @@ maintPriorityChips.forEach(function(chip){
 });
 STATE.tickets = STATE.tickets || [];
 
+var maintOffDutyBanner = document.getElementById("maintOffDutyBanner");
+function renderMaintOffDutyBanner(){
+  maintOffDutyBanner.hidden = isOnDuty("maintenance");
+}
+
 function openMaintenanceTab(){
   maintFeed.innerHTML = '<div class="maint-col-empty">Loading…</div>';
   refreshMaintenanceBadge();
+  renderMaintOffDutyBanner();
 }
 
 var MAINT_PRIORITY_ORDER = { safety: 0, guest: 1, problem: 2, routine: 3 };
@@ -5251,7 +5277,7 @@ newMaintForm.addEventListener("submit", function(e){
     newMaintDeadline.value = "";
     maintSelectedPriority = "problem";
     maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "problem"); });
-    showToast(res.merged ? "Already reported — added your note to it" : "Reported");
+    showToast(res.merged ? "Already reported. Added your note to it" : (isOnDuty("maintenance") ? "Reported" : "Reported. Maintenance is off duty, they'll see it once they're back on"));
   }).catch(function(err){
     maintError.textContent = err.message || "Couldn't report that issue.";
   }).finally(function(){ submitBtn.disabled = false; });
