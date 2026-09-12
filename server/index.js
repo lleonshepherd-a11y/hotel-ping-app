@@ -10,6 +10,7 @@ const UPLOADS_DIR = path.join(__dirname, '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
+const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -73,6 +74,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completedBy: row.completed_by || undefined,
     broadcastId: row.broadcast_id || undefined,
     roomNumber: row.room_number || undefined,
+    taskStatus: row.task_status || undefined,
   };
 }
 
@@ -96,12 +98,12 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null
   );
   return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
 }
@@ -387,11 +389,12 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber } = body;
+      const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
       if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
       if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
+      if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return send(res, 400, { error: 'Invalid task status' });
 
       let filePathOnDisk = null;
       let fileSize = null;
@@ -413,6 +416,7 @@ const server = http.createServer(async (req, res) => {
         urgent: !!urgent,
         replyToId: replyToId || null,
         roomNumber: roomNumber ? String(roomNumber).trim() : null,
+        taskStatus: taskStatus || null,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
@@ -454,6 +458,21 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?').run(
         nextCompleted ? new Date().toISOString() : null, nextCompleted ? requester.department_id : null, id
       );
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/task-status')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/task-status'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      if (!existing.task_status) return send(res, 400, { error: "This message isn't tagged as a task" });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const bodyIn = await readJsonBody(req);
+      if (!TASK_STATUSES.includes(bodyIn.status)) return send(res, 400, { error: 'Invalid task status' });
+      db.prepare('UPDATE messages SET task_status = ? WHERE id = ?').run(bodyIn.status, id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }

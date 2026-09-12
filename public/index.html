@@ -329,6 +329,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
 .room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
+.task-msg-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px 3px 7px;border-radius:20px;margin-bottom:5px;border:none;color:var(--text-dim);background:var(--surface-3)}
+.task-msg-tag.in_progress{color:var(--accent);background:rgba(24,119,242,.12)}
+.task-msg-tag.completed{color:#2f9a5c;background:rgba(47,154,92,.12)}
+.task-msg-tag svg{width:11px;height:11px}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -403,6 +407,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .plus-opt-label{font-size:10.5px;font-weight:700;color:var(--text-dim);white-space:nowrap}
 .plus-opt#optUrgent.active .plus-opt-ic{box-shadow:0 0 0 3px var(--urgent-tint), 0 3px 8px -2px rgba(214,73,60,.5)}
 .plus-opt#optUrgent.active .plus-opt-label{color:var(--urgent)}
+#optTask .plus-opt-ic{background:linear-gradient(145deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 3px 8px -2px rgba(24,119,242,.5)}
+.plus-opt#optTask.active .plus-opt-ic{box-shadow:0 0 0 3px rgba(24,119,242,.15), 0 3px 8px -2px rgba(24,119,242,.5)}
+.plus-opt#optTask.active .plus-opt-label{color:var(--accent)}
 #msgInput{
   flex:1;border:none;background:none;resize:none;color:var(--text);
   font-size:16px;line-height:1.35;padding:7px 2px;max-height:120px;min-height:20px;
@@ -834,6 +841,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6.5a2.5 2.5 0 0 1 2.5-2.5H12v17" stroke-width="1.7"/><path d="M12 8h5a2 2 0 0 1 2 2v11" stroke-width="1.7"/><path d="M2 21h20" stroke-width="1.7"/><circle cx="9" cy="13" r="0.9" fill="currentColor" stroke="none"/></svg></span>
                   <span class="plus-opt-label">Room</span>
                 </button>
+                <button class="plus-opt" id="optTask" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3" stroke-width="1.7"/><path d="M8.5 12l2.3 2.3L16 9.5" stroke-width="1.7"/></svg></span>
+                  <span class="plus-opt-label">Task</span>
+                </button>
               </div>
             </div>
             <div class="qr-wrap">
@@ -1149,7 +1160,8 @@ function mapServerMessage(row, self){
     completedAt: row.completedAt ? new Date(row.completedAt).getTime() : undefined,
     completedBy: row.completedBy || undefined,
     broadcastId: row.broadcastId || undefined,
-    roomNumber: row.roomNumber || undefined
+    roomNumber: row.roomNumber || undefined,
+    taskStatus: row.taskStatus || undefined
   };
 }
 
@@ -1799,6 +1811,20 @@ function toggleCompleteMessage(m){
   }).catch(function(){ showToast("Couldn't update that"); });
 }
 
+var TASK_LABELS = { not_started: "New", in_progress: "Started", completed: "Completed" };
+var TASK_NEXT = { not_started: "in_progress", in_progress: "completed", completed: "not_started" };
+function cycleTaskStatus(m){
+  var nextStatus = TASK_NEXT[m.taskStatus] || "not_started";
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/task-status', 'POST', { status: nextStatus }).then(function(res){
+    var deptId = STATE.active;
+    var msgs = STATE.data[deptId] || [];
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    if(STATE.active === deptId) renderThread();
+    showToast(TASK_LABELS[nextStatus]);
+  }).catch(function(){ showToast("Couldn't update that"); });
+}
+
 var forwardOverlay = document.getElementById("forwardOverlay");
 var forwardClose = document.getElementById("forwardClose");
 var forwardDeptList = document.getElementById("forwardDeptList");
@@ -1958,6 +1984,15 @@ function buildMessageRow(m, groupEnd, msgsById){
     tag.className = "urgent-tag";
     tag.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg> Urgent';
     wrap.appendChild(tag);
+  }
+
+  if(m.taskStatus){
+    var taskTag = document.createElement("button");
+    taskTag.type = "button";
+    taskTag.className = "task-msg-tag " + m.taskStatus;
+    taskTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.3 2.3L16 9.5"/></svg> ' + TASK_LABELS[m.taskStatus];
+    taskTag.addEventListener("click", function(){ cycleTaskStatus(m); });
+    wrap.appendChild(taskTag);
   }
 
   if(m.pinned){
@@ -2243,6 +2278,7 @@ var optCamera = document.getElementById("optCamera");
 var micQuickBtn = document.getElementById("micQuickBtn");
 var optUrgent = document.getElementById("optUrgent");
 var optRoom = document.getElementById("optRoom");
+var optTask = document.getElementById("optTask");
 var fileInput = document.getElementById("fileInput");
 var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
@@ -2259,6 +2295,7 @@ var vpTrash = document.getElementById("vpTrash");
 var vpSend = document.getElementById("vpSend");
 var vpAudio = document.getElementById("vpAudio");
 var urgentActive = false;
+var taskActive = false;
 
 for(var i=0;i<22;i++){
   var s = document.createElement("span");
@@ -2350,6 +2387,11 @@ optRoom.addEventListener("click", function(){
   closePlusMenu();
   showRoomTagBar();
 });
+optTask.addEventListener("click", function(){
+  taskActive = !taskActive;
+  optTask.classList.toggle("active", taskActive);
+  closePlusMenu();
+});
 
 function handleAttachedFile(file){
   if(!file) return;
@@ -2431,7 +2473,8 @@ function pendingMessageFromQueueItem(item){
     id: item.localId, from: "self", type: "text", text: item.payload.text,
     urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
     replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
-    deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined
+    deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined,
+    taskStatus: item.payload.taskStatus || undefined
   };
 }
 function queueOfflineMessage(deptId, payload){
@@ -2487,6 +2530,7 @@ function doSend(){
   var deptId = STATE.active;
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
+  var wasTask = taskActive;
 
   msgInput.value = "";
   autoGrow();
@@ -2495,6 +2539,8 @@ function doSend(){
   urgentActive = false;
   optUrgent.classList.remove("active");
   composer.classList.remove("urgent-mode");
+  taskActive = false;
+  optTask.classList.remove("active");
   refreshSendState();
 
   var payload = { from: STATE.self, to: deptId, urgent: wasUrgent };
@@ -2503,6 +2549,7 @@ function doSend(){
   var roomTag = roomTagInput.value.trim();
   if(roomTag) payload.roomNumber = roomTag;
   clearRoomTagBar();
+  if(wasTask) payload.taskStatus = "not_started";
   var sendPromise;
   if(attachment && attachment.type === "image"){
     payload.type = "image"; payload.text = text; payload.fileName = attachment.name;

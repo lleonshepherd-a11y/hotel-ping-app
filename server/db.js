@@ -87,6 +87,9 @@ if (!messageColumns.includes('room_number')) {
 if (!messageColumns.includes('read_at')) {
   db.exec('ALTER TABLE messages ADD COLUMN read_at TEXT');
 }
+if (!messageColumns.includes('task_status')) {
+  db.exec('ALTER TABLE messages ADD COLUMN task_status TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS typing_status (

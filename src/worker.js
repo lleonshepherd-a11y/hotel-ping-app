@@ -4,6 +4,7 @@ const DEPT_NAMES = {
   kitchen: "Kitchen", bar: "Bar", housekeeping: "Housekeeping", maintenance: "Maintenance",
 };
 const PIN_RE = /^\d{4,6}$/;
+const TASK_STATUSES = ["not_started", "in_progress", "completed"];
 
 function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
@@ -217,12 +218,12 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -278,6 +279,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completedBy: row.completed_by || undefined,
     broadcastId: row.broadcast_id || undefined,
     roomNumber: row.room_number || undefined,
+    taskStatus: row.task_status || undefined,
   };
 }
 function rowToStaff(row) {
@@ -585,11 +587,12 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber } = body;
+        const { from, to, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
         if (!DEPT_IDS.has(from) || !DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
+        if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return json({ error: "Invalid task status" }, 400);
 
         let filePathOnDisk = null;
         let fileSize = null;
@@ -613,6 +616,7 @@ export default {
           urgent: !!urgent,
           replyToId: replyToId || null,
           roomNumber: roomNumber ? String(roomNumber).trim() : null,
+          taskStatus: taskStatus || null,
         });
 
         return json({ message: rowToMessage(row, from, false) }, 201);
@@ -654,6 +658,21 @@ export default {
         const nextCompleted = !existing.completed_at;
         await env.DB.prepare("UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?")
           .bind(nextCompleted ? new Date().toISOString() : null, nextCompleted ? requester.department_id : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/task-status")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/task-status".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        if (!existing.task_status) return json({ error: "This message isn't tagged as a task" }, 400);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id;
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const bodyIn = await readJsonBody(request);
+        if (!TASK_STATUSES.includes(bodyIn.status)) return json({ error: "Invalid task status" }, 400);
+        await env.DB.prepare("UPDATE messages SET task_status = ? WHERE id = ?").bind(bodyIn.status, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
