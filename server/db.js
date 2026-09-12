@@ -93,6 +93,12 @@ if (!messageColumns.includes('task_status')) {
 if (!messageColumns.includes('group_id')) {
   db.exec('ALTER TABLE messages ADD COLUMN group_id TEXT');
 }
+if (!messageColumns.includes('edited_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN edited_at TEXT');
+}
+if (!messageColumns.includes('mentions')) {
+  db.exec('ALTER TABLE messages ADD COLUMN mentions TEXT');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -121,9 +127,11 @@ if (toDeptCol && toDeptCol.notnull) {
       room_number TEXT,
       read_at TEXT,
       task_status TEXT,
-      group_id TEXT
+      group_id TEXT,
+      edited_at TEXT,
+      mentions TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);

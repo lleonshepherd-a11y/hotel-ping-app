@@ -909,6 +909,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </button>
       </div>
 
+      <div class="reply-preview-bar" id="editBar" hidden>
+        <div class="reply-preview-bar-accent"></div>
+        <div class="reply-preview-bar-body">
+          <div class="reply-preview-bar-name">Editing message</div>
+          <div class="reply-preview-bar-text">Update the text below and send to save your changes</div>
+        </div>
+        <button type="button" class="reply-preview-bar-close" id="editBarClose" aria-label="Cancel edit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
       <div class="composer-locked" id="composerLocked" hidden></div>
 
       <div class="composer" id="composer">
@@ -1256,7 +1267,8 @@ function mapServerMessage(row, self){
     completedBy: row.completedBy || undefined,
     broadcastId: row.broadcastId || undefined,
     roomNumber: row.roomNumber || undefined,
-    taskStatus: row.taskStatus || undefined
+    taskStatus: row.taskStatus || undefined,
+    edited: !!row.editedAt
   };
 }
 
@@ -1553,7 +1565,7 @@ function markRead(deptId){
 }
 
 function openThread(deptId){
-  if(STATE.active !== deptId) clearReplyBar();
+  if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); }
   STATE.active = deptId;
   STATE.activeGroupId = null;
   markRead(deptId);
@@ -1823,6 +1835,30 @@ function clearReplyBar(){
 }
 replyPreviewClose.addEventListener("click", clearReplyBar);
 
+var editBar = document.getElementById("editBar");
+var editBarClose = document.getElementById("editBarClose");
+function showEditBar(m){
+  clearReplyBar();
+  clearRoomTagBar();
+  setTaskActive(false);
+  STATE.editingMessage = m;
+  msgInput.value = m.text || "";
+  autoGrow();
+  refreshSendState();
+  editBar.hidden = false;
+  msgInput.focus();
+}
+function clearEditBar(){
+  STATE.editingMessage = null;
+  editBar.hidden = true;
+}
+editBarClose.addEventListener("click", function(){
+  clearEditBar();
+  msgInput.value = "";
+  autoGrow();
+  refreshSendState();
+});
+
 var roomTagBar = document.getElementById("roomTagBar");
 var roomTagInput = document.getElementById("roomTagInput");
 var roomTagClose = document.getElementById("roomTagClose");
@@ -1870,7 +1906,8 @@ var ACTION_ICONS = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
-  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
 };
 
 function hideMessageActionMenu(){
@@ -1883,6 +1920,7 @@ function showMessageActionMenu(m, x, y){
   var canDelete = !m.deleted && (m.from === "self" || (AUTH.staff && AUTH.staff.isAdmin));
   var rows = [];
   rows.push({ key:"reply", label:"Reply", icon:ACTION_ICONS.reply });
+  if(!m.deleted && m.from === "self" && m.type === "text") rows.push({ key:"edit", label:"Edit", icon:ACTION_ICONS.edit });
   rows.push({ key:"forward", label:"Forward", icon:ACTION_ICONS.forward });
   rows.push({ key:"copy", label:"Copy", icon:ACTION_ICONS.copy });
   rows.push({ key:"pin", label: m.pinned ? "Unpin" : "Pin", icon:ACTION_ICONS.pin });
@@ -1912,6 +1950,7 @@ function showMessageActionMenu(m, x, y){
       var action = btn.getAttribute("data-action");
       hideMessageActionMenu();
       if(action === "reply") showReplyBar(m);
+      else if(action === "edit") showEditBar(m);
       else if(action === "forward") openForwardPicker(m);
       else if(action === "copy") copyMessageContent(m);
       else if(action === "pin") togglePinMessage(m);
@@ -2274,7 +2313,7 @@ function buildMessageRow(m, groupEnd, msgsById){
       meta.appendChild(pendingLabel);
     } else {
       var timeSpan = document.createElement("span");
-      timeSpan.textContent = fmtClock(m.t);
+      timeSpan.textContent = (m.edited ? "Edited · " : "") + fmtClock(m.t);
       var ticks = document.createElement("span");
       ticks.className = "ticks";
       ticks.innerHTML = TICK_SVG;
@@ -2284,7 +2323,7 @@ function buildMessageRow(m, groupEnd, msgsById){
   } else {
     meta.className = "msg-time";
     var timeSpan2 = document.createElement("span");
-    timeSpan2.textContent = fmtClock(m.t);
+    timeSpan2.textContent = (m.edited ? "Edited · " : "") + fmtClock(m.t);
     meta.appendChild(timeSpan2);
   }
   wrap.appendChild(meta);
@@ -2670,7 +2709,26 @@ function flushOfflineQueue(){
 }
 window.addEventListener("online", flushOfflineQueue);
 
+function saveEditedMessage(){
+  var text = msgInput.value.trim();
+  if(!text) return;
+  if(containsProfanity(text)){ blockForLanguage(); return; }
+  var m = STATE.editingMessage;
+  msgInput.value = "";
+  autoGrow();
+  clearEditBar();
+  refreshSendState();
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/edit', 'POST', { text: text }).then(function(res){
+    var msgs = currentMessagesArray();
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    renderThread();
+    showToast("Message updated");
+  }).catch(function(){ showToast("Couldn't save changes"); });
+}
+
 function doSend(){
+  if(STATE.editingMessage) return saveEditedMessage();
   var text = msgInput.value.trim();
   if(!text && !STATE.attachment) return;
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
@@ -3880,6 +3938,7 @@ function openGroupThread(groupId){
   var g = STATE.groups.find(function(x){ return x.id === groupId; });
   if(!g) return;
   clearReplyBar();
+  clearEditBar();
   STATE.active = null;
   STATE.activeGroupId = groupId;
   updateComposerLock();

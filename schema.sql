@@ -29,7 +29,9 @@ CREATE TABLE IF NOT EXISTS messages (
   room_number TEXT,
   read_at TEXT,
   task_status TEXT,
-  group_id TEXT
+  group_id TEXT,
+  edited_at TEXT,
+  mentions TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 

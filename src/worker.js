@@ -217,13 +217,14 @@ async function checkEscalations(env) {
 async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -234,9 +235,10 @@ async function insertMessage(env, ctx, opts) {
   if (opts.groupId) {
     const members = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(opts.groupId).all();
     const others = members.results.map((m) => m.department_id).filter((d) => d !== opts.from);
+    const mentioned = new Set(opts.mentions || []);
     notifyPromise = Promise.all(others.map((deptId) => notifyDepartment(env, deptId, {
       title: DEPT_NAMES[opts.from] || opts.from,
-      body: notifyBody,
+      body: mentioned.has(deptId) ? "🔔 You were mentioned: " + notifyBody : notifyBody,
       url: "/",
       tag: "hotel-ping-group-" + opts.groupId,
       icon: "/avatars/" + opts.from + ".png",
@@ -297,6 +299,8 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     roomNumber: row.room_number || undefined,
     taskStatus: row.task_status || undefined,
     groupId: row.group_id || undefined,
+    editedAt: row.edited_at || undefined,
+    mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
   };
 }
 function rowToStaff(row) {
@@ -711,11 +715,13 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
+        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions } = body;
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
+        let validMembers = null;
         if (groupId) {
-          const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(groupId, from).first();
-          if (!member) return json({ error: "Not a member of this group" }, 403);
+          const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
+          validMembers = new Set(memberRows.results.map((m) => m.department_id));
+          if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);
         } else if (!DEPT_IDS.has(to)) {
           return json({ error: "Unknown department" }, 400);
         }
@@ -723,6 +729,9 @@ export default {
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
         if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return json({ error: "Invalid task status" }, 400);
+        const validMentions = Array.isArray(mentions) && validMembers
+          ? mentions.filter((d) => validMembers.has(d) && d !== from)
+          : [];
 
         let filePathOnDisk = null;
         let fileSize = null;
@@ -747,6 +756,7 @@ export default {
           replyToId: replyToId || null,
           roomNumber: roomNumber ? String(roomNumber).trim() : null,
           taskStatus: taskStatus || null,
+          mentions: validMentions,
         });
 
         return json({ message: rowToMessage(row, from, false) }, 201);
@@ -763,6 +773,22 @@ export default {
         await env.DB.prepare("UPDATE messages SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/edit")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/edit".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        if (existing.from_dept !== requester.department_id) return json({ error: "You can only edit your own messages" }, 403);
+        if (existing.deleted_at) return json({ error: "Can't edit a deleted message" }, 400);
+        if (existing.type !== "text") return json({ error: "Only text messages can be edited" }, 400);
+        const body = await readJsonBody(request);
+        const text = String(body.text || "").trim();
+        if (!text) return json({ error: "Message text is required" }, 400);
+        await env.DB.prepare("UPDATE messages SET body = ?, edited_at = ? WHERE id = ?").bind(text, new Date().toISOString(), id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 
       if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/pin")) {

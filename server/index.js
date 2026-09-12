@@ -78,6 +78,8 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     roomNumber: row.room_number || undefined,
     taskStatus: row.task_status || undefined,
     groupId: row.group_id || undefined,
+    editedAt: row.edited_at || undefined,
+    mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
   };
 }
 function rowToGroup(row, members) {
@@ -103,19 +105,21 @@ function checkEscalations() {
 function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson
   );
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId) {
     const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(opts.groupId);
+    const mentioned = new Set(opts.mentions || []);
     for (const m of members) {
-      if (m.department_id !== opts.from) console.log('[group notify]', m.department_id, 'new message in group', opts.groupId);
+      if (m.department_id !== opts.from) console.log('[group notify]', m.department_id, mentioned.has(m.department_id) ? 'MENTIONED in group' : 'new message in group', opts.groupId);
     }
   }
   return row;
@@ -508,11 +512,13 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus } = body;
+      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions } = body;
       if (!DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
+      let validMembers = null;
       if (groupId) {
-        const member = db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(groupId, from);
-        if (!member) return send(res, 403, { error: 'Not a member of this group' });
+        const memberRows = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(groupId);
+        validMembers = new Set(memberRows.map((m) => m.department_id));
+        if (!validMembers.has(from)) return send(res, 403, { error: 'Not a member of this group' });
       } else if (!DEPT_IDS.has(to)) {
         return send(res, 400, { error: 'Unknown department' });
       }
@@ -520,6 +526,9 @@ const server = http.createServer(async (req, res) => {
       if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
       if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return send(res, 400, { error: 'Invalid task status' });
+      const validMentions = Array.isArray(mentions) && validMembers
+        ? mentions.filter((d) => validMembers.has(d) && d !== from)
+        : [];
 
       let filePathOnDisk = null;
       let fileSize = null;
@@ -542,6 +551,7 @@ const server = http.createServer(async (req, res) => {
         replyToId: replyToId || null,
         roomNumber: roomNumber ? String(roomNumber).trim() : null,
         taskStatus: taskStatus || null,
+        mentions: validMentions,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
@@ -557,6 +567,24 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/edit')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/edit'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      const requester = staffFromToken(req);
+      if (existing.from_dept !== requester.department_id) {
+        return send(res, 403, { error: 'You can only edit your own messages' });
+      }
+      if (existing.deleted_at) return send(res, 400, { error: "Can't edit a deleted message" });
+      if (existing.type !== 'text') return send(res, 400, { error: 'Only text messages can be edited' });
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim();
+      if (!text) return send(res, 400, { error: 'Message text is required' });
+      db.prepare('UPDATE messages SET body = ?, edited_at = ? WHERE id = ?').run(text, new Date().toISOString(), id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/pin')) {
