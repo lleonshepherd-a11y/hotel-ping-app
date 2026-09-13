@@ -330,6 +330,9 @@ if (!staffColumns.includes('profile_complete')) {
   db.exec('ALTER TABLE staff ADD COLUMN profile_complete INTEGER NOT NULL DEFAULT 0');
   db.exec('UPDATE staff SET profile_complete = 1');
 }
+if (!staffColumns.includes('status_line')) {
+  db.exec('ALTER TABLE staff ADD COLUMN status_line TEXT');
+}
 
 const DEPARTMENTS = [
   { id: 'gm', name: 'General Manager', contact: 'Dave' },

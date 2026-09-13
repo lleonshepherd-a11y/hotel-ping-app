@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS staff (
   pin_salt TEXT NOT NULL,
   is_admin INTEGER NOT NULL DEFAULT 0,
   profile_complete INTEGER NOT NULL DEFAULT 0,
+  status_line TEXT,
   created_at TEXT NOT NULL
 );
 

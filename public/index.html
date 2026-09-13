@@ -433,6 +433,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-profile-info{flex:1;min-width:0}
 .sb-profile-name{display:block;font-size:14.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-profile-role{display:block;font-size:12px;color:var(--text-dim);margin-top:1px}
+.sb-profile-status{display:block;font-size:11.5px;color:var(--accent);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dept-photo-preview svg{width:34px;height:34px}
 .dept-photo-remove-btn{background:var(--surface-3);color:#c0392b;margin-top:8px}
 
@@ -1093,6 +1094,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <span class="sb-profile-info">
         <span class="sb-profile-name" id="myProfileName">—</span>
         <span class="sb-profile-role" id="myProfileRole">—</span>
+        <span class="sb-profile-status" id="myProfileStatus" hidden></span>
       </span>
       <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
     </button>
@@ -1678,7 +1680,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
     <form class="admin-add-form" id="myProfileNameForm" style="margin-top:14px">
       <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
-      <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save name</button>
+      <input type="text" id="myProfileStatusInput" placeholder="Status, e.g. Back at 6pm (optional)" maxlength="60">
+      <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save</button>
     </form>
     <p class="broadcast-hint" id="myProfileNameHint" hidden style="margin-top:14px">You're viewing as this department, but this only renames your own account (<b id="myProfileNameHintWho"></b>). To rename someone else, use <b>Manage staff</b> instead — tap their name in that list.</p>
     <div class="admin-add-error" id="deptPhotoError"></div>
@@ -4838,8 +4841,10 @@ var myProfileBtn = document.getElementById("myProfileBtn");
 var myProfileAvatar = document.getElementById("myProfileAvatar");
 var myProfileName = document.getElementById("myProfileName");
 var myProfileRole = document.getElementById("myProfileRole");
+var myProfileStatus = document.getElementById("myProfileStatus");
 var myProfileNameForm = document.getElementById("myProfileNameForm");
 var myProfileNameInput = document.getElementById("myProfileNameInput");
+var myProfileStatusInput = document.getElementById("myProfileStatusInput");
 var myProfileNameSaveBtn = document.getElementById("myProfileNameSaveBtn");
 function renderDeptPhotoPreview(){
   var meta = DEPT_META[STATE.self];
@@ -4859,12 +4864,15 @@ function renderMyProfileCard(){
   myProfileAvatar.innerHTML = avatarInnerHtml(STATE.self);
   myProfileName.textContent = AUTH.staff.name;
   myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
+  myProfileStatus.hidden = !AUTH.staff.statusLine;
+  myProfileStatus.textContent = AUTH.staff.statusLine || "";
 }
 var myProfileNameHint = document.getElementById("myProfileNameHint");
 var myProfileNameHintWho = document.getElementById("myProfileNameHintWho");
 function openMyProfileOverlay(){
   deptPhotoError.textContent = "";
   myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
+  myProfileStatusInput.value = AUTH.staff && AUTH.staff.statusLine ? AUTH.staff.statusLine : "";
   var impersonating = AUTH.staff && STATE.self !== AUTH.staff.departmentId;
   myProfileNameForm.hidden = impersonating;
   myProfileNameHint.hidden = !impersonating;
@@ -4883,16 +4891,17 @@ myProfileNameForm.addEventListener("submit", function(e){
   if(!name) return;
   deptPhotoError.textContent = "";
   myProfileNameSaveBtn.disabled = true;
-  apiSend('/api/profile', 'PATCH', { name: name }).then(function(res){
+  apiSend('/api/profile', 'PATCH', { name: name, statusLine: myProfileStatusInput.value.trim() }).then(function(res){
     AUTH.staff.name = res.staff.name;
+    AUTH.staff.statusLine = res.staff.statusLine;
     renderMyProfileCard();
     msgInput.placeholder = "Message as " + AUTH.staff.name + " (" + (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "") + ")…";
     return loadStaffMeta();
   }).then(function(){
     renderList();
-    showToast("Name updated");
+    showToast("Profile updated");
   }).catch(function(err){
-    deptPhotoError.textContent = err.message || "Couldn't update your name.";
+    deptPhotoError.textContent = err.message || "Couldn't update your profile.";
   }).finally(function(){ myProfileNameSaveBtn.disabled = false; });
 });
 /* ---- Photo crop/zoom editor (used for profile photo uploads) ---- */
