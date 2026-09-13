@@ -480,7 +480,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .story-viewer-sub{color:rgba(255,255,255,.6);font-size:11.5px}
 .story-viewer-delete,.story-viewer-close{background:none;border:none;color:#fff;opacity:.85;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .story-viewer-delete svg,.story-viewer-close svg{width:19px;height:19px}
-.story-viewer-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
+.story-viewer-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 .story-viewer-img{max-width:100%;max-height:100%;object-fit:contain}
 .story-viewer-tap{position:absolute;top:0;bottom:0;width:35%}
 .story-viewer-tap-left{left:0}
@@ -1806,7 +1806,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
   </div>
-  <div class="story-viewer-stage">
+  <div class="story-viewer-stage" id="storyViewerStage">
     <div class="story-viewer-tap story-viewer-tap-left" id="storyTapLeft"></div>
     <div class="story-viewer-tap story-viewer-tap-right" id="storyTapRight"></div>
     <img class="story-viewer-img" id="storyViewerImg" alt="">
@@ -5260,8 +5260,11 @@ var storyViewerClose = document.getElementById("storyViewerClose");
 var storyViewerDelete = document.getElementById("storyViewerDelete");
 var storyTapLeft = document.getElementById("storyTapLeft");
 var storyTapRight = document.getElementById("storyTapRight");
+var storyViewerStage = document.getElementById("storyViewerStage");
 var STORY_DURATION_MS = 5000;
 var storyViewState = null;
+var storyHoldTimer = null;
+var storySuppressClick = false;
 
 function storyReelOrder(){
   var grouped = storiesByDept();
@@ -5315,7 +5318,26 @@ function renderStoryFrame(){
     apiSend('/api/stories/' + encodeURIComponent(story.id) + '/view', 'POST', {}).catch(function(){});
   }
 
+  storyViewState.paused = false;
+  storyViewState.remainingMs = STORY_DURATION_MS;
+  storyViewState.segStartedAt = Date.now();
   storyViewState.timer = setTimeout(function(){ storyAdvance(1); }, STORY_DURATION_MS);
+}
+function pauseStoryProgress(){
+  if(!storyViewState || storyViewState.paused) return;
+  storyViewState.paused = true;
+  if(storyViewState.timer){ clearTimeout(storyViewState.timer); storyViewState.timer = null; }
+  storyViewState.remainingMs = Math.max(storyViewState.remainingMs - (Date.now() - storyViewState.segStartedAt), 0);
+  var activeFill = storyProgressRow.querySelector(".story-progress-seg.active .story-progress-fill");
+  if(activeFill) activeFill.style.animationPlayState = "paused";
+}
+function resumeStoryProgress(){
+  if(!storyViewState || !storyViewState.paused) return;
+  storyViewState.paused = false;
+  storyViewState.segStartedAt = Date.now();
+  var activeFill = storyProgressRow.querySelector(".story-progress-seg.active .story-progress-fill");
+  if(activeFill) activeFill.style.animationPlayState = "running";
+  storyViewState.timer = setTimeout(function(){ storyAdvance(1); }, storyViewState.remainingMs);
 }
 function storyAdvance(dir){
   if(!storyViewState) return;
@@ -5342,8 +5364,22 @@ function closeStoryViewer(){
   renderStoriesRow();
 }
 storyViewerClose.addEventListener("click", closeStoryViewer);
-storyTapLeft.addEventListener("click", function(){ storyAdvance(-1); });
-storyTapRight.addEventListener("click", function(){ storyAdvance(1); });
+storyTapLeft.addEventListener("click", function(){ if(storySuppressClick){ storySuppressClick = false; return; } storyAdvance(-1); });
+storyTapRight.addEventListener("click", function(){ if(storySuppressClick){ storySuppressClick = false; return; } storyAdvance(1); });
+storyViewerStage.addEventListener("pointerdown", function(){
+  clearTimeout(storyHoldTimer);
+  storyHoldTimer = setTimeout(function(){
+    pauseStoryProgress();
+    storySuppressClick = true;
+  }, 180);
+});
+function endStoryHold(){
+  clearTimeout(storyHoldTimer);
+  if(storyViewState && storyViewState.paused) resumeStoryProgress();
+}
+storyViewerStage.addEventListener("pointerup", endStoryHold);
+storyViewerStage.addEventListener("pointercancel", endStoryHold);
+storyViewerStage.addEventListener("pointerleave", endStoryHold);
 storyViewerDelete.addEventListener("click", function(){
   if(!storyViewState) return;
   var reel = currentReel();
