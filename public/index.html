@@ -196,6 +196,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   display:flex;align-items:center;gap:12px;
   padding:10px 10px;border-radius:15px;border:1px solid var(--outline-soft);background:none;width:100%;text-align:left;color:inherit;
   transition:background .12s ease,transform .1s ease,border-color .12s ease;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:pan-y;
 }
 .thread-item:hover{background:var(--surface-3)}
 .thread-item.active{background:var(--active-tint);border-color:rgba(148,222,184,.5)}
@@ -406,6 +407,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 .signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
 .dept-photo-preview{width:96px;height:96px;border-radius:50%;margin:4px auto 16px;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center}
+.sb-profile-card{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:12px 14px;background:var(--surface-2);border-radius:16px;border:none;width:calc(100% - 40px);text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sb-profile-avatar{width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.sb-profile-avatar svg{width:20px;height:20px}
+.sb-profile-info{flex:1;min-width:0}
+.sb-profile-name{display:block;font-size:14.5px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-profile-role{display:block;font-size:12px;color:var(--text-dim);margin-top:1px}
 .dept-photo-preview svg{width:34px;height:34px}
 .dept-photo-remove-btn{background:var(--surface-3);color:#c0392b;margin-top:8px}
 
@@ -1052,6 +1059,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </div>
     </div>
 
+    <button class="sb-profile-card" id="myProfileBtn" type="button">
+      <span class="sb-profile-avatar" id="myProfileAvatar"></span>
+      <span class="sb-profile-info">
+        <span class="sb-profile-name" id="myProfileName">—</span>
+        <span class="sb-profile-role" id="myProfileRole">—</span>
+      </span>
+      <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+    </button>
+
     <div class="sb-missed" id="missedWrap">
       <div class="missed-inline-box" id="missedMsgBox">
         <div class="missed-inline-head">
@@ -1595,16 +1611,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 <div class="admin-overlay" id="deptPhotoOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
-      <h2>Department photo</h2>
+      <h2>Your profile</h2>
       <button class="admin-close" id="deptPhotoClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <p class="broadcast-hint">Replace the icon with a real photo of your head of department. Shown across chats, everyone will see it instead of the icon.</p>
+    <p class="broadcast-hint">Change the photo and name shown across chats. Anyone on your team can update it — the General Manager controls who's allowed on the app at all.</p>
     <div class="dept-photo-preview" id="deptPhotoPreview"></div>
     <input type="file" accept="image/*" id="deptPhotoFileInput" hidden>
     <button type="button" class="admin-add-btn" id="deptPhotoUploadBtn">Upload photo</button>
     <button type="button" class="admin-add-btn dept-photo-remove-btn" id="deptPhotoRemoveBtn" hidden>Remove photo</button>
+    <form class="admin-add-form" id="myProfileNameForm" style="margin-top:14px">
+      <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
+      <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save name</button>
+    </form>
     <div class="admin-add-error" id="deptPhotoError"></div>
   </div>
 </div>
@@ -3382,6 +3402,7 @@ function switchSelf(id){
   STATE.self = id;
   STATE.loading = true;
   renderSwitcher();
+  renderMyProfileCard();
   updateComposerLock();
   Promise.all([buildData(id), loadMutedList()]).then(function(results){
     STATE.data = results[0];
@@ -4178,6 +4199,7 @@ function boot(){
     var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
     STATE.active = order[0];
     renderSwitcher();
+    renderMyProfileCard();
     updateComposerLock();
     markRead(STATE.active);
     renderList();
@@ -4742,6 +4764,13 @@ var deptPhotoFileInput = document.getElementById("deptPhotoFileInput");
 var deptPhotoUploadBtn = document.getElementById("deptPhotoUploadBtn");
 var deptPhotoRemoveBtn = document.getElementById("deptPhotoRemoveBtn");
 var deptPhotoError = document.getElementById("deptPhotoError");
+var myProfileBtn = document.getElementById("myProfileBtn");
+var myProfileAvatar = document.getElementById("myProfileAvatar");
+var myProfileName = document.getElementById("myProfileName");
+var myProfileRole = document.getElementById("myProfileRole");
+var myProfileNameForm = document.getElementById("myProfileNameForm");
+var myProfileNameInput = document.getElementById("myProfileNameInput");
+var myProfileNameSaveBtn = document.getElementById("myProfileNameSaveBtn");
 function renderDeptPhotoPreview(){
   var meta = DEPT_META[STATE.self];
   if(meta && meta.photoUrl){
@@ -4754,14 +4783,46 @@ function renderDeptPhotoPreview(){
     deptPhotoRemoveBtn.hidden = true;
   }
 }
+function renderMyProfileCard(){
+  if(!AUTH.staff) return;
+  myProfileAvatar.setAttribute("style", avatarStyleAttr(STATE.self));
+  myProfileAvatar.innerHTML = avatarInnerHtml(STATE.self);
+  myProfileName.textContent = AUTH.staff.name;
+  myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
+}
+myProfileBtn.addEventListener("click", function(){
+  deptPhotoError.textContent = "";
+  myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
+  renderDeptPhotoPreview();
+  deptPhotoOverlay.hidden = false;
+});
 deptPhotoBtn.addEventListener("click", function(){
   deptPhotoError.textContent = "";
+  myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
   renderDeptPhotoPreview();
   deptPhotoOverlay.hidden = false;
 });
 deptPhotoClose.addEventListener("click", function(){ deptPhotoOverlay.hidden = true; });
 deptPhotoOverlay.addEventListener("click", function(e){ if(e.target === deptPhotoOverlay) deptPhotoOverlay.hidden = true; });
 deptPhotoUploadBtn.addEventListener("click", function(){ deptPhotoFileInput.click(); });
+myProfileNameForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var name = myProfileNameInput.value.trim();
+  if(!name) return;
+  deptPhotoError.textContent = "";
+  myProfileNameSaveBtn.disabled = true;
+  apiSend('/api/profile', 'PATCH', { name: name }).then(function(res){
+    AUTH.staff.name = res.staff.name;
+    renderMyProfileCard();
+    msgInput.placeholder = "Message as " + AUTH.staff.name + " (" + (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "") + ")…";
+    return loadStaffMeta();
+  }).then(function(){
+    renderList();
+    showToast("Name updated");
+  }).catch(function(err){
+    deptPhotoError.textContent = err.message || "Couldn't update your name.";
+  }).finally(function(){ myProfileNameSaveBtn.disabled = false; });
+});
 deptPhotoFileInput.addEventListener("change", function(){
   var file = deptPhotoFileInput.files[0];
   deptPhotoFileInput.value = "";
@@ -4773,6 +4834,7 @@ deptPhotoFileInput.addEventListener("change", function(){
   }).then(function(res){
     DEPT_META[STATE.self] = res.department;
     renderDeptPhotoPreview();
+    renderMyProfileCard();
     renderList();
     renderHeader();
     renderSwitcher();
@@ -4787,6 +4849,7 @@ deptPhotoRemoveBtn.addEventListener("click", function(){
   apiDelete('/api/departments/' + encodeURIComponent(STATE.self) + '/photo').then(function(res){
     DEPT_META[STATE.self] = res.department;
     renderDeptPhotoPreview();
+    renderMyProfileCard();
     renderList();
     renderHeader();
     renderSwitcher();
