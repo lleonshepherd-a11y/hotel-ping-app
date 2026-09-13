@@ -786,7 +786,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #newEventName{flex:1;min-width:0;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13.5px;background:var(--surface-2)}
 .event-list{display:flex;flex-direction:column;gap:12px;padding:0 20px 20px}
 .event-empty{font-size:12.5px;color:var(--text-faint);text-align:center;padding:20px 0}
-.event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .18s cubic-bezier(.32,1.4,.4,1),background .18s ease}
+.event-card{border-radius:16px;background:var(--surface-2);padding:14px;transition:box-shadow .18s cubic-bezier(.32,1.4,.4,1),background .18s ease;cursor:pointer}
 .event-card.drag-over{background:rgba(47,174,106,.14);box-shadow:0 0 0 2px var(--accent)}
 .event-card.landed{animation:eventCardLanded .4s cubic-bezier(.32,1.4,.4,1)}
 @keyframes eventCardLanded{
@@ -829,8 +829,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card.dragging{opacity:.4;transition:opacity .15s ease}
 .event-chip.pressing,.event-member-chip.pressing{transform:scale(.9);transition:transform .1s ease}
 .event-card.pressing{transform:scale(.98);transition:transform .1s ease}
-.event-card-details{border:none;background:none;color:var(--text-faint);display:flex;align-items:center;padding:4px 4px}
-.event-card-details svg{width:16px;height:16px}
 
 .event-detail-modal{width:560px}
 .event-detail-loading{padding:30px 4px;text-align:center;color:var(--text-faint);font-size:13px}

@@ -4532,9 +4532,6 @@ function renderEventList(){
         '<div class="event-card-actions">'+
           (canManage && isEmpty ? '<button type="button" class="event-card-end event-card-delete" data-group-id="'+g.id+'">Delete</button>' : '')+
           (canManage && !isEmpty ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
-          '<button type="button" class="event-card-details" data-group-id="'+g.id+'" title="Event details">'+
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/></svg>'+
-          '</button>'+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
@@ -4544,7 +4541,10 @@ function renderEventList(){
       (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
     eventList.appendChild(card);
 
-    card.querySelector(".event-card-details").addEventListener("click", function(e){ e.stopPropagation(); openEventDetail(g.id); });
+    card.addEventListener("click", function(e){
+      if(e.target.closest(".event-card-open, .event-card-end, .event-card-delete, .event-member-chip")) return;
+      openEventDetail(g.id);
+    });
     card.querySelectorAll(".event-member-chip").forEach(function(chip){
       var deptId = chip.getAttribute("data-dept-id");
       attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true, dropLabel: "Drop to remove" });
@@ -4555,7 +4555,7 @@ function renderEventList(){
     if(canManage && !isEmpty){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); archiveEvent(g.id); });
     }
-    card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
+    card.querySelector(".event-card-open").addEventListener("click", function(e){ e.stopPropagation(); openGroupThread(g.id); });
   });
 
   pastEventsLabel.hidden = !past.length;
@@ -4585,10 +4585,14 @@ function renderEventList(){
       '<div class="event-card-members">'+membersHtml+'</div>'+
       (canShare ? '<div class="event-card-hint">Only you can see this. Share to give every department head access.</div>' : '');
     pastEventList.appendChild(card);
+    card.addEventListener("click", function(e){
+      if(e.target.closest(".event-card-open, .event-card-end, .event-member-chip")) return;
+      openEventDetail(g.id);
+    });
     if(canShare){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); shareEvent(g.id); });
     }
-    card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
+    card.querySelector(".event-card-open").addEventListener("click", function(e){ e.stopPropagation(); openGroupThread(g.id); });
   });
 }
 
