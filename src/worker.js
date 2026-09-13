@@ -422,6 +422,13 @@ async function staffFromToken(env, request) {
   return staff || null;
 }
 
+// Admins can VIEW another department's conversations ("Viewing as"), but nobody -
+// admin included - may act or read AS a department they aren't signed in as unless
+// this explicitly allows it. Never trust a "self"/"from" field on its own.
+function canViewAsSelf(requester, self) {
+  return self === requester.department_id || !!requester.is_admin;
+}
+
 async function ensureSeeded(env) {
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM staff").first();
   if (count && count.n > 0) return;
@@ -535,19 +542,21 @@ export default {
         const pin = String(body.pin || "");
         if (!name || !pin) return json({ error: "Name and PIN are required" }, 400);
 
+        const LOCKOUT_WINDOW_MS = 5 * 60 * 1000;
         const attemptKey = name.toLowerCase();
         const attempt = await env.DB.prepare("SELECT * FROM login_attempts WHERE key = ?").bind(attemptKey).first();
-        if (attempt && attempt.count >= 5 && Date.now() - Date.parse(attempt.first_at) < 5 * 60 * 1000) {
+        const windowExpired = attempt && (Date.now() - Date.parse(attempt.first_at) >= LOCKOUT_WINDOW_MS);
+        if (attempt && !windowExpired && attempt.count >= 5) {
           return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
         }
 
         const staff = await env.DB.prepare("SELECT * FROM staff WHERE LOWER(name) = LOWER(?)").bind(name).first();
         const ok = staff && (await hashPin(pin, staff.pin_salt)) === staff.pin_hash;
         if (!ok) {
-          if (attempt) {
+          if (attempt && !windowExpired) {
             await env.DB.prepare("UPDATE login_attempts SET count = ? WHERE key = ?").bind(attempt.count + 1, attemptKey).run();
           } else {
-            await env.DB.prepare("INSERT INTO login_attempts (key, count, first_at) VALUES (?, 1, ?)").bind(attemptKey, new Date().toISOString()).run();
+            await env.DB.prepare("INSERT OR REPLACE INTO login_attempts (key, count, first_at) VALUES (?, 1, ?)").bind(attemptKey, new Date().toISOString()).run();
           }
           return json({ error: "Incorrect name or PIN" }, 401);
         }
@@ -744,6 +753,7 @@ export default {
       if (method === "GET" && p === "/api/conversations") {
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const others = Array.from(DEPT_IDS).filter((id) => id !== self);
         const conversations = [];
         for (const other of others) {
@@ -771,6 +781,7 @@ export default {
         const self = url.searchParams.get("self");
         const other = url.searchParams.get("with");
         if (!DEPT_IDS.has(self) || !DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
         ).bind(self, other, other, self).all();
@@ -921,6 +932,7 @@ export default {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/messages".length));
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const group = await env.DB.prepare("SELECT archived_at, shared_at FROM groups WHERE id = ?").bind(id).first();
         if (!request._staff.is_admin) {
           if (group && group.archived_at) {
@@ -959,6 +971,7 @@ export default {
       if (method === "POST" && p === "/api/messages/read") {
         const body = await readJsonBody(request);
         if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, body.self)) return json({ error: "You can only mark your own department's messages as read" }, 403);
         await env.DB.prepare(`UPDATE messages SET status = 'read', read_at = ? WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).bind(new Date().toISOString(), body.self, body.with).run();
         return json({ ok: true });
       }
@@ -1015,6 +1028,7 @@ export default {
         const body = await readJsonBody(request);
         const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
+        if (from !== request._staff.department_id) return json({ error: "You can only send messages as your own department" }, 403);
         let validMembers = null;
         if (groupId) {
           const group = await env.DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(groupId).first();
@@ -1289,6 +1303,7 @@ export default {
       if (method === "GET" && p === "/api/muted") {
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's settings" }, 403);
         const rows = await env.DB.prepare("SELECT other_dept_id FROM muted_conversations WHERE department_id = ?").bind(self).all();
         return json({ muted: rows.results.map((r) => r.other_dept_id) });
       }

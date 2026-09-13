@@ -272,6 +272,13 @@ function staffFromToken(req) {
   return staff || null;
 }
 
+// Admins can VIEW another department's conversations ("Viewing as"), but nobody -
+// admin included - may act or read AS a department they aren't signed in as unless
+// this explicitly allows it. Never trust a "self"/"from" field on its own.
+function canViewAsSelf(requester, self) {
+  return self === requester.department_id || !!requester.is_admin;
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, '');
   const url = new URL(req.url, 'http://localhost');
@@ -362,16 +369,18 @@ const server = http.createServer(async (req, res) => {
       const pin = String(body.pin || '');
       if (!name || !pin) return send(res, 400, { error: 'Name and PIN are required' });
 
+      const LOCKOUT_WINDOW_MS = 5 * 60 * 1000;
       const attemptKey = (req.socket.remoteAddress || 'unknown') + '|' + name.toLowerCase();
       const attempt = loginAttempts.get(attemptKey);
-      if (attempt && attempt.count >= 5 && Date.now() - attempt.first < 5 * 60 * 1000) {
+      const windowExpired = attempt && (Date.now() - attempt.first >= LOCKOUT_WINDOW_MS);
+      if (attempt && !windowExpired && attempt.count >= 5) {
         return send(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       }
 
       const staff = db.prepare('SELECT * FROM staff WHERE LOWER(name) = LOWER(?)').get(name);
       const ok = staff && hashPin(pin, staff.pin_salt) === staff.pin_hash;
       if (!ok) {
-        const next = attempt ? { count: attempt.count + 1, first: attempt.first } : { count: 1, first: Date.now() };
+        const next = (attempt && !windowExpired) ? { count: attempt.count + 1, first: attempt.first } : { count: 1, first: Date.now() };
         loginAttempts.set(attemptKey, next);
         return send(res, 401, { error: 'Incorrect name or PIN' });
       }
@@ -541,6 +550,7 @@ const server = http.createServer(async (req, res) => {
       const self = url.searchParams.get('self');
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
+      if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
       return send(res, 200, { conversations: getConversations(self, requester.is_admin) });
     }
 
@@ -549,6 +559,7 @@ const server = http.createServer(async (req, res) => {
       const other = url.searchParams.get('with');
       if (!DEPT_IDS.has(self) || !DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
+      if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
       const rows = db.prepare(`
         SELECT * FROM messages
         WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?)
@@ -694,6 +705,7 @@ const server = http.createServer(async (req, res) => {
       const self = url.searchParams.get('self');
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
+      if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
       const group = db.prepare('SELECT archived_at, shared_at FROM groups WHERE id = ?').get(id);
       if (!requester.is_admin) {
         if (group && group.archived_at) {
@@ -791,6 +803,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p === '/api/messages/read') {
       const body = await readJsonBody(req);
       if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return send(res, 400, { error: 'Unknown department' });
+      const readRequester = staffFromToken(req);
+      if (!canViewAsSelf(readRequester, body.self)) return send(res, 403, { error: "You can only mark your own department's messages as read" });
       markThreadRead(body.self, body.with);
       return send(res, 200, { ok: true });
     }
@@ -799,6 +813,8 @@ const server = http.createServer(async (req, res) => {
       const body = await readJsonBody(req);
       const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
       if (!DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
+      const sendRequester = staffFromToken(req);
+      if (from !== sendRequester.department_id) return send(res, 403, { error: 'You can only send messages as your own department' });
       let validMembers = null;
       if (groupId) {
         const group = db.prepare('SELECT archived_at FROM groups WHERE id = ?').get(groupId);
@@ -1069,6 +1085,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/muted') {
       const self = url.searchParams.get('self');
       if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const mutedRequester = staffFromToken(req);
+      if (!canViewAsSelf(mutedRequester, self)) return send(res, 403, { error: "You can only view your own department's settings" });
       const rows = db.prepare('SELECT other_dept_id FROM muted_conversations WHERE department_id = ?').all(self);
       return send(res, 200, { muted: rows.map((r) => r.other_dept_id) });
     }
