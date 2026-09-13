@@ -384,7 +384,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bubble.mentioned-for-me{box-shadow:0 0 0 2px #ff9f0a}
 .room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
 .task-msg-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px 3px 7px;border-radius:20px;margin-bottom:5px;border:none;color:var(--text-dim);background:var(--surface-3)}
-.task-msg-tag.in_progress{color:var(--accent);background:rgba(47,174,106,.12)}
+.task-msg-tag.in_progress{color:#3b82c4;background:rgba(59,130,196,.14)}
 .task-msg-tag.completed{color:#2f9a5c;background:rgba(47,154,92,.12)}
 .task-msg-tag svg{width:11px;height:11px}
 .task-msg-tag.readonly{cursor:default;opacity:.85}
@@ -835,7 +835,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-pin-btn svg{width:11px;height:11px}
 .maint-pin-btn.pinned{background:rgba(255,159,10,.18);color:#ff9f0a}
 .maint-card.status-reported{border-left-color:#e0902c}
-.maint-card.status-in_progress{border-left-color:var(--accent)}
+.maint-card.status-in_progress{border-left-color:#3b82c4}
 .maint-card.status-fixed{border-left-color:#2f9a5c}
 .maint-card-top{display:flex;align-items:center;gap:9px;margin-bottom:6px}
 .maint-card-thumb{width:38px;height:38px;border-radius:8px;object-fit:cover;flex:none;background:#000;cursor:pointer}
@@ -863,7 +863,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guests-header-icon svg{width:15px;height:15px}
 .guests-feed{display:flex;flex-direction:column;gap:7px;padding:4px 20px 20px}
 .guest-card{position:relative;background:var(--surface-2);border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid #e0902c}
-.guest-card.status-in_progress{border-left-color:var(--accent)}
+.guest-card.status-in_progress{border-left-color:#3b82c4}
 .guest-card.status-completed{border-left-color:#2f9a5c;opacity:.88}
 .guest-card.pinned{box-shadow:0 0 0 2px rgba(184,151,92,.55),0 1px 3px rgba(0,0,0,.08)}
 .guest-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:rgba(184,151,92,.18);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#b8975c;cursor:pointer}
@@ -873,7 +873,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guest-card-room{font-size:10px;font-weight:800;color:#b8975c}
 .guest-status-pill{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .guest-status-pill.status-new{background:rgba(224,144,44,.14);color:#b5701f}
-.guest-status-pill.status-in_progress{background:rgba(47,174,106,.12);color:var(--accent)}
+.guest-status-pill.status-in_progress{background:rgba(59,130,196,.14);color:#3b82c4}
 .guest-status-pill.status-completed{background:rgba(47,154,92,.14);color:#2f9a5c}
 .guest-card-desc{font-size:13px;line-height:1.3;color:var(--text);margin-bottom:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .guest-card-meta{font-size:10px;color:var(--text-faint);margin-bottom:6px}
@@ -896,7 +896,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ticket-detail-meta{font-size:12px;color:var(--text-faint);margin-bottom:16px}
 .ticket-detail-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;margin-bottom:14px}
 .ticket-detail-status.status-reported{background:rgba(224,144,44,.14);color:#b5701f}
-.ticket-detail-status.status-in_progress{background:rgba(47,174,106,.12);color:var(--accent)}
+.ticket-detail-status.status-in_progress{background:rgba(59,130,196,.14);color:#3b82c4}
 .ticket-detail-status.status-fixed{background:rgba(47,154,92,.14);color:#2f9a5c}
 .ticket-detail-actions{display:flex;gap:8px;margin-bottom:4px}
 .ticket-detail-delete{display:block;width:100%;border:none;background:none;color:var(--urgent);font-size:12.5px;font-weight:700;padding:10px 0 2px;cursor:pointer}
@@ -1645,7 +1645,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <p class="broadcast-hint">Change the photo and name shown across chats. Anyone on your team can update it — the General Manager controls who's allowed on the app at all.</p>
+    <p class="broadcast-hint">Change the photo and name shown across chats. Anyone on your team can update it. The General Manager controls who's allowed on the app at all.</p>
     <button type="button" class="dept-photo-preview-wrap" id="deptPhotoPreviewWrap" aria-label="Change photo">
       <div class="dept-photo-preview" id="deptPhotoPreview"></div>
       <span class="dept-photo-cam-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13.3" r="3.6"/></svg></span>
@@ -4939,24 +4939,51 @@ function closePhotoCropper(){
   photoCropImg.src = "";
   cropState = null;
 }
-var cropDragging = false, cropPointerId = null, cropDragStartX = 0, cropDragStartY = 0, cropStartOffX = 0, cropStartOffY = 0;
+var cropPointers = {};
+var cropPanStart = null;
+var cropPinchStart = null;
+function cropPointerArray(){ return Object.keys(cropPointers).map(function(k){ return cropPointers[k]; }); }
+function cropDist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y); }
 photoCropStage.addEventListener("pointerdown", function(e){
   if(!cropState) return;
-  cropDragging = true;
-  cropPointerId = e.pointerId;
-  cropDragStartX = e.clientX; cropDragStartY = e.clientY;
-  cropStartOffX = cropState.offsetX; cropStartOffY = cropState.offsetY;
-  photoCropStage.setPointerCapture(cropPointerId);
+  try{ photoCropStage.setPointerCapture(e.pointerId); }catch(err){}
+  cropPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var pts = cropPointerArray();
+  if(pts.length === 1){
+    cropPanStart = { x: e.clientX, y: e.clientY, offX: cropState.offsetX, offY: cropState.offsetY };
+    cropPinchStart = null;
+  } else if(pts.length === 2){
+    cropPinchStart = { dist: cropDist(pts[0], pts[1]), zoom: cropState.zoom };
+    cropPanStart = null;
+  }
 });
 photoCropStage.addEventListener("pointermove", function(e){
-  if(!cropDragging || e.pointerId !== cropPointerId || !cropState) return;
-  cropState.offsetX = cropStartOffX + (e.clientX - cropDragStartX);
-  cropState.offsetY = cropStartOffY + (e.clientY - cropDragStartY);
-  applyCropTransform();
+  if(!cropState || !cropPointers[e.pointerId]) return;
+  cropPointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+  var pts = cropPointerArray();
+  if(pts.length === 2 && cropPinchStart){
+    var ratio = cropDist(pts[0], pts[1]) / cropPinchStart.dist;
+    cropState.zoom = Math.max(1, Math.min(2.5, cropPinchStart.zoom * ratio));
+    photoCropZoom.value = Math.round(cropState.zoom * 100);
+    applyCropTransform();
+  } else if(pts.length === 1 && cropPanStart){
+    cropState.offsetX = cropPanStart.offX + (e.clientX - cropPanStart.x);
+    cropState.offsetY = cropPanStart.offY + (e.clientY - cropPanStart.y);
+    applyCropTransform();
+  }
 });
-function endCropDrag(e){ if(e.pointerId !== cropPointerId) return; cropDragging = false; }
-photoCropStage.addEventListener("pointerup", endCropDrag);
-photoCropStage.addEventListener("pointercancel", endCropDrag);
+function endCropPointer(e){
+  delete cropPointers[e.pointerId];
+  var pts = cropPointerArray();
+  if(pts.length === 1 && cropState){
+    cropPanStart = { x: pts[0].x, y: pts[0].y, offX: cropState.offsetX, offY: cropState.offsetY };
+    cropPinchStart = null;
+  } else if(pts.length === 0){
+    cropPanStart = null; cropPinchStart = null;
+  }
+}
+photoCropStage.addEventListener("pointerup", endCropPointer);
+photoCropStage.addEventListener("pointercancel", endCropPointer);
 photoCropZoom.addEventListener("input", function(){
   if(!cropState) return;
   cropState.zoom = photoCropZoom.value / 100;
