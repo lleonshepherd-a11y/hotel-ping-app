@@ -230,12 +230,16 @@ async function insertMessage(env, ctx, opts) {
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
+    opts.signoff ? opts.signoff.title : null,
+    opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
+    opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+    opts.signoff ? "pending" : null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -346,6 +350,14 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     groupId: row.group_id || undefined,
     editedAt: row.edited_at || undefined,
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
+    signoff: row.signoff_title ? {
+      title: row.signoff_title,
+      amount: row.signoff_amount != null ? row.signoff_amount : undefined,
+      target: row.signoff_target || undefined,
+      status: row.signoff_status,
+      decidedBy: row.signoff_decided_by || undefined,
+      decidedAt: row.signoff_decided_at || undefined,
+    } : undefined,
   };
 }
 function rowToStaff(row) {
@@ -926,7 +938,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions } = body;
+        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff } = body;
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         let validMembers = null;
         if (groupId) {
@@ -942,6 +954,20 @@ export default {
         if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
         if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return json({ error: "Invalid task status" }, 400);
+        let signoffData = null;
+        if (signoff) {
+          if (groupId) return json({ error: "Sign-off requests can't be sent in event groups" }, 400);
+          const title = String(signoff.title || "").trim();
+          if (!title) return json({ error: "Sign-off title is required" }, 400);
+          if (title.length > 120) return json({ error: "Sign-off title is too long" }, 400);
+          let amount = null;
+          if (signoff.amount !== undefined && signoff.amount !== null && signoff.amount !== "") {
+            amount = Number(signoff.amount);
+            if (!Number.isFinite(amount) || amount < 0) return json({ error: "Invalid sign-off amount" }, 400);
+          }
+          const target = signoff.target ? String(signoff.target).trim().slice(0, 120) : null;
+          signoffData = { title, amount, target };
+        }
         const validMentions = Array.isArray(mentions) && validMembers
           ? mentions.filter((d) => validMembers.has(d) && d !== from)
           : [];
@@ -970,6 +996,7 @@ export default {
           roomNumber: roomNumber ? String(roomNumber).trim() : null,
           taskStatus: taskStatus || null,
           mentions: validMentions,
+          signoff: signoffData,
         });
 
         return json({ message: rowToMessage(row, from, false) }, 201);
@@ -1052,6 +1079,30 @@ export default {
             body: verb + " task" + taskPreview,
           });
         }
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/signoff-decision")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/signoff-decision".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        if (!existing.signoff_status) return json({ error: "This message isn't a sign-off request" }, 400);
+        const requester = request._staff;
+        if (existing.to_dept !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department this was sent to can decide" }, 403);
+        }
+        if (existing.signoff_status !== "pending") return json({ error: "This request has already been decided" }, 400);
+        const bodyIn = await readJsonBody(request);
+        if (!["approved", "declined"].includes(bodyIn.decision)) return json({ error: "Invalid decision" }, 400);
+        const now = new Date().toISOString();
+        await env.DB.prepare("UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ?")
+          .bind(bodyIn.decision, requester.name, now, id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        const verb = bodyIn.decision === "approved" ? "Approved" : "Declined";
+        await insertMessage(env, ctx, {
+          from: existing.to_dept, to: existing.from_dept, type: "text",
+          body: verb + " sign-off: " + existing.signoff_title,
+        });
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 

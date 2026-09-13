@@ -121,6 +121,14 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     groupId: row.group_id || undefined,
     editedAt: row.edited_at || undefined,
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
+    signoff: row.signoff_title ? {
+      title: row.signoff_title,
+      amount: row.signoff_amount != null ? row.signoff_amount : undefined,
+      target: row.signoff_target || undefined,
+      status: row.signoff_status,
+      decidedBy: row.signoff_decided_by || undefined,
+      decidedAt: row.signoff_decided_at || undefined,
+    } : undefined,
   };
 }
 function rowToGroup(row, members) {
@@ -151,12 +159,16 @@ function insertMessage(opts) {
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson
+    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
+    opts.signoff ? opts.signoff.title : null,
+    opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
+    opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+    opts.signoff ? 'pending' : null
   );
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId && !opts.silent) {
@@ -708,7 +720,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions } = body;
+      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff } = body;
       if (!DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
       let validMembers = null;
       if (groupId) {
@@ -724,6 +736,20 @@ const server = http.createServer(async (req, res) => {
       if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
       if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return send(res, 400, { error: 'Invalid task status' });
+      let signoffData = null;
+      if (signoff) {
+        if (groupId) return send(res, 400, { error: "Sign-off requests can't be sent in event groups" });
+        const title = String(signoff.title || '').trim();
+        if (!title) return send(res, 400, { error: 'Sign-off title is required' });
+        if (title.length > 120) return send(res, 400, { error: 'Sign-off title is too long' });
+        let amount = null;
+        if (signoff.amount !== undefined && signoff.amount !== null && signoff.amount !== '') {
+          amount = Number(signoff.amount);
+          if (!Number.isFinite(amount) || amount < 0) return send(res, 400, { error: 'Invalid sign-off amount' });
+        }
+        const target = signoff.target ? String(signoff.target).trim().slice(0, 120) : null;
+        signoffData = { title, amount, target };
+      }
       const validMentions = Array.isArray(mentions) && validMembers
         ? mentions.filter((d) => validMembers.has(d) && d !== from)
         : [];
@@ -750,6 +776,7 @@ const server = http.createServer(async (req, res) => {
         roomNumber: roomNumber ? String(roomNumber).trim() : null,
         taskStatus: taskStatus || null,
         mentions: validMentions,
+        signoff: signoffData,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
@@ -834,6 +861,30 @@ const server = http.createServer(async (req, res) => {
           body: verb + ' task' + taskPreview,
         });
       }
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/signoff-decision')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/signoff-decision'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      if (!existing.signoff_status) return send(res, 400, { error: "This message isn't a sign-off request" });
+      const requester = staffFromToken(req);
+      if (existing.to_dept !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department this was sent to can decide' });
+      }
+      if (existing.signoff_status !== 'pending') return send(res, 400, { error: 'This request has already been decided' });
+      const bodyIn = await readJsonBody(req);
+      if (!['approved', 'declined'].includes(bodyIn.decision)) return send(res, 400, { error: 'Invalid decision' });
+      const now = new Date().toISOString();
+      db.prepare('UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ?')
+        .run(bodyIn.decision, requester.name, now, id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      const verb = bodyIn.decision === 'approved' ? 'Approved' : 'Declined';
+      insertMessage({
+        from: existing.to_dept, to: existing.from_dept, type: 'text',
+        body: verb + ' sign-off: ' + existing.signoff_title,
+      });
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 

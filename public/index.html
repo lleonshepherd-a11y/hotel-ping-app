@@ -177,6 +177,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-search button{flex:none;border:none;background:none;color:var(--text-faint);display:flex;align-items:center;justify-content:center;padding:2px}
 .sb-search button svg{width:13px;height:13px}
 .sb-empty{padding:24px 20px;text-align:center;font-size:12.5px;color:var(--text-faint);line-height:1.5}
+.chat-filter-row{display:flex;gap:6px;padding:12px 16px 0}
+.chat-filter-chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700}
+.chat-filter-chip.active{border-color:transparent;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .sb-list-label{padding:18px 20px 9px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint)}
 .push-prompt{margin:14px 20px 0;padding:12px 14px;border-radius:14px;background:var(--active-tint);}
 .push-prompt-text{font-size:12px;line-height:1.4;color:var(--text-dim)}
@@ -290,6 +293,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bubble-wrap{max-width:72%;display:flex;flex-direction:column;position:relative}
 .msg-row.out .bubble-wrap{align-items:flex-end;padding-right:7px}
 .msg-row.in .bubble-wrap{align-items:flex-start;padding-left:7px}
+.group-sender-name{font-size:11.5px;font-weight:800;margin:0 2px 2px;color:var(--text-dim)}
 
 .bubble{
   position:relative;
@@ -321,8 +325,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-row.out .bubble.file-bubble{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.22)}
 .file-ic{width:34px;height:34px;border-radius:9px;background:var(--accent);flex:none;display:flex;align-items:center;justify-content:center}
 .file-ic svg{width:16px;height:16px}
+.file-meta{flex:1;min-width:0}
 .file-meta b{display:block;font-size:13px;font-weight:700;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-meta span{font-size:11px;opacity:.75}
+.file-download-btn{flex:none;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#2f9a5c}
+.msg-row.out .file-download-btn{color:#8fe0ab}
+.file-download-btn svg{width:16px;height:16px}
 
 .bubble.audio-bubble{display:flex;align-items:center;gap:10px;padding:9px 13px 9px 9px;min-width:200px;background:var(--accent) !important;color:#fff !important}
 .play-btn{width:32px;height:32px;border-radius:50%;border:none;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.22);color:inherit}
@@ -374,6 +382,25 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .task-msg-tag.completed{color:#2f9a5c;background:rgba(47,154,92,.12)}
 .task-msg-tag svg{width:11px;height:11px}
 .task-msg-tag.readonly{cursor:default;opacity:.85}
+
+.signoff-card{margin-top:2px;margin-bottom:4px;width:min(300px,78vw);border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,rgba(224,144,44,.1),rgba(224,144,44,.04));border:1px solid rgba(224,144,44,.35)}
+.signoff-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.signoff-head-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.05em;color:#b3760f}
+.signoff-head-label svg{width:12px;height:12px}
+.signoff-amount{font-size:14px;font-weight:800;color:#8a5a14;font-variant-numeric:tabular-nums}
+.signoff-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.signoff-target{font-size:12px;color:var(--text-dim);margin-bottom:8px}
+.signoff-actions{display:flex;gap:8px;margin-top:2px}
+.signoff-decline-btn{flex:1;border:1px solid var(--border);background:var(--surface);color:#c0392b;font-size:12.5px;font-weight:700;border-radius:12px;padding:8px 10px}
+.signoff-approve-btn{flex:1.3;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:none;background:linear-gradient(150deg,#2f9a5c,#227a48);color:#fff;font-size:12.5px;font-weight:700;border-radius:12px;padding:8px 10px}
+.signoff-approve-btn svg{width:13px;height:13px}
+.signoff-status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.03em;padding:6px 10px;border-radius:10px}
+.signoff-status-badge svg{width:12px;height:12px}
+.signoff-status-badge.pending{color:var(--text-dim);background:var(--surface-3);font-weight:600;letter-spacing:normal}
+.signoff-status-badge.approved{color:#2f9a5c;background:rgba(47,154,92,.14)}
+.signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.12)}
+.signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
+.signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -453,12 +480,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #optPhoto .plus-opt-ic,#optCamera .plus-opt-ic{background:linear-gradient(155deg,#2c2c30,#131315);color:#fff;box-shadow:0 3px 8px -2px rgba(15,15,17,.45)}
 #optUrgent .plus-opt-ic{background:linear-gradient(145deg,var(--urgent),var(--urgent-2));color:#fff;box-shadow:0 3px 8px -2px rgba(214,73,60,.5)}
 #optRoom .plus-opt-ic,#optTask .plus-opt-ic{background:linear-gradient(145deg,var(--accent),var(--accent-2));color:#fff;box-shadow:0 3px 8px -2px rgba(24,119,242,.5)}
+#optSignoff .plus-opt-ic{background:linear-gradient(145deg,#e0902c,#b3760f);color:#fff;box-shadow:0 3px 8px -2px rgba(224,144,44,.5)}
 .plus-opt-ic svg{width:17px;height:17px}
 .plus-opt-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .plus-opt#optUrgent.active .plus-opt-ic{box-shadow:0 0 0 2px rgba(255,255,255,.95), 0 3px 8px -2px rgba(214,73,60,.5)}
 .plus-opt#optUrgent.active .plus-opt-label{color:var(--urgent)}
 .plus-opt#optTask.active .plus-opt-ic{box-shadow:0 0 0 2px rgba(255,255,255,.95), 0 3px 8px -2px rgba(24,119,242,.5)}
 .plus-opt#optTask.active .plus-opt-label{color:var(--accent)}
+.plus-opt#optSignoff.active .plus-opt-ic{box-shadow:0 0 0 2px rgba(255,255,255,.95), 0 3px 8px -2px rgba(224,144,44,.5)}
+.plus-opt#optSignoff.active .plus-opt-label{color:#b3760f}
 #msgInput{
   flex:1;border:none;background:none;resize:none;color:var(--text);
   font-size:16px;line-height:1.35;padding:7px 2px;max-height:120px;min-height:20px;
@@ -1097,10 +1127,14 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </div>
     </div>
 
+    <div class="chat-filter-row" id="chatFilterRow">
+      <button type="button" class="chat-filter-chip active" data-filter="all">All</button>
+      <button type="button" class="chat-filter-chip" data-filter="unread">Unread</button>
+    </div>
     <div class="pull-refresh" id="listPullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg></div>
     <div class="sb-list-label" id="listLabel">Conversations</div>
     <nav class="thread-list" id="threadList"></nav>
-    <div class="sb-empty" id="searchEmpty" hidden>No conversations match "<span id="searchEmptyTerm"></span>"</div>
+    <div class="sb-empty" id="searchEmpty" hidden><span id="searchEmptyUnread" hidden>No unread conversations</span><span id="searchEmptyMatch">No conversations match "<span id="searchEmptyTerm"></span>"</span></div>
     </div>
 
     <div class="sb-page" id="eventsPage" hidden>
@@ -1268,6 +1302,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </button>
       </div>
 
+      <div class="reply-preview-bar" id="signoffTagBar" hidden>
+        <div class="reply-preview-bar-accent signoff-accent"></div>
+        <div class="reply-preview-bar-body">
+          <div class="reply-preview-bar-name">Sign-off request</div>
+          <div class="reply-preview-bar-text" id="signoffTagText"></div>
+        </div>
+        <button type="button" class="reply-preview-bar-close" id="signoffTagClose" aria-label="Remove sign-off request">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
       <div class="mention-popover" id="mentionPopover" hidden></div>
 
       <div class="reply-preview-bar" id="editBar" hidden>
@@ -1310,6 +1355,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                 <button class="plus-opt" id="optTask" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.7"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="1.7"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="1.7"/><path d="M8.5 18h7" stroke-width="1.7"/></svg></span>
                   <span class="plus-opt-label">Task</span>
+                </button>
+                <button class="plus-opt" id="optSignoff" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" stroke-width="1.7"/><path d="M12 7.5V12l3 2" stroke-width="1.7"/></svg></span>
+                  <span class="plus-opt-label">Sign-off</span>
                 </button>
               </div>
             </div>
@@ -1528,6 +1577,25 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="admin-overlay" id="signoffOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Request sign-off</h2>
+      <button class="admin-close" id="signoffClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Attach a formal approval request to your message. Type what happened in the message box below, then fill this in.</p>
+    <form class="admin-add-form" id="signoffForm">
+      <input type="text" id="signoffTitleInput" placeholder="What needs approving, e.g. Emergency chiller seal overhaul" maxlength="120" required>
+      <input type="number" id="signoffAmountInput" placeholder="Amount, e.g. 1450 (optional)" min="0" step="0.01" inputmode="decimal">
+      <input type="text" id="signoffTargetInput" placeholder="Target / location, e.g. Plant Room B2 (optional)" maxlength="120">
+      <button type="submit" class="admin-add-btn">Attach to message</button>
+      <div class="admin-add-error" id="signoffFormError"></div>
+    </form>
+  </div>
+</div>
+
 <div class="admin-overlay" id="forwardOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1718,7 +1786,8 @@ function mapServerMessage(row, self){
     roomNumber: row.roomNumber || undefined,
     taskStatus: row.taskStatus || undefined,
     edited: !!row.editedAt,
-    mentions: row.mentions || undefined
+    mentions: row.mentions || undefined,
+    signoff: row.signoff || undefined
   };
 }
 
@@ -1898,6 +1967,8 @@ var searchInput = document.getElementById("searchInput");
 var searchClear = document.getElementById("searchClear");
 var searchEmpty = document.getElementById("searchEmpty");
 var searchEmptyTerm = document.getElementById("searchEmptyTerm");
+var searchEmptyUnread = document.getElementById("searchEmptyUnread");
+var searchEmptyMatch = document.getElementById("searchEmptyMatch");
 
 searchInput.addEventListener("input", function(){
   STATE.searchTerm = searchInput.value;
@@ -1910,6 +1981,16 @@ searchClear.addEventListener("click", function(){
   searchClear.hidden = true;
   renderList();
   searchInput.focus();
+});
+
+var chatFilterRow = document.getElementById("chatFilterRow");
+STATE.chatFilter = "all";
+chatFilterRow.addEventListener("click", function(e){
+  var btn = e.target.closest(".chat-filter-chip");
+  if(!btn) return;
+  STATE.chatFilter = btn.dataset.filter;
+  chatFilterRow.querySelectorAll(".chat-filter-chip").forEach(function(c){ c.classList.toggle("active", c === btn); });
+  renderList();
 });
 
 function renderSwitcher(){
@@ -1939,11 +2020,17 @@ function hasUrgentUnread(deptId){
   return (STATE.data[deptId] || []).some(function(m){ return !m.read && m.urgent && m.from !== "self"; });
 }
 
+function fmtClockDuration(seconds){
+  seconds = Math.max(0, Math.round(seconds || 0));
+  var m = Math.floor(seconds / 60), s = seconds % 60;
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
 function previewText(m){
+  if(m.signoff) return (m.from === "self" ? "You: " : "") + "🖋 Sign-off request: " + m.signoff.title;
   if(m.type === "text") return (m.from === "self" ? "You: " : "") + m.text;
   if(m.type === "image") return (m.from === "self" ? "You: " : "") + "📷 Photo";
   if(m.type === "file") return (m.from === "self" ? "You: " : "") + "📎 " + m.fileName;
-  if(m.type === "audio") return (m.from === "self" ? "You: " : "") + "🎤 Voice message";
+  if(m.type === "audio") return (m.from === "self" ? "You: " : "") + "🎤 Voice message" + (m.duration ? " (" + fmtClockDuration(m.duration) + ")" : "");
   return "";
 }
 
@@ -1974,13 +2061,20 @@ function renderList(){
   var term = (STATE.searchTerm || "").trim().toLowerCase();
   var matches = {};
   var ids = sortedDeptIds().filter(function(id){
+    if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
     var r = findSearchMatch(id, term);
     if(r.match) matches[id] = r.message;
     return r.match;
   });
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
-  if(ids.length === 0){ searchEmptyTerm.textContent = STATE.searchTerm; return; }
+  if(ids.length === 0){
+    var unreadEmpty = STATE.chatFilter === "unread" && !term;
+    searchEmptyUnread.hidden = !unreadEmpty;
+    searchEmptyMatch.hidden = unreadEmpty;
+    searchEmptyTerm.textContent = STATE.searchTerm;
+    return;
+  }
   ids.forEach(function(id){
     var d = DEPTS[id];
     var msgs = STATE.data[id] || [];
@@ -2105,6 +2199,8 @@ function renderHeader(){
     filesBtn.hidden = true;
     optTask.hidden = true;
     if(taskActive) setTaskActive(false);
+    optSignoff.hidden = true;
+    if(signoffActive) clearSignoffTag();
     return;
   }
   eventNotice.hidden = true;
@@ -2113,6 +2209,7 @@ function renderHeader(){
   muteBtn.hidden = false;
   filesBtn.hidden = false;
   optTask.hidden = false;
+  optSignoff.hidden = false;
   var d = DEPTS[STATE.active];
   hAvatar.style.background = avatarGradient(STATE.active);
   hAvatar.innerHTML = iconSvg(STATE.active);
@@ -2250,8 +2347,10 @@ function renderThread(){
       prevDay = m.t;
     }
     var next = msgs[i+1];
+    var prev = msgs[i-1];
     var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
-    threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById));
+    var groupStart = !prev || prev.from !== m.from || !sameDay(prev.t, m.t);
+    threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById, groupStart));
   });
   threadScroll.scrollTop = threadScroll.scrollHeight;
 }
@@ -2375,6 +2474,51 @@ function setTaskActive(on){
 }
 taskTagClose.addEventListener("click", function(){ setTaskActive(false); });
 
+var signoffTagBar = document.getElementById("signoffTagBar");
+var signoffTagText = document.getElementById("signoffTagText");
+var signoffTagClose = document.getElementById("signoffTagClose");
+var signoffOverlay = document.getElementById("signoffOverlay");
+var signoffClose = document.getElementById("signoffClose");
+var signoffForm = document.getElementById("signoffForm");
+var signoffTitleInput = document.getElementById("signoffTitleInput");
+var signoffAmountInput = document.getElementById("signoffAmountInput");
+var signoffTargetInput = document.getElementById("signoffTargetInput");
+var signoffFormError = document.getElementById("signoffFormError");
+var signoffActive = false;
+var signoffData = null;
+function clearSignoffTag(){
+  signoffActive = false;
+  signoffData = null;
+  optSignoff.classList.remove("active");
+  signoffTagBar.hidden = true;
+}
+signoffTagClose.addEventListener("click", clearSignoffTag);
+function openSignoffOverlay(){
+  signoffFormError.textContent = "";
+  signoffTitleInput.value = signoffData ? signoffData.title : "";
+  signoffAmountInput.value = signoffData && signoffData.amount != null ? signoffData.amount : "";
+  signoffTargetInput.value = signoffData && signoffData.target ? signoffData.target : "";
+  signoffOverlay.hidden = false;
+  setTimeout(function(){ signoffTitleInput.focus(); }, 30);
+}
+signoffClose.addEventListener("click", function(){ signoffOverlay.hidden = true; });
+signoffOverlay.addEventListener("click", function(e){ if(e.target === signoffOverlay) signoffOverlay.hidden = true; });
+signoffForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var title = signoffTitleInput.value.trim();
+  if(!title){ signoffFormError.textContent = "Title is required."; return; }
+  var amountRaw = signoffAmountInput.value.trim();
+  var amount = amountRaw ? Number(amountRaw) : null;
+  if(amountRaw && (!isFinite(amount) || amount < 0)){ signoffFormError.textContent = "Enter a valid amount."; return; }
+  signoffData = { title: title, amount: amount, target: signoffTargetInput.value.trim() || null };
+  signoffActive = true;
+  optSignoff.classList.add("active");
+  signoffTagText.textContent = title + (amount != null ? " · £" + amount.toFixed(2) : "");
+  signoffTagBar.hidden = false;
+  signoffOverlay.hidden = true;
+  msgInput.focus();
+});
+
 var appToast = document.getElementById("appToast");
 var toastTimer = null;
 function showToast(text){
@@ -2486,6 +2630,16 @@ function toggleCompleteMessage(m){
     renderThread();
     showToast(res.message.completed ? "Marked as done" : "Marked as not done");
   }).catch(function(){ showToast("Couldn't update that"); });
+}
+
+function decideSignoff(m, decision){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/signoff-decision', 'POST', { decision: decision }).then(function(res){
+    var msgs = currentMessagesArray();
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    renderThread();
+    showToast(decision === "approved" ? "Approved" : "Declined");
+  }).catch(function(){ showToast("Couldn't record that decision"); });
 }
 
 var TASK_LABELS = { not_started: "New", in_progress: "Started", completed: "Completed" };
@@ -2626,7 +2780,70 @@ setupPullToRefresh(threadList, document.getElementById("listPullRefresh"), refre
 
 var TICK_SVG = '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5L5 10.5L11 2.5"/><path d="M7 6.5L11 10.5L17 2.5"/></svg>';
 
-function buildMessageRow(m, groupEnd, msgsById){
+function fmtSignoffAmount(n){
+  return "£" + Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function buildSignoffCard(m){
+  var s = m.signoff;
+  var card = document.createElement("div");
+  card.className = "signoff-card " + s.status;
+  var head = document.createElement("div");
+  head.className = "signoff-head";
+  head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> HOD SIGN-OFF REQUEST</span>' +
+    (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '');
+  card.appendChild(head);
+
+  var title = document.createElement("div");
+  title.className = "signoff-title";
+  title.textContent = s.title;
+  card.appendChild(title);
+
+  if(s.target){
+    var target = document.createElement("div");
+    target.className = "signoff-target";
+    target.innerHTML = 'Target: <b>'+esc(s.target)+'</b>';
+    card.appendChild(target);
+  }
+
+  var actions = document.createElement("div");
+  actions.className = "signoff-actions";
+  var canDecide = m.to === AUTH.staff.departmentId;
+  if(s.status === "pending"){
+    if(canDecide){
+      var declineBtn = document.createElement("button");
+      declineBtn.type = "button";
+      declineBtn.className = "signoff-decline-btn";
+      declineBtn.textContent = "Decline";
+      declineBtn.addEventListener("click", function(){ decideSignoff(m, "declined"); });
+      var approveBtn = document.createElement("button");
+      approveBtn.type = "button";
+      approveBtn.className = "signoff-approve-btn";
+      approveBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Approve Sign-Off';
+      approveBtn.addEventListener("click", function(){ decideSignoff(m, "approved"); });
+      actions.appendChild(declineBtn);
+      actions.appendChild(approveBtn);
+    } else {
+      var waitingLabel = document.createElement("div");
+      waitingLabel.className = "signoff-status-badge pending";
+      var toName = DEPTS[m.to] ? DEPTS[m.to].name : m.to;
+      waitingLabel.textContent = "Awaiting sign-off from " + toName;
+      actions.appendChild(waitingLabel);
+    }
+  } else {
+    var badge = document.createElement("div");
+    badge.className = "signoff-status-badge " + s.status;
+    var byName = s.decidedBy || "";
+    badge.innerHTML = (s.status === "approved"
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> EXECUTED'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> DECLINED') +
+      (byName ? ' <span class="signoff-decided-by">by ' + esc(byName) + '</span>' : '');
+    actions.appendChild(badge);
+  }
+  card.appendChild(actions);
+  return card;
+}
+
+function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var row = document.createElement("div");
   var out = m.from === "self";
   row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "") + (m.pending ? " pending" : "");
@@ -2634,6 +2851,15 @@ function buildMessageRow(m, groupEnd, msgsById){
 
   var wrap = document.createElement("div");
   wrap.className = "bubble-wrap";
+
+  if(STATE.activeGroupId && !out && groupStart){
+    var senderLabel = document.createElement("div");
+    senderLabel.className = "group-sender-name";
+    var senderDept = DEPTS[m.from];
+    if(senderDept) senderLabel.style.color = senderDept.color;
+    senderLabel.textContent = senderDept ? senderDept.name : m.from;
+    wrap.appendChild(senderLabel);
+  }
 
   var revealedDeleted = m.deleted && (m.text || m.url || m.transcript || m.dataUrl);
 
@@ -2759,7 +2985,8 @@ function buildMessageRow(m, groupEnd, msgsById){
     bubble.className = "bubble file-bubble";
     bubble.innerHTML =
       '<div class="file-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg></div>'+
-      '<div class="file-meta"><b>'+esc(m.fileName)+'</b><span>'+fmtBytes(m.fileSize||0)+'</span></div>';
+      '<div class="file-meta"><b>'+esc(m.fileName)+'</b><span>'+fmtBytes(m.fileSize||0)+'</span></div>'+
+      '<div class="file-download-btn" aria-label="Download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M5 20h14"/></svg></div>';
     if(m.url){ bubble.addEventListener("click", function(){ window.open(m.url, "_blank"); }); }
     if(m.text){
       var capRow = document.createElement("div");
@@ -2798,6 +3025,8 @@ function buildMessageRow(m, groupEnd, msgsById){
     capBubble.textContent = m.text;
     wrap.appendChild(capBubble);
   }
+
+  if(m.signoff) wrap.appendChild(buildSignoffCard(m));
 
   var meta = document.createElement("div");
   if(out){
@@ -2973,6 +3202,7 @@ var micQuickBtn = document.getElementById("micQuickBtn");
 var optUrgent = document.getElementById("optUrgent");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
+var optSignoff = document.getElementById("optSignoff");
 var fileInput = document.getElementById("fileInput");
 var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
@@ -3225,6 +3455,10 @@ optTask.addEventListener("click", function(){
   setTaskActive(!taskActive);
   closePlusMenu();
 });
+optSignoff.addEventListener("click", function(){
+  closePlusMenu();
+  openSignoffOverlay();
+});
 
 function handleAttachedFile(file){
   if(!file) return;
@@ -3307,7 +3541,8 @@ function pendingMessageFromQueueItem(item){
     urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
     replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
     deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined,
-    taskStatus: item.payload.taskStatus || undefined
+    taskStatus: item.payload.taskStatus || undefined,
+    signoff: item.payload.signoff ? Object.assign({ status: "pending" }, item.payload.signoff) : undefined
   };
 }
 function queueOfflineMessage(deptId, payload){
@@ -3385,6 +3620,8 @@ function doSend(){
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
   var wasTask = taskActive;
+  var wasSignoff = signoffActive;
+  var signoffPayload = signoffData;
 
   msgInput.value = "";
   autoGrow();
@@ -3404,6 +3641,8 @@ function doSend(){
   clearRoomTagBar();
   if(wasTask && !groupId) payload.taskStatus = "not_started";
   setTaskActive(false);
+  if(wasSignoff && !groupId && signoffPayload) payload.signoff = signoffPayload;
+  clearSignoffTag();
   var sendPromise;
   if(attachment && attachment.type === "image"){
     payload.type = "image"; payload.text = text; payload.fileName = attachment.name;
@@ -3781,6 +4020,7 @@ function enterApp(staff){
   responseBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "concierge";
+  msgInput.placeholder = "Message as " + staff.name + " (" + (DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "") + ")…";
   boot();
   startPolling();
   refreshMaintenanceBadge();

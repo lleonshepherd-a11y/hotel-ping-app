@@ -99,6 +99,24 @@ if (!messageColumns.includes('edited_at')) {
 if (!messageColumns.includes('mentions')) {
   db.exec('ALTER TABLE messages ADD COLUMN mentions TEXT');
 }
+if (!messageColumns.includes('signoff_title')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_title TEXT');
+}
+if (!messageColumns.includes('signoff_amount')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_amount REAL');
+}
+if (!messageColumns.includes('signoff_target')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_target TEXT');
+}
+if (!messageColumns.includes('signoff_status')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_status TEXT');
+}
+if (!messageColumns.includes('signoff_decided_by')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_decided_by TEXT');
+}
+if (!messageColumns.includes('signoff_decided_at')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_decided_at TEXT');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -129,9 +147,15 @@ if (toDeptCol && toDeptCol.notnull) {
       task_status TEXT,
       group_id TEXT,
       edited_at TEXT,
-      mentions TEXT
+      mentions TEXT,
+      signoff_title TEXT,
+      signoff_amount REAL,
+      signoff_target TEXT,
+      signoff_status TEXT,
+      signoff_decided_by TEXT,
+      signoff_decided_at TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_status, signoff_decided_by, signoff_decided_at FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);

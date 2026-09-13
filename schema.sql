@@ -31,7 +31,13 @@ CREATE TABLE IF NOT EXISTS messages (
   task_status TEXT,
   group_id TEXT,
   edited_at TEXT,
-  mentions TEXT
+  mentions TEXT,
+  signoff_title TEXT,
+  signoff_amount REAL,
+  signoff_target TEXT,
+  signoff_status TEXT,
+  signoff_decided_by TEXT,
+  signoff_decided_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
