@@ -230,8 +230,8 @@ async function insertMessage(env, ctx, opts) {
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -239,6 +239,8 @@ async function insertMessage(env, ctx, opts) {
     opts.signoff ? opts.signoff.title : null,
     opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
     opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+    opts.signoff && opts.signoff.category ? opts.signoff.category : null,
+    opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
     opts.signoff ? "pending" : null
   ).run();
 
@@ -354,6 +356,8 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       title: row.signoff_title,
       amount: row.signoff_amount != null ? row.signoff_amount : undefined,
       target: row.signoff_target || undefined,
+      category: row.signoff_category || undefined,
+      guestInfo: row.signoff_guest_info || undefined,
       status: row.signoff_status,
       decidedBy: row.signoff_decided_by || undefined,
       decidedAt: row.signoff_decided_at || undefined,
@@ -995,7 +999,9 @@ export default {
             if (!Number.isFinite(amount) || amount < 0) return json({ error: "Invalid sign-off amount" }, 400);
           }
           const target = signoff.target ? String(signoff.target).trim().slice(0, 120) : null;
-          signoffData = { title, amount, target };
+          const category = signoff.category ? String(signoff.category).trim().slice(0, 60) : null;
+          const guestInfo = signoff.guestInfo ? String(signoff.guestInfo).trim().slice(0, 120) : null;
+          signoffData = { title, amount, target, category, guestInfo };
         }
         const validMentions = Array.isArray(mentions) && validMembers
           ? mentions.filter((d) => validMembers.has(d) && d !== from)

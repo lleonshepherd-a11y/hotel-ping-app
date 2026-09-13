@@ -388,6 +388,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-head-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.05em;color:#b3760f}
 .signoff-head-label svg{width:12px;height:12px}
 .signoff-amount{font-size:14px;font-weight:800;color:#8a5a14;font-variant-numeric:tabular-nums}
+.signoff-category{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#b3760f;background:rgba(224,144,44,.14);padding:2px 8px;border-radius:8px;margin-bottom:5px}
 .signoff-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
 .signoff-target{font-size:12px;color:var(--text-dim);margin-bottom:8px}
 .signoff-actions{display:flex;gap:8px;margin-top:2px}
@@ -1612,9 +1613,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
     <p class="broadcast-hint">Attach a formal approval request to your message. Type what happened in the message box below, then fill this in.</p>
     <form class="admin-add-form" id="signoffForm">
+      <select id="signoffCategoryInput">
+        <option value="">Category (optional)</option>
+        <option>Guest Service Recovery &amp; Comp</option>
+        <option>Maintenance &amp; Engineering</option>
+        <option>Security &amp; Safety</option>
+        <option>Facilities &amp; Events</option>
+        <option>Other</option>
+      </select>
       <input type="text" id="signoffTitleInput" placeholder="What needs approving, e.g. Emergency chiller seal overhaul" maxlength="120" required>
-      <input type="number" id="signoffAmountInput" placeholder="Amount, e.g. 1450 (optional)" min="0" step="0.01" inputmode="decimal">
-      <input type="text" id="signoffTargetInput" placeholder="Target / location, e.g. Plant Room B2 (optional)" maxlength="120">
+      <input type="text" id="signoffTargetInput" placeholder="Room / area, e.g. Plant Room B2 (optional)" maxlength="120">
+      <input type="number" id="signoffAmountInput" placeholder="Financial amount £, e.g. 1450 (optional)" min="0" step="0.01" inputmode="decimal">
+      <input type="text" id="signoffGuestInput" placeholder="Guest name &amp; VIP level (optional)" maxlength="120">
       <button type="submit" class="admin-add-btn">Attach to message</button>
       <div class="admin-add-error" id="signoffFormError"></div>
     </form>
@@ -2518,6 +2528,8 @@ var signoffForm = document.getElementById("signoffForm");
 var signoffTitleInput = document.getElementById("signoffTitleInput");
 var signoffAmountInput = document.getElementById("signoffAmountInput");
 var signoffTargetInput = document.getElementById("signoffTargetInput");
+var signoffCategoryInput = document.getElementById("signoffCategoryInput");
+var signoffGuestInput = document.getElementById("signoffGuestInput");
 var signoffFormError = document.getElementById("signoffFormError");
 var signoffActive = false;
 var signoffData = null;
@@ -2533,6 +2545,8 @@ function openSignoffOverlay(){
   signoffTitleInput.value = signoffData ? signoffData.title : "";
   signoffAmountInput.value = signoffData && signoffData.amount != null ? signoffData.amount : "";
   signoffTargetInput.value = signoffData && signoffData.target ? signoffData.target : "";
+  signoffCategoryInput.value = signoffData && signoffData.category ? signoffData.category : "";
+  signoffGuestInput.value = signoffData && signoffData.guestInfo ? signoffData.guestInfo : "";
   signoffOverlay.hidden = false;
   setTimeout(function(){ signoffTitleInput.focus(); }, 30);
 }
@@ -2545,7 +2559,10 @@ signoffForm.addEventListener("submit", function(e){
   var amountRaw = signoffAmountInput.value.trim();
   var amount = amountRaw ? Number(amountRaw) : null;
   if(amountRaw && (!isFinite(amount) || amount < 0)){ signoffFormError.textContent = "Enter a valid amount."; return; }
-  signoffData = { title: title, amount: amount, target: signoffTargetInput.value.trim() || null };
+  signoffData = {
+    title: title, amount: amount, target: signoffTargetInput.value.trim() || null,
+    category: signoffCategoryInput.value || null, guestInfo: signoffGuestInput.value.trim() || null
+  };
   signoffActive = true;
   optSignoff.classList.add("active");
   signoffTagText.textContent = title + (amount != null ? " · £" + amount.toFixed(2) : "");
@@ -2828,6 +2845,13 @@ function buildSignoffCard(m){
     (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '');
   card.appendChild(head);
 
+  if(s.category){
+    var category = document.createElement("div");
+    category.className = "signoff-category";
+    category.textContent = s.category;
+    card.appendChild(category);
+  }
+
   var title = document.createElement("div");
   title.className = "signoff-title";
   title.textContent = s.title;
@@ -2838,6 +2862,13 @@ function buildSignoffCard(m){
     target.className = "signoff-target";
     target.innerHTML = 'Target: <b>'+esc(s.target)+'</b>';
     card.appendChild(target);
+  }
+
+  if(s.guestInfo){
+    var guestInfo = document.createElement("div");
+    guestInfo.className = "signoff-target";
+    guestInfo.innerHTML = 'Guest: <b>'+esc(s.guestInfo)+'</b>';
+    card.appendChild(guestInfo);
   }
 
   var actions = document.createElement("div");

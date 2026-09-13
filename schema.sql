@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS messages (
   signoff_title TEXT,
   signoff_amount REAL,
   signoff_target TEXT,
+  signoff_category TEXT,
+  signoff_guest_info TEXT,
   signoff_status TEXT,
   signoff_decided_by TEXT,
   signoff_decided_at TEXT
