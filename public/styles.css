@@ -1,3 +1,17 @@
+@font-face{
+  font-family:'Manrope';
+  font-style:normal;
+  font-weight:500 800;
+  font-display:swap;
+  src:url(/fonts/manrope-variable.woff2) format('woff2');
+}
+@font-face{
+  font-family:'Inter';
+  font-style:normal;
+  font-weight:400 600;
+  font-display:swap;
+  src:url(/fonts/inter-variable.woff2) format('woff2');
+}
 :root{
   --bg:#0d0d0d;
   --surface:#161616;

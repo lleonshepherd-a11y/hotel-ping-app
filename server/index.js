@@ -287,7 +287,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) filePath = path.join(PUBLIC_DIR, 'index.html');
       const ext = path.extname(filePath);
-      const type = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }[ext] || 'application/octet-stream';
+      const type = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2' }[ext] || 'application/octet-stream';
       res.writeHead(200, { 'Content-Type': type });
       fs.createReadStream(filePath).pipe(res);
       return;
