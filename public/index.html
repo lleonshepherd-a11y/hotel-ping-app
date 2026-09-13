@@ -231,8 +231,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);position:relative}
 .pull-refresh{position:absolute;left:50%;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow-soft);display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:none;opacity:0}
 .pull-refresh svg{width:16px;height:16px;color:var(--accent)}
-.pull-refresh.spinning svg{animation:pullSpin .7s linear infinite}
-@keyframes pullSpin{to{transform:rotate(360deg)}}
 .thread-head{
   display:flex;align-items:center;justify-content:center;gap:13px;
   padding:16px 24px;
@@ -3429,13 +3427,12 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
       refreshing = true;
       spinnerEl.style.top = (scrollEl.offsetTop + 14) + "px";
       spinnerEl.style.opacity = "1";
-      spinnerEl.classList.add("spinning");
-      onRefresh().catch(function(){}).then(function(){
+      onRefresh().catch(function(){});
+      setTimeout(function(){
         refreshing = false;
-        spinnerEl.classList.remove("spinning");
         spinnerEl.style.opacity = "0";
         spinnerEl.style.transform = "";
-      });
+      }, 350);
     } else {
       spinnerEl.style.opacity = "0";
       spinnerEl.style.transform = "";
@@ -4698,26 +4695,49 @@ document.getElementById("backBtn").addEventListener("click", function(){
 });
 
 /* ---------------- Boot ---------------- */
+function bootCacheKey(){ return "hp_boot_cache_" + STATE.self; }
+function loadBootCache(){
+  try{ return JSON.parse(localStorage.getItem(bootCacheKey()) || "null"); }catch(e){ return null; }
+}
+function saveBootCache(){
+  try{
+    localStorage.setItem(bootCacheKey(), JSON.stringify({ data: STATE.data, deptMeta: DEPT_META, muted: STATE.muted }));
+  }catch(e){}
+}
+function renderBooted(){
+  var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
+  STATE.active = order[0];
+  renderSwitcher();
+  renderMyProfileCard();
+  updateComposerLock();
+  markRead(STATE.active);
+  renderList();
+  renderHeader();
+  renderThread();
+  refreshSendState();
+  renderDuty();
+  if(window.innerWidth > 720){
+    document.querySelector(".main").classList.add("show-mobile");
+  }
+}
 function boot(){
   STATE.loading = true;
-  renderList();
+  var cache = loadBootCache();
+  if(cache && cache.data){
+    // Show last-known messages instantly (stale-while-revalidate) so the
+    // list never has to sit on a bare loading state while fresh data loads.
+    STATE.data = cache.data;
+    Object.keys(cache.deptMeta || {}).forEach(function(id){ DEPT_META[id] = cache.deptMeta[id]; });
+    STATE.muted = cache.muted || {};
+    renderBooted();
+  } else {
+    renderList();
+  }
   Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList()]).then(function(results){
     STATE.data = mergePendingIntoData(results[2]);
     flushOfflineQueue();
-    var order = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
-    STATE.active = order[0];
-    renderSwitcher();
-    renderMyProfileCard();
-    updateComposerLock();
-    markRead(STATE.active);
-    renderList();
-    renderHeader();
-    renderThread();
-    refreshSendState();
-    renderDuty();
-    if(window.innerWidth > 720){
-      document.querySelector(".main").classList.add("show-mobile");
-    }
+    renderBooted();
+    saveBootCache();
   }).finally(function(){ STATE.loading = false; });
 }
 
@@ -4782,24 +4802,31 @@ var slowPollTimer = null;
 function startPolling(){
   if(pollTimer) return;
   pollTimer = setInterval(function(){
+    if(document.hidden) return;
     refreshActiveThread().catch(function(){});
     refreshMaintenanceBadge();
     pollMissed();
     flushOfflineQueue();
   }, 1500);
   slowPollTimer = setInterval(function(){
+    if(document.hidden) return;
     refreshNow().catch(function(){});
     refreshAssetsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
   }, 6000);
   startTypingPoll();
 }
+document.addEventListener("visibilitychange", function(){
+  if(!document.hidden && AUTH.staff){
+    refreshNow().catch(function(){});
+  }
+});
 
 var typingPollTimer = null;
 function startTypingPoll(){
   if(typingPollTimer) return;
   typingPollTimer = setInterval(function(){
-    if(STATE.loading || isViewOnly()) return;
+    if(document.hidden || STATE.loading || isViewOnly()) return;
     apiGet('/api/typing?self=' + encodeURIComponent(STATE.self)).then(function(res){
       var next = {};
       (res.typing || []).forEach(function(id){ next[id] = true; });
