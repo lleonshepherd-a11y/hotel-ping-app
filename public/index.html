@@ -401,6 +401,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.12)}
 .signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 .signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
+.dept-photo-preview{width:96px;height:96px;border-radius:50%;margin:4px auto 16px;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center}
+.dept-photo-preview svg{width:34px;height:34px}
+.dept-photo-remove-btn{background:var(--surface-3);color:#c0392b;margin-top:8px}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -1064,6 +1067,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <span class="sb-menu-label">Change your PIN</span>
           <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
         </button>
+        <button class="sb-menu-row sb-menu-row-sub" id="deptPhotoBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
+          <span class="sb-menu-label">Department photo</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
         <button class="sb-menu-row sb-menu-row-sub" id="notifSettingsBtn" type="button">
           <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>
           <span class="sb-menu-label">Notification settings</span>
@@ -1527,6 +1535,23 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="admin-overlay" id="deptPhotoOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Department photo</h2>
+      <button class="admin-close" id="deptPhotoClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Replace the icon with a real photo of your head of department. Shown across chats, everyone will see it instead of the icon.</p>
+    <div class="dept-photo-preview" id="deptPhotoPreview"></div>
+    <input type="file" accept="image/*" id="deptPhotoFileInput" hidden>
+    <button type="button" class="admin-add-btn" id="deptPhotoUploadBtn">Upload photo</button>
+    <button type="button" class="admin-add-btn dept-photo-remove-btn" id="deptPhotoRemoveBtn" hidden>Remove photo</button>
+    <div class="admin-add-error" id="deptPhotoError"></div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="notifSettingsOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1661,6 +1686,16 @@ function shadeColor(hex, pct){
 }
 function avatarGradient(deptId){
   return "linear-gradient(155deg, #2c2c30, #131315)";
+}
+function avatarStyleAttr(deptId){
+  var meta = DEPT_META[deptId];
+  if(meta && meta.photoUrl) return "background-image:url('"+meta.photoUrl+"');background-size:cover;background-position:center";
+  return "background:"+avatarGradient(deptId);
+}
+function avatarInnerHtml(deptId){
+  var meta = DEPT_META[deptId];
+  if(meta && meta.photoUrl) return "";
+  return iconSvg(deptId);
 }
 
 var DEPTS = {
@@ -2000,7 +2035,7 @@ function renderSwitcher(){
     var btn = document.createElement("button");
     btn.className = "sw-chip" + (id === STATE.self ? " active" : "");
     btn.title = d.name;
-    btn.innerHTML = '<span class="sw-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</span>';
+    btn.innerHTML = '<span class="sw-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>';
     btn.addEventListener("click", function(){ switchSelf(id); });
     switcherRow.appendChild(btn);
   });
@@ -2087,7 +2122,7 @@ function renderList(){
     var el = document.createElement("button");
     el.className = "thread-item" + (id === STATE.active ? " active" : "") + (unread ? " unread" : "");
     el.innerHTML =
-      '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'<span class="t-duty-dot '+(isOnDuty(id)?'on':'off')+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'"></span></div>'+
+      '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'<span class="t-duty-dot '+(isOnDuty(id)?'on':'off')+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'"></span></div>'+
       '<div class="t-body">'+
         '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
@@ -2191,7 +2226,7 @@ function renderHeader(){
     hGroupAvatars.hidden = false;
     hGroupAvatars.classList.remove("expanded");
     hGroupAvatars.innerHTML = g ? g.members.map(function(deptId){
-      return '<span class="group-avatar" style="background:'+avatarGradient(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+iconSvg(deptId)+'</span>';
+      return '<span class="group-avatar" style="'+avatarStyleAttr(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+avatarInnerHtml(deptId)+'</span>';
     }).join("") : "";
     offDutyBanner.hidden = true;
     eventNotice.hidden = !!(g && g.archivedAt);
@@ -2211,8 +2246,8 @@ function renderHeader(){
   optTask.hidden = false;
   optSignoff.hidden = false;
   var d = DEPTS[STATE.active];
-  hAvatar.style.background = avatarGradient(STATE.active);
-  hAvatar.innerHTML = iconSvg(STATE.active);
+  hAvatar.setAttribute("style", avatarStyleAttr(STATE.active));
+  hAvatar.innerHTML = avatarInnerHtml(STATE.active);
   hName.textContent = d.name;
   var targetOn = isOnDuty(STATE.active);
   if(STATE.typingFrom[STATE.active]){
@@ -2664,7 +2699,7 @@ function openForwardPicker(m){
   var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self && id !== STATE.active; });
   forwardDeptList.innerHTML = targets.map(function(id){
     return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
-      '<span class="fwd-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</span>'+
+      '<span class="fwd-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
       DEPTS[id].name+'</button>';
   }).join("");
   forwardDeptList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
@@ -3260,7 +3295,7 @@ function updateMentionPopover(){
   if(!candidates.length){ mentionPopover.hidden = true; return; }
   mentionPopover.innerHTML = candidates.map(function(c){
     return '<button type="button" class="mention-popover-opt" data-dept="'+c.id+'">'+
-      '<span class="fwd-avatar" style="background:'+avatarGradient(c.id)+'">'+iconSvg(c.id)+'</span>'+esc(c.name)+'</button>';
+      '<span class="fwd-avatar" style="'+avatarStyleAttr(c.id)+'">'+avatarInnerHtml(c.id)+'</span>'+esc(c.name)+'</button>';
   }).join("");
   mentionPopover.hidden = false;
   mentionPopover.querySelectorAll(".mention-popover-opt").forEach(function(btn){
@@ -4434,6 +4469,68 @@ changePinForm.addEventListener("submit", function(e){
   }).finally(function(){ changePinSubmitBtn.disabled = false; });
 });
 
+var deptPhotoBtn = document.getElementById("deptPhotoBtn");
+var deptPhotoOverlay = document.getElementById("deptPhotoOverlay");
+var deptPhotoClose = document.getElementById("deptPhotoClose");
+var deptPhotoPreview = document.getElementById("deptPhotoPreview");
+var deptPhotoFileInput = document.getElementById("deptPhotoFileInput");
+var deptPhotoUploadBtn = document.getElementById("deptPhotoUploadBtn");
+var deptPhotoRemoveBtn = document.getElementById("deptPhotoRemoveBtn");
+var deptPhotoError = document.getElementById("deptPhotoError");
+function renderDeptPhotoPreview(){
+  var meta = DEPT_META[STATE.self];
+  if(meta && meta.photoUrl){
+    deptPhotoPreview.style.backgroundImage = "url('"+meta.photoUrl+"')";
+    deptPhotoPreview.innerHTML = "";
+    deptPhotoRemoveBtn.hidden = false;
+  } else {
+    deptPhotoPreview.style.backgroundImage = "none";
+    deptPhotoPreview.innerHTML = iconSvg(STATE.self);
+    deptPhotoRemoveBtn.hidden = true;
+  }
+}
+deptPhotoBtn.addEventListener("click", function(){
+  deptPhotoError.textContent = "";
+  renderDeptPhotoPreview();
+  deptPhotoOverlay.hidden = false;
+});
+deptPhotoClose.addEventListener("click", function(){ deptPhotoOverlay.hidden = true; });
+deptPhotoOverlay.addEventListener("click", function(e){ if(e.target === deptPhotoOverlay) deptPhotoOverlay.hidden = true; });
+deptPhotoUploadBtn.addEventListener("click", function(){ deptPhotoFileInput.click(); });
+deptPhotoFileInput.addEventListener("change", function(){
+  var file = deptPhotoFileInput.files[0];
+  deptPhotoFileInput.value = "";
+  if(!file) return;
+  deptPhotoError.textContent = "";
+  deptPhotoUploadBtn.disabled = true;
+  blobToBase64(file).then(function(b64){
+    return apiSend('/api/departments/' + encodeURIComponent(STATE.self) + '/photo', 'POST', { fileBase64: b64, fileMime: file.type });
+  }).then(function(res){
+    DEPT_META[STATE.self] = res.department;
+    renderDeptPhotoPreview();
+    renderList();
+    renderHeader();
+    renderSwitcher();
+    showToast("Photo updated");
+  }).catch(function(err){
+    deptPhotoError.textContent = err.message || "Couldn't upload that photo.";
+  }).finally(function(){ deptPhotoUploadBtn.disabled = false; });
+});
+deptPhotoRemoveBtn.addEventListener("click", function(){
+  deptPhotoError.textContent = "";
+  deptPhotoRemoveBtn.disabled = true;
+  apiDelete('/api/departments/' + encodeURIComponent(STATE.self) + '/photo').then(function(res){
+    DEPT_META[STATE.self] = res.department;
+    renderDeptPhotoPreview();
+    renderList();
+    renderHeader();
+    renderSwitcher();
+    showToast("Photo removed");
+  }).catch(function(err){
+    deptPhotoError.textContent = err.message || "Couldn't remove that photo.";
+  }).finally(function(){ deptPhotoRemoveBtn.disabled = false; });
+});
+
 var notifSettingsBtn = document.getElementById("notifSettingsBtn");
 var notifSettingsOverlay = document.getElementById("notifSettingsOverlay");
 var notifSettingsClose = document.getElementById("notifSettingsClose");
@@ -4757,7 +4854,7 @@ function renderFeed(messages){
     row.className = "feed-row";
     var preview = messagePreviewLabel(m);
     row.innerHTML =
-      '<span class="feed-avatar" style="background:'+avatarGradient(m.from)+'">'+iconSvg(m.from)+'</span>'+
+      '<span class="feed-avatar" style="'+avatarStyleAttr(m.from)+'">'+avatarInnerHtml(m.from)+'</span>'+
       '<span class="feed-body">'+
         '<span class="feed-route">'+esc(DEPTS[m.from] ? DEPTS[m.from].name : m.from)+
           '<span class="arrow">→</span>'+esc(DEPTS[m.to] ? DEPTS[m.to].name : m.to)+'</span>'+
@@ -5029,7 +5126,7 @@ function renderEventPalette(){
     var chip = document.createElement("div");
     chip.className = "event-chip";
     chip.innerHTML =
-      '<div class="event-chip-avatar" style="background:'+avatarGradient(id)+'">'+iconSvg(id)+'</div>'+
+      '<div class="event-chip-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].initials : id))+'</div>';
     attachDragChip(chip, function(groupId){
       if(groupId) joinGroup(groupId, id);
@@ -5091,7 +5188,7 @@ function renderEventList(){
     card.setAttribute("data-group-id", g.id);
     var membersHtml = g.members.map(function(deptId){
       return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
-        '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
+        '<div class="event-member-avatar" style="'+avatarStyleAttr(deptId)+'">'+avatarInnerHtml(deptId)+'</div>'+
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");
@@ -5133,7 +5230,7 @@ function renderEventList(){
     card.className = "event-card past";
     var membersHtml = g.members.map(function(deptId){
       return '<div class="event-member-chip" data-dept-id="'+deptId+'">'+
-        '<div class="event-member-avatar" style="background:'+avatarGradient(deptId)+'">'+iconSvg(deptId)+'</div>'+
+        '<div class="event-member-avatar" style="'+avatarStyleAttr(deptId)+'">'+avatarInnerHtml(deptId)+'</div>'+
         '<div class="event-member-label">'+esc((DEPTS[deptId] ? DEPTS[deptId].initials : deptId))+'</div>'+
       '</div>';
     }).join("");

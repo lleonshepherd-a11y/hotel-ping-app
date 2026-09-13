@@ -277,7 +277,7 @@ function rowToHandoverNote(row) {
   return { id: row.id, departmentId: row.department_id, staffId: row.staff_id, staffName: row.staff_name, body: row.body, createdAt: row.created_at };
 }
 function rowToDepartment(row) {
-  return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
+  return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty, photoUrl: row.photo_path ? "/uploads/" + row.photo_path : undefined };
 }
 function rowToTicket(row) {
   return {
@@ -661,6 +661,35 @@ export default {
           if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
           await env.DB.prepare("UPDATE departments SET contact_name = ? WHERE id = ?").bind(body.contactName.trim() || null, id).run();
         }
+        const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();
+        return json({ department: rowToDepartment(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/departments/") && p.endsWith("/photo")) {
+        const id = decodeURIComponent(p.slice("/api/departments/".length, -"/photo".length));
+        if (!DEPT_IDS.has(id)) return json({ error: "Unknown department" }, 404);
+        const requester = request._staff;
+        if (requester.department_id !== id && !requester.is_admin) return json({ error: "You can only change your own department's photo" }, 403);
+        const body = await readJsonBody(request);
+        if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
+        const binary = atob(body.fileBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Photo is too large (8MB max)" }, 400);
+        const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
+        const safeName = "dept-" + id + "-" + crypto.randomUUID() + ext;
+        await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
+        await env.DB.prepare("UPDATE departments SET photo_path = ? WHERE id = ?").bind(safeName, id).run();
+        const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();
+        return json({ department: rowToDepartment(row) });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/departments/") && p.endsWith("/photo")) {
+        const id = decodeURIComponent(p.slice("/api/departments/".length, -"/photo".length));
+        if (!DEPT_IDS.has(id)) return json({ error: "Unknown department" }, 404);
+        const requester = request._staff;
+        if (requester.department_id !== id && !requester.is_admin) return json({ error: "You can only change your own department's photo" }, 403);
+        await env.DB.prepare("UPDATE departments SET photo_path = NULL WHERE id = ?").bind(id).run();
         const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();
         return json({ department: rowToDepartment(row) });
       }

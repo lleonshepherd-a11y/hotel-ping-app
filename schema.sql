@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS departments (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   contact_name TEXT,
-  on_duty INTEGER NOT NULL DEFAULT 1
+  on_duty INTEGER NOT NULL DEFAULT 1,
+  photo_path TEXT
 );
 
 CREATE TABLE IF NOT EXISTS messages (

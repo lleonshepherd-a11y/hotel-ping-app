@@ -56,6 +56,11 @@ db.exec(`
   );
 `);
 
+const departmentColumns = db.prepare("PRAGMA table_info(departments)").all().map((c) => c.name);
+if (!departmentColumns.includes('photo_path')) {
+  db.exec('ALTER TABLE departments ADD COLUMN photo_path TEXT');
+}
+
 const messageColumns = db.prepare("PRAGMA table_info(messages)").all().map((c) => c.name);
 if (!messageColumns.includes('transcript')) {
   db.exec('ALTER TABLE messages ADD COLUMN transcript TEXT');
