@@ -152,7 +152,27 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
   };
 }
 function rowToGroup(row, members) {
-  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined };
+  return {
+    id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [],
+    archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined,
+    description: row.description || undefined, eventDate: row.event_date || undefined,
+    guestCount: row.guest_count === null || row.guest_count === undefined ? undefined : row.guest_count,
+    location: row.location || undefined,
+  };
+}
+function rowToStation(row) {
+  return {
+    id: row.id, groupId: row.group_id, title: row.title, category: row.category || undefined,
+    description: row.description || undefined, icon: row.icon || undefined,
+    assignedDeptId: row.assigned_dept_id || undefined, confirmedAt: row.confirmed_at || undefined,
+    position: row.position,
+  };
+}
+function rowToRunsheetItem(row) {
+  return {
+    id: row.id, groupId: row.group_id, timeLabel: row.time_label, title: row.title,
+    description: row.description || undefined, teamLabel: row.team_label || undefined, position: row.position,
+  };
 }
 function rowToStory(row, viewed) {
   return {
@@ -591,6 +611,9 @@ const server = http.createServer(async (req, res) => {
         return {
           id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
           archivedAt: g.archived_at || undefined, sharedAt: g.shared_at || undefined,
+          description: g.description || undefined, eventDate: g.event_date || undefined,
+          guestCount: g.guest_count === null || g.guest_count === undefined ? undefined : g.guest_count,
+          location: g.location || undefined,
           members, isMember,
           lastMessage: last ? rowToMessage(last, self, requester.is_admin) : null,
           unreadCount: isMember ? unread.n : 0,
@@ -615,6 +638,185 @@ const server = http.createServer(async (req, res) => {
       }
       const row = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
       return send(res, 201, { group: rowToGroup(row, allMembers) });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/groups/') && p.split('/').length === 4) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length));
+      const group = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Event not found' });
+      const requester = staffFromToken(req);
+      if (group.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department that created this event can edit its details' });
+      }
+      const body = await readJsonBody(req);
+      if (typeof body.description === 'string') {
+        db.prepare('UPDATE groups SET description = ? WHERE id = ?').run(body.description.trim().slice(0, 400) || null, id);
+      }
+      if (typeof body.eventDate === 'string' || body.eventDate === null) {
+        db.prepare('UPDATE groups SET event_date = ? WHERE id = ?').run(body.eventDate ? String(body.eventDate).trim().slice(0, 60) : null, id);
+      }
+      if (typeof body.guestCount === 'number' || body.guestCount === null) {
+        const gc = body.guestCount === null ? null : Math.max(0, Math.round(body.guestCount));
+        db.prepare('UPDATE groups SET guest_count = ? WHERE id = ?').run(gc, id);
+      }
+      if (typeof body.location === 'string' || body.location === null) {
+        db.prepare('UPDATE groups SET location = ? WHERE id = ?').run(body.location ? String(body.location).trim().slice(0, 120) : null, id);
+      }
+      const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(id).map((m) => m.department_id);
+      const row2 = db.prepare('SELECT * FROM groups WHERE id = ?').get(id);
+      return send(res, 200, { group: rowToGroup(row2, members) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/groups/') && p.endsWith('/stations')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/stations'.length));
+      const rows = db.prepare('SELECT * FROM event_stations WHERE group_id = ? ORDER BY position ASC, created_at ASC').all(id);
+      return send(res, 200, { stations: rows.map(rowToStation) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/stations')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/stations'.length));
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Event not found' });
+      const requester = staffFromToken(req);
+      if (group.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department that created this event can add stations' });
+      }
+      const body = await readJsonBody(req);
+      const title = String(body.title || '').trim();
+      if (!title) return send(res, 400, { error: 'Station title is required' });
+      if (title.length > 80) return send(res, 400, { error: 'Station title is too long' });
+      const category = body.category ? String(body.category).trim().slice(0, 60) : null;
+      const description = body.description ? String(body.description).trim().slice(0, 200) : null;
+      const icon = body.icon ? String(body.icon).trim().slice(0, 30) : null;
+      const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_stations WHERE group_id = ?').get(id);
+      const stationId = crypto.randomUUID();
+      db.prepare(
+        'INSERT INTO event_stations (id, group_id, title, category, description, icon, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(stationId, id, title, category, description, icon, posRow.maxPos + 1, new Date().toISOString());
+      const row = db.prepare('SELECT * FROM event_stations WHERE id = ?').get(stationId);
+      return send(res, 201, { station: rowToStation(row) });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/stations/')) {
+      const id = decodeURIComponent(p.slice('/api/stations/'.length));
+      const station = db.prepare('SELECT * FROM event_stations WHERE id = ?').get(id);
+      if (!station) return send(res, 404, { error: 'Station not found' });
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(station.group_id);
+      const requester = staffFromToken(req);
+      const canManage = group && (group.created_by === requester.department_id || requester.is_admin);
+      const body = await readJsonBody(req);
+
+      if (typeof body.assignedDeptId !== 'undefined') {
+        if (!canManage) return send(res, 403, { error: 'Only the department that created this event can assign stations' });
+        if (body.assignedDeptId !== null && !DEPT_IDS.has(body.assignedDeptId)) return send(res, 400, { error: 'Unknown department' });
+        db.prepare('UPDATE event_stations SET assigned_dept_id = ?, confirmed_at = NULL WHERE id = ?').run(body.assignedDeptId || null, id);
+      }
+      if (body.confirm === true) {
+        if (station.assigned_dept_id !== requester.department_id && !requester.is_admin) {
+          return send(res, 403, { error: 'Only the assigned department can confirm this station' });
+        }
+        db.prepare('UPDATE event_stations SET confirmed_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      }
+      if (typeof body.title === 'string' || typeof body.category === 'string' || typeof body.description === 'string') {
+        if (!canManage) return send(res, 403, { error: 'Only the department that created this event can edit stations' });
+        if (typeof body.title === 'string') {
+          const title = body.title.trim();
+          if (!title) return send(res, 400, { error: 'Station title is required' });
+          db.prepare('UPDATE event_stations SET title = ? WHERE id = ?').run(title.slice(0, 80), id);
+        }
+        if (typeof body.category === 'string') {
+          db.prepare('UPDATE event_stations SET category = ? WHERE id = ?').run(body.category.trim().slice(0, 60) || null, id);
+        }
+        if (typeof body.description === 'string') {
+          db.prepare('UPDATE event_stations SET description = ? WHERE id = ?').run(body.description.trim().slice(0, 200) || null, id);
+        }
+      }
+      const row = db.prepare('SELECT * FROM event_stations WHERE id = ?').get(id);
+      return send(res, 200, { station: rowToStation(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/stations/')) {
+      const id = decodeURIComponent(p.slice('/api/stations/'.length));
+      const station = db.prepare('SELECT group_id FROM event_stations WHERE id = ?').get(id);
+      if (!station) return send(res, 404, { error: 'Station not found' });
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(station.group_id);
+      const requester = staffFromToken(req);
+      if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        return send(res, 403, { error: 'Only the department that created this event can remove stations' });
+      }
+      db.prepare('DELETE FROM event_stations WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/groups/') && p.endsWith('/runsheet')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/runsheet'.length));
+      const rows = db.prepare('SELECT * FROM event_runsheet_items WHERE group_id = ? ORDER BY position ASC, created_at ASC').all(id);
+      return send(res, 200, { items: rows.map(rowToRunsheetItem) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/runsheet')) {
+      const id = decodeURIComponent(p.slice('/api/groups/'.length, -'/runsheet'.length));
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(id);
+      if (!group) return send(res, 404, { error: 'Event not found' });
+      const requester = staffFromToken(req);
+      if (group.created_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the department that created this event can edit the run sheet' });
+      }
+      const body = await readJsonBody(req);
+      const timeLabel = String(body.timeLabel || '').trim();
+      const title = String(body.title || '').trim();
+      if (!timeLabel) return send(res, 400, { error: 'A time is required' });
+      if (!title) return send(res, 400, { error: 'A title is required' });
+      if (timeLabel.length > 20) return send(res, 400, { error: 'Time is too long' });
+      if (title.length > 100) return send(res, 400, { error: 'Title is too long' });
+      const description = body.description ? String(body.description).trim().slice(0, 300) : null;
+      const teamLabel = body.teamLabel ? String(body.teamLabel).trim().slice(0, 60) : null;
+      const posRow = db.prepare('SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_runsheet_items WHERE group_id = ?').get(id);
+      const itemId = crypto.randomUUID();
+      db.prepare(
+        'INSERT INTO event_runsheet_items (id, group_id, time_label, title, description, team_label, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(itemId, id, timeLabel, title, description, teamLabel, posRow.maxPos + 1, new Date().toISOString());
+      const row = db.prepare('SELECT * FROM event_runsheet_items WHERE id = ?').get(itemId);
+      return send(res, 201, { item: rowToRunsheetItem(row) });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/runsheet/')) {
+      const id = decodeURIComponent(p.slice('/api/runsheet/'.length));
+      const item = db.prepare('SELECT * FROM event_runsheet_items WHERE id = ?').get(id);
+      if (!item) return send(res, 404, { error: 'Run sheet item not found' });
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(item.group_id);
+      const requester = staffFromToken(req);
+      if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        return send(res, 403, { error: 'Only the department that created this event can edit the run sheet' });
+      }
+      const body = await readJsonBody(req);
+      if (typeof body.timeLabel === 'string' && body.timeLabel.trim()) {
+        db.prepare('UPDATE event_runsheet_items SET time_label = ? WHERE id = ?').run(body.timeLabel.trim().slice(0, 20), id);
+      }
+      if (typeof body.title === 'string' && body.title.trim()) {
+        db.prepare('UPDATE event_runsheet_items SET title = ? WHERE id = ?').run(body.title.trim().slice(0, 100), id);
+      }
+      if (typeof body.description === 'string') {
+        db.prepare('UPDATE event_runsheet_items SET description = ? WHERE id = ?').run(body.description.trim().slice(0, 300) || null, id);
+      }
+      if (typeof body.teamLabel === 'string') {
+        db.prepare('UPDATE event_runsheet_items SET team_label = ? WHERE id = ?').run(body.teamLabel.trim().slice(0, 60) || null, id);
+      }
+      const row = db.prepare('SELECT * FROM event_runsheet_items WHERE id = ?').get(id);
+      return send(res, 200, { item: rowToRunsheetItem(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/runsheet/')) {
+      const id = decodeURIComponent(p.slice('/api/runsheet/'.length));
+      const item = db.prepare('SELECT group_id FROM event_runsheet_items WHERE id = ?').get(id);
+      if (!item) return send(res, 404, { error: 'Run sheet item not found' });
+      const group = db.prepare('SELECT created_by FROM groups WHERE id = ?').get(item.group_id);
+      const requester = staffFromToken(req);
+      if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        return send(res, 403, { error: 'Only the department that created this event can edit the run sheet' });
+      }
+      db.prepare('DELETE FROM event_runsheet_items WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/join')) {

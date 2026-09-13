@@ -115,8 +115,38 @@ CREATE TABLE IF NOT EXISTS groups (
   created_at TEXT NOT NULL,
   deleted_at TEXT,
   archived_at TEXT,
-  shared_at TEXT
+  shared_at TEXT,
+  description TEXT,
+  event_date TEXT,
+  guest_count INTEGER,
+  location TEXT
 );
+
+CREATE TABLE IF NOT EXISTS event_stations (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  category TEXT,
+  description TEXT,
+  icon TEXT,
+  assigned_dept_id TEXT,
+  confirmed_at TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_event_stations_group ON event_stations(group_id, position);
+
+CREATE TABLE IF NOT EXISTS event_runsheet_items (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL,
+  time_label TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  team_label TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_event_runsheet_group ON event_runsheet_items(group_id, position);
 
 CREATE TABLE IF NOT EXISTS group_members (
   group_id TEXT NOT NULL,

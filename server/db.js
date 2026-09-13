@@ -348,6 +348,46 @@ if (!groupColumns.includes('archived_at')) {
 if (!groupColumns.includes('shared_at')) {
   db.exec('ALTER TABLE groups ADD COLUMN shared_at TEXT');
 }
+if (!groupColumns.includes('description')) {
+  db.exec('ALTER TABLE groups ADD COLUMN description TEXT');
+}
+if (!groupColumns.includes('event_date')) {
+  db.exec('ALTER TABLE groups ADD COLUMN event_date TEXT');
+}
+if (!groupColumns.includes('guest_count')) {
+  db.exec('ALTER TABLE groups ADD COLUMN guest_count INTEGER');
+}
+if (!groupColumns.includes('location')) {
+  db.exec('ALTER TABLE groups ADD COLUMN location TEXT');
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS event_stations (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT,
+    description TEXT,
+    icon TEXT,
+    assigned_dept_id TEXT,
+    confirmed_at TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_event_stations_group ON event_stations(group_id, position);
+
+  CREATE TABLE IF NOT EXISTS event_runsheet_items (
+    id TEXT PRIMARY KEY,
+    group_id TEXT NOT NULL,
+    time_label TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    team_label TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_event_runsheet_group ON event_runsheet_items(group_id, position);
+`);
 
 const staffColumns = db.prepare("PRAGMA table_info(staff)").all().map((c) => c.name);
 if (!staffColumns.includes('profile_complete')) {

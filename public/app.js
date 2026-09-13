@@ -4532,6 +4532,9 @@ function renderEventList(){
         '<div class="event-card-actions">'+
           (canManage && isEmpty ? '<button type="button" class="event-card-end event-card-delete" data-group-id="'+g.id+'">Delete</button>' : '')+
           (canManage && !isEmpty ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
+          '<button type="button" class="event-card-details" data-group-id="'+g.id+'" title="Event details">'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/></svg>'+
+          '</button>'+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
@@ -4541,6 +4544,7 @@ function renderEventList(){
       (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
     eventList.appendChild(card);
 
+    card.querySelector(".event-card-details").addEventListener("click", function(e){ e.stopPropagation(); openEventDetail(g.id); });
     card.querySelectorAll(".event-member-chip").forEach(function(chip){
       var deptId = chip.getAttribute("data-dept-id");
       attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true, dropLabel: "Drop to remove" });
@@ -4585,6 +4589,389 @@ function renderEventList(){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); shareEvent(g.id); });
     }
     card.querySelector(".event-card-open").addEventListener("click", function(){ openGroupThread(g.id); });
+  });
+}
+
+/* ---------------- Event detail: banner + stations + run sheet ---------------- */
+var STATION_ICONS = {
+  fnb: '<path d="M8 2h8l-1 7a3 3 0 0 1-6 0z"/><path d="M12 13v7"/><path d="M8 20h8"/>',
+  catering: '<path d="M6 2v8a2 2 0 0 0 4 0V2"/><path d="M8 10v12"/><path d="M17 2c-1.5 0-3 1.5-3 4s1.5 4 3 4v10"/>',
+  engineering: '<path d="M13 2L4 14h6l-1 8 9-12h-6z"/>',
+  housekeeping: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/>',
+  security: '<path d="M12 3l7 3v6c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/>',
+  guest: '<path d="M12 3l2.6 5.8 6.2.6-4.7 4.2 1.4 6.1L12 16.9 6.5 19.7l1.4-6.1-4.7-4.2 6.2-.6z"/>',
+  music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+  general: '<path d="M5 3v18"/><path d="M5 4h13l-3 5 3 5H5"/>'
+};
+var STATION_ICON_ORDER = ["fnb","catering","engineering","housekeeping","security","guest","music","general"];
+function stationIconSvg(key){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+(STATION_ICONS[key] || STATION_ICONS.general)+'</svg>';
+}
+
+var eventDetailOverlay = document.getElementById("eventDetailOverlay");
+var eventDetailBody = document.getElementById("eventDetailBody");
+var eventDetailName = document.getElementById("eventDetailName");
+var eventDetailClose = document.getElementById("eventDetailClose");
+var eventDetailRunsheetOpen = false;
+STATE.eventDetailGroupId = null;
+STATE.eventDetailStations = [];
+STATE.eventDetailRunsheet = [];
+
+function openEventDetail(groupId){
+  var g = STATE.groups.find(function(x){ return x.id === groupId; });
+  if(!g) return;
+  STATE.eventDetailGroupId = groupId;
+  eventDetailRunsheetOpen = false;
+  eventDetailName.textContent = g.name;
+  eventDetailOverlay.hidden = false;
+  appToast.classList.add("above-modal");
+  eventDetailBody.innerHTML = '<div class="event-detail-loading">Loading…</div>';
+  Promise.all([
+    apiGet('/api/groups/' + encodeURIComponent(groupId) + '/stations'),
+    apiGet('/api/groups/' + encodeURIComponent(groupId) + '/runsheet')
+  ]).then(function(results){
+    STATE.eventDetailStations = results[0].stations;
+    STATE.eventDetailRunsheet = results[1].items;
+    renderEventDetailBody();
+  }).catch(function(err){
+    eventDetailBody.innerHTML = '<div class="event-detail-loading">' + esc(err.message || "Couldn't load this event") + '</div>';
+  });
+}
+function closeEventDetail(){
+  eventDetailOverlay.hidden = true;
+  appToast.classList.remove("above-modal");
+  STATE.eventDetailGroupId = null;
+}
+eventDetailClose.addEventListener("click", closeEventDetail);
+eventDetailOverlay.addEventListener("click", function(e){ if(e.target === eventDetailOverlay) closeEventDetail(); });
+
+function currentEventDetailGroup(){
+  return STATE.groups.find(function(x){ return x.id === STATE.eventDetailGroupId; });
+}
+function eventDetailCanManage(){
+  var g = currentEventDetailGroup();
+  return !!(g && (g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin)));
+}
+
+function renderEventDetailBody(){
+  var g = currentEventDetailGroup();
+  if(!g){ closeEventDetail(); return; }
+  eventDetailName.textContent = g.name;
+  var canManage = eventDetailCanManage();
+
+  function bannerPill(field, iconSvg, valueText, hasValue){
+    if(!canManage && !hasValue) return "";
+    var tag = canManage ? "button" : "div";
+    return '<'+tag+(canManage ? ' type="button"' : '')+' class="event-detail-pill'+(canManage ? '' : ' readonly')+'" data-field="'+field+'">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+iconSvg+'</svg>'+
+      '<span>'+esc(valueText)+'</span>'+
+    '</'+tag+'>';
+  }
+  var pillsHtml =
+    bannerPill("eventDate", '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4M16 3v4"/>', g.eventDate || "Add date", !!g.eventDate) +
+    bannerPill("guestCount", '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>', (g.guestCount || g.guestCount === 0) ? String(g.guestCount) + " guests" : "Add guest count", g.guestCount || g.guestCount === 0) +
+    bannerPill("location", '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>', g.location || "Add location", !!g.location);
+
+  var hodsHtml = DEPT_ORDER.filter(function(id){ return id !== STATE.self || true; }).map(function(id){
+    return '<div class="event-detail-hod-chip" data-dept-id="'+id+'">'+
+      '<div class="event-detail-hod-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</div>'+
+      '<div class="event-detail-hod-label">'+esc(DEPTS[id] ? DEPTS[id].initials : id)+'</div>'+
+    '</div>';
+  }).join("");
+
+  var stationsHtml = STATE.eventDetailStations.map(function(s){
+    var assignedDept = s.assignedDeptId;
+    var canConfirm = assignedDept && (assignedDept === STATE.self || (AUTH.staff && AUTH.staff.isAdmin));
+    var assignHtml;
+    if(assignedDept){
+      assignHtml =
+        '<div class="station-assigned-chip" data-dept-id="'+assignedDept+'">'+
+          '<div class="station-assigned-avatar" style="'+avatarStyleAttr(assignedDept)+'">'+avatarInnerHtml(assignedDept)+'</div>'+
+          '<span class="station-assigned-label">'+esc(DEPTS[assignedDept] ? DEPTS[assignedDept].initials : assignedDept)+'</span>'+
+          (s.confirmedAt ? '<span class="station-confirmed-badge" title="Confirmed">'+ACTION_ICONS.check+'</span>' :
+            (canConfirm ? '<button type="button" class="station-confirm-btn" data-station-id="'+s.id+'">Confirm</button>' : '<span class="station-pending-badge">Pending</span>')) +
+          (canManage ? '<button type="button" class="station-unassign-btn" data-station-id="'+s.id+'" aria-label="Unassign">×</button>' : '') +
+        '</div>';
+    } else {
+      assignHtml = '<div class="station-empty-slot">Drop a department here</div>';
+    }
+    return '<div class="station-row" data-station-id="'+s.id+'">'+
+      '<div class="station-icon">'+stationIconSvg(s.icon)+'</div>'+
+      '<div class="station-body">'+
+        '<div class="station-title">'+esc(s.title)+'</div>'+
+        (s.category ? '<div class="station-category">'+esc(s.category)+'</div>' : '')+
+      '</div>'+
+      '<div class="station-assign">'+assignHtml+'</div>'+
+      (canManage ? '<button type="button" class="station-remove-btn" data-station-id="'+s.id+'" aria-label="Remove station">'+ACTION_ICONS.trash+'</button>' : '')+
+    '</div>';
+  }).join("") || '<div class="event-detail-empty">No stations yet'+(canManage ? ' — add one below.' : '.')+'</div>';
+
+  var iconPickerHtml = STATION_ICON_ORDER.map(function(key, i){
+    return '<button type="button" class="station-icon-choice'+(i===0 ? ' active' : '')+'" data-icon="'+key+'">'+stationIconSvg(key)+'</button>';
+  }).join("");
+
+  var runsheetHtml = STATE.eventDetailRunsheet.map(function(item){
+    return '<div class="runsheet-row" data-item-id="'+item.id+'">'+
+      '<div class="runsheet-time">'+esc(item.timeLabel)+'</div>'+
+      '<div class="runsheet-body-text">'+
+        '<div class="runsheet-title">'+esc(item.title)+'</div>'+
+        (item.description ? '<div class="runsheet-desc">'+esc(item.description)+'</div>' : '')+
+      '</div>'+
+      (item.teamLabel ? '<div class="runsheet-team">'+esc(item.teamLabel)+'</div>' : '')+
+      (canManage ? '<button type="button" class="runsheet-remove-btn" data-item-id="'+item.id+'" aria-label="Remove row">×</button>' : '')+
+    '</div>';
+  }).join("") || '<div class="event-detail-empty">Nothing on the run sheet yet'+(canManage ? ' — add a row below.' : '.')+'</div>';
+
+  eventDetailBody.innerHTML =
+    '<div class="event-detail-banner">'+
+      (canManage ? '<button type="button" class="event-detail-desc'+(g.description ? '' : ' placeholder')+'" data-field="description">'+(g.description ? esc(g.description) : "Add a description")+'</button>' : (g.description ? '<div class="event-detail-desc readonly">'+esc(g.description)+'</div>' : ''))+
+      '<div class="event-detail-pills">'+pillsHtml+'</div>'+
+    '</div>'+
+    '<div class="event-detail-section">'+
+      '<div class="event-detail-section-head"><h3>Stations</h3></div>'+
+      (canManage ? '<p class="event-detail-hint">Drag a department onto a station to assign them.</p>' : '')+
+      (canManage ? '<div class="event-detail-hods" id="eventDetailHods">'+hodsHtml+'</div>' : '')+
+      '<div class="station-list" id="stationList">'+stationsHtml+'</div>'+
+      (canManage ?
+        '<button type="button" class="event-detail-add-btn" id="stationAddToggle">+ Add station</button>'+
+        '<div class="station-add-form" id="stationAddForm" hidden>'+
+          '<div class="station-icon-picker">'+iconPickerHtml+'</div>'+
+          '<input type="text" id="stationTitleInput" placeholder="Station name, e.g. Banqueting &amp; Wine Service" maxlength="80">'+
+          '<input type="text" id="stationCategoryInput" placeholder="Category (optional), e.g. Food &amp; Beverage" maxlength="60">'+
+          '<button type="button" class="admin-add-btn" id="stationAddSubmit">Add station</button>'+
+        '</div>'
+      : '')+
+    '</div>'+
+    '<div class="event-detail-section runsheet-section">'+
+      '<button type="button" class="runsheet-toggle" id="runsheetToggle">'+
+        '<h3>Run Sheet</h3>'+
+        '<svg class="runsheet-chevron'+(eventDetailRunsheetOpen ? ' open' : '')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
+      '</button>'+
+      '<div class="runsheet-body" id="runsheetBody"'+(eventDetailRunsheetOpen ? '' : ' hidden')+'>'+
+        '<div class="runsheet-list" id="runsheetList">'+runsheetHtml+'</div>'+
+        (canManage ?
+          '<button type="button" class="event-detail-add-btn" id="runsheetAddToggle">+ Add to run sheet</button>'+
+          '<div class="runsheet-add-form" id="runsheetAddForm" hidden>'+
+            '<input type="text" id="runsheetTimeInput" placeholder="Time, e.g. 14:30" maxlength="20">'+
+            '<input type="text" id="runsheetTitleInput" placeholder="What happens, e.g. Wedding Ceremony" maxlength="100">'+
+            '<input type="text" id="runsheetTeamInput" placeholder="Team (optional), e.g. F&amp;B and Culinary" maxlength="60">'+
+            '<button type="button" class="admin-add-btn" id="runsheetAddSubmit">Add row</button>'+
+          '</div>'
+        : '')+
+      '</div>'+
+    '</div>';
+
+  wireEventDetailInteractions(canManage);
+}
+
+function wireEventDetailInteractions(canManage){
+  if(canManage){
+    var descBtn = eventDetailBody.querySelector('.event-detail-desc');
+    if(descBtn){
+      descBtn.addEventListener("click", function(){ editEventBannerField("description", "Event description", currentEventDetailGroup().description || ""); });
+    }
+    eventDetailBody.querySelectorAll(".event-detail-pill").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var field = btn.getAttribute("data-field");
+        var g = currentEventDetailGroup();
+        if(field === "eventDate") editEventBannerField("eventDate", "Date & time", g.eventDate || "");
+        else if(field === "guestCount") editEventBannerField("guestCount", "Number of guests", g.guestCount || g.guestCount === 0 ? String(g.guestCount) : "");
+        else if(field === "location") editEventBannerField("location", "Location", g.location || "");
+      });
+    });
+  }
+
+  if(canManage){
+    var hodsWrap = document.getElementById("eventDetailHods");
+    if(hodsWrap){
+      hodsWrap.querySelectorAll(".event-detail-hod-chip").forEach(function(chip){
+        var deptId = chip.getAttribute("data-dept-id");
+        attachStationDragChip(chip, deptId);
+      });
+    }
+  }
+
+  eventDetailBody.querySelectorAll(".station-confirm-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){ confirmStation(btn.getAttribute("data-station-id")); });
+  });
+  eventDetailBody.querySelectorAll(".station-unassign-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){ assignStation(btn.getAttribute("data-station-id"), null); });
+  });
+  eventDetailBody.querySelectorAll(".station-remove-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){ removeStation(btn.getAttribute("data-station-id")); });
+  });
+
+  var stationAddToggle = document.getElementById("stationAddToggle");
+  var stationAddForm = document.getElementById("stationAddForm");
+  if(stationAddToggle){
+    var selectedIcon = STATION_ICON_ORDER[0];
+    stationAddToggle.addEventListener("click", function(){
+      stationAddForm.hidden = !stationAddForm.hidden;
+      if(!stationAddForm.hidden) document.getElementById("stationTitleInput").focus();
+    });
+    stationAddForm.querySelectorAll(".station-icon-choice").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        stationAddForm.querySelectorAll(".station-icon-choice").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        selectedIcon = btn.getAttribute("data-icon");
+      });
+    });
+    document.getElementById("stationAddSubmit").addEventListener("click", function(){
+      var title = document.getElementById("stationTitleInput").value.trim();
+      if(!title) return;
+      var category = document.getElementById("stationCategoryInput").value.trim();
+      addStation(title, category, selectedIcon);
+    });
+  }
+
+  eventDetailBody.querySelectorAll(".runsheet-remove-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){ removeRunsheetItem(btn.getAttribute("data-item-id")); });
+  });
+
+  var runsheetToggle = document.getElementById("runsheetToggle");
+  var runsheetBody = document.getElementById("runsheetBody");
+  runsheetToggle.addEventListener("click", function(){
+    eventDetailRunsheetOpen = !eventDetailRunsheetOpen;
+    runsheetBody.hidden = !eventDetailRunsheetOpen;
+    runsheetToggle.querySelector(".runsheet-chevron").classList.toggle("open", eventDetailRunsheetOpen);
+  });
+
+  var runsheetAddToggle = document.getElementById("runsheetAddToggle");
+  if(runsheetAddToggle){
+    var runsheetAddForm = document.getElementById("runsheetAddForm");
+    runsheetAddToggle.addEventListener("click", function(){
+      runsheetAddForm.hidden = !runsheetAddForm.hidden;
+      if(!runsheetAddForm.hidden) document.getElementById("runsheetTimeInput").focus();
+    });
+    document.getElementById("runsheetAddSubmit").addEventListener("click", function(){
+      var time = document.getElementById("runsheetTimeInput").value.trim();
+      var title = document.getElementById("runsheetTitleInput").value.trim();
+      if(!time || !title) return;
+      var team = document.getElementById("runsheetTeamInput").value.trim();
+      addRunsheetItem(time, title, team);
+    });
+  }
+}
+
+function editEventBannerField(field, label, currentValue){
+  showPrompt({ title: label, value: currentValue, placeholder: label, confirmLabel: "Save" }).then(function(value){
+    if(value === null) return;
+    var payload = {};
+    if(field === "guestCount"){
+      var n = value.trim() === "" ? null : parseInt(value, 10);
+      payload.guestCount = (n === null || isNaN(n)) ? null : n;
+    } else {
+      payload[field] = value.trim();
+    }
+    apiSend('/api/groups/' + encodeURIComponent(STATE.eventDetailGroupId), 'PATCH', payload).then(function(res){
+      var idx = STATE.groups.findIndex(function(g){ return g.id === STATE.eventDetailGroupId; });
+      if(idx !== -1) STATE.groups[idx] = Object.assign({}, STATE.groups[idx], res.group);
+      renderEventDetailBody();
+    }).catch(function(err){ showToast(err.message || "Couldn't save that"); });
+  });
+}
+
+function assignStation(stationId, deptId){
+  apiSend('/api/stations/' + encodeURIComponent(stationId), 'PATCH', { assignedDeptId: deptId }).then(function(res){
+    var idx = STATE.eventDetailStations.findIndex(function(s){ return s.id === stationId; });
+    if(idx !== -1) STATE.eventDetailStations[idx] = res.station;
+    renderEventDetailBody();
+  }).catch(function(err){ showToast(err.message || "Couldn't assign that station"); });
+}
+function confirmStation(stationId){
+  apiSend('/api/stations/' + encodeURIComponent(stationId), 'PATCH', { confirm: true }).then(function(res){
+    var idx = STATE.eventDetailStations.findIndex(function(s){ return s.id === stationId; });
+    if(idx !== -1) STATE.eventDetailStations[idx] = res.station;
+    renderEventDetailBody();
+    showToast("Station confirmed");
+  }).catch(function(err){ showToast(err.message || "Couldn't confirm that station"); });
+}
+function addStation(title, category, icon){
+  apiSend('/api/groups/' + encodeURIComponent(STATE.eventDetailGroupId) + '/stations', 'POST', { title: title, category: category, icon: icon }).then(function(res){
+    STATE.eventDetailStations.push(res.station);
+    renderEventDetailBody();
+  }).catch(function(err){ showToast(err.message || "Couldn't add that station"); });
+}
+function removeStation(stationId){
+  showConfirm({ title: "Remove this station?", confirmLabel: "Remove" }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/stations/' + encodeURIComponent(stationId)).then(function(){
+      STATE.eventDetailStations = STATE.eventDetailStations.filter(function(s){ return s.id !== stationId; });
+      renderEventDetailBody();
+    }).catch(function(err){ showToast(err.message || "Couldn't remove that station"); });
+  });
+}
+
+function addRunsheetItem(timeLabel, title, teamLabel){
+  apiSend('/api/groups/' + encodeURIComponent(STATE.eventDetailGroupId) + '/runsheet', 'POST', { timeLabel: timeLabel, title: title, teamLabel: teamLabel }).then(function(res){
+    STATE.eventDetailRunsheet.push(res.item);
+    renderEventDetailBody();
+  }).catch(function(err){ showToast(err.message || "Couldn't add that row"); });
+}
+function removeRunsheetItem(itemId){
+  showConfirm({ title: "Remove this row?", confirmLabel: "Remove" }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/runsheet/' + encodeURIComponent(itemId)).then(function(){
+      STATE.eventDetailRunsheet = STATE.eventDetailRunsheet.filter(function(i){ return i.id !== itemId; });
+      renderEventDetailBody();
+    }).catch(function(err){ showToast(err.message || "Couldn't remove that row"); });
+  });
+}
+
+function attachStationDragChip(chipEl, deptId){
+  var pointerId = null, dragging = false, ghost = null;
+  function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
+  function clearHighlights(){ document.querySelectorAll(".station-row.drag-over").forEach(function(r){ r.classList.remove("drag-over"); }); }
+  function teardown(){
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    pointerId = null;
+  }
+  function endVisuals(){
+    chipEl.classList.remove("dragging", "pressing");
+    if(ghost){ ghost.remove(); ghost = null; }
+    clearHighlights();
+    dragging = false;
+  }
+  function onMove(ev){
+    if(ev.pointerId !== pointerId) return;
+    ev.preventDefault();
+    moveGhost(ev.clientX, ev.clientY);
+    var el = document.elementFromPoint(ev.clientX, ev.clientY);
+    var row = el && el.closest ? el.closest(".station-row") : null;
+    clearHighlights();
+    if(row) row.classList.add("drag-over");
+  }
+  function onCancel(ev){ if(ev.pointerId !== pointerId) return; teardown(); endVisuals(); }
+  function onUp(ev){
+    if(ev.pointerId !== pointerId) return;
+    var wasDragging = dragging;
+    var dropX = ev.clientX, dropY = ev.clientY;
+    teardown();
+    if(!wasDragging) return;
+    var el = document.elementFromPoint(dropX, dropY);
+    var row = el && el.closest ? el.closest(".station-row") : null;
+    endVisuals();
+    if(row){
+      if(navigator.vibrate) navigator.vibrate(18);
+      assignStation(row.getAttribute("data-station-id"), deptId);
+    }
+  }
+  chipEl.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    pointerId = e.pointerId;
+    dragging = true;
+    chipEl.classList.add("pressing");
+    ghost = chipEl.cloneNode(true);
+    ghost.classList.add("drag-ghost");
+    ghost.style.width = chipEl.offsetWidth + "px";
+    document.body.appendChild(ghost);
+    moveGhost(e.clientX, e.clientY);
+    chipEl.classList.add("dragging");
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
   });
 }
 

@@ -344,7 +344,27 @@ function rowToStory(row, viewed) {
   };
 }
 function rowToGroup(row, members) {
-  return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined };
+  return {
+    id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [],
+    archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined,
+    description: row.description || undefined, eventDate: row.event_date || undefined,
+    guestCount: row.guest_count === null || row.guest_count === undefined ? undefined : row.guest_count,
+    location: row.location || undefined,
+  };
+}
+function rowToStation(row) {
+  return {
+    id: row.id, groupId: row.group_id, title: row.title, category: row.category || undefined,
+    description: row.description || undefined, icon: row.icon || undefined,
+    assignedDeptId: row.assigned_dept_id || undefined, confirmedAt: row.confirmed_at || undefined,
+    position: row.position,
+  };
+}
+function rowToRunsheetItem(row) {
+  return {
+    id: row.id, groupId: row.group_id, timeLabel: row.time_label, title: row.title,
+    description: row.description || undefined, teamLabel: row.team_label || undefined, position: row.position,
+  };
 }
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
@@ -811,6 +831,9 @@ export default {
           groups.push({
             id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
             archivedAt: g.archived_at || undefined, sharedAt: g.shared_at || undefined,
+            description: g.description || undefined, eventDate: g.event_date || undefined,
+            guestCount: g.guest_count === null || g.guest_count === undefined ? undefined : g.guest_count,
+            location: g.location || undefined,
             members, isMember,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: isMember ? unread.n : 0,
@@ -835,6 +858,187 @@ export default {
         }
         const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
         return json({ group: rowToGroup(row, allMembers) }, 201);
+      }
+
+      if (method === "PATCH" && p.startsWith("/api/groups/") && p.split("/").length === 4) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length));
+        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        const requester = request._staff;
+        if (group.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that created this event can edit its details" }, 403);
+        }
+        const body = await readJsonBody(request);
+        if (typeof body.description === "string") {
+          await env.DB.prepare("UPDATE groups SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 400) || null, id).run();
+        }
+        if (typeof body.eventDate === "string" || body.eventDate === null) {
+          await env.DB.prepare("UPDATE groups SET event_date = ? WHERE id = ?").bind(body.eventDate ? String(body.eventDate).trim().slice(0, 60) : null, id).run();
+        }
+        if (typeof body.guestCount === "number" || body.guestCount === null) {
+          const gc = body.guestCount === null ? null : Math.max(0, Math.round(body.guestCount));
+          await env.DB.prepare("UPDATE groups SET guest_count = ? WHERE id = ?").bind(gc, id).run();
+        }
+        if (typeof body.location === "string" || body.location === null) {
+          await env.DB.prepare("UPDATE groups SET location = ? WHERE id = ?").bind(body.location ? String(body.location).trim().slice(0, 120) : null, id).run();
+        }
+        const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(id).all();
+        const row2 = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        return json({ group: rowToGroup(row2, memberRows.results.map((m) => m.department_id)) });
+      }
+
+      // ---- Event stations (drag-a-department-icon-in role assignments) ----
+      if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/stations")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/stations".length));
+        const rows = await env.DB.prepare("SELECT * FROM event_stations WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        return json({ stations: rows.results.map(rowToStation) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/stations")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/stations".length));
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        const requester = request._staff;
+        if (group.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that created this event can add stations" }, 403);
+        }
+        const body = await readJsonBody(request);
+        const title = String(body.title || "").trim();
+        if (!title) return json({ error: "Station title is required" }, 400);
+        if (title.length > 80) return json({ error: "Station title is too long" }, 400);
+        const category = body.category ? String(body.category).trim().slice(0, 60) : null;
+        const description = body.description ? String(body.description).trim().slice(0, 200) : null;
+        const icon = body.icon ? String(body.icon).trim().slice(0, 30) : null;
+        const posRow = await env.DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_stations WHERE group_id = ?").bind(id).first();
+        const stationId = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO event_stations (id, group_id, title, category, description, icon, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(stationId, id, title, category, description, icon, posRow.maxPos + 1, new Date().toISOString()).run();
+        const row = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(stationId).first();
+        return json({ station: rowToStation(row) }, 201);
+      }
+
+      if (method === "PATCH" && p.startsWith("/api/stations/")) {
+        const id = decodeURIComponent(p.slice("/api/stations/".length));
+        const station = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
+        if (!station) return json({ error: "Station not found" }, 404);
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(station.group_id).first();
+        const requester = request._staff;
+        const canManage = group && (group.created_by === requester.department_id || requester.is_admin);
+        const body = await readJsonBody(request);
+
+        if (typeof body.assignedDeptId !== "undefined") {
+          if (!canManage) return json({ error: "Only the department that created this event can assign stations" }, 403);
+          if (body.assignedDeptId !== null && !DEPT_IDS.has(body.assignedDeptId)) return json({ error: "Unknown department" }, 400);
+          await env.DB.prepare("UPDATE event_stations SET assigned_dept_id = ?, confirmed_at = NULL WHERE id = ?").bind(body.assignedDeptId || null, id).run();
+        }
+        if (body.confirm === true) {
+          if (station.assigned_dept_id !== requester.department_id && !requester.is_admin) {
+            return json({ error: "Only the assigned department can confirm this station" }, 403);
+          }
+          await env.DB.prepare("UPDATE event_stations SET confirmed_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        }
+        if (typeof body.title === "string" || typeof body.category === "string" || typeof body.description === "string") {
+          if (!canManage) return json({ error: "Only the department that created this event can edit stations" }, 403);
+          if (typeof body.title === "string") {
+            const title = body.title.trim();
+            if (!title) return json({ error: "Station title is required" }, 400);
+            await env.DB.prepare("UPDATE event_stations SET title = ? WHERE id = ?").bind(title.slice(0, 80), id).run();
+          }
+          if (typeof body.category === "string") {
+            await env.DB.prepare("UPDATE event_stations SET category = ? WHERE id = ?").bind(body.category.trim().slice(0, 60) || null, id).run();
+          }
+          if (typeof body.description === "string") {
+            await env.DB.prepare("UPDATE event_stations SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 200) || null, id).run();
+          }
+        }
+        const row = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
+        return json({ station: rowToStation(row) });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/stations/")) {
+        const id = decodeURIComponent(p.slice("/api/stations/".length));
+        const station = await env.DB.prepare("SELECT group_id FROM event_stations WHERE id = ?").bind(id).first();
+        if (!station) return json({ error: "Station not found" }, 404);
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(station.group_id).first();
+        const requester = request._staff;
+        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+          return json({ error: "Only the department that created this event can remove stations" }, 403);
+        }
+        await env.DB.prepare("DELETE FROM event_stations WHERE id = ?").bind(id).run();
+        return json({ ok: true });
+      }
+
+      // ---- Event run sheet ----
+      if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/runsheet")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/runsheet".length));
+        const rows = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        return json({ items: rows.results.map(rowToRunsheetItem) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/runsheet")) {
+        const id = decodeURIComponent(p.slice("/api/groups/".length, -"/runsheet".length));
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(id).first();
+        if (!group) return json({ error: "Event not found" }, 404);
+        const requester = request._staff;
+        if (group.created_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
+        }
+        const body = await readJsonBody(request);
+        const timeLabel = String(body.timeLabel || "").trim();
+        const title = String(body.title || "").trim();
+        if (!timeLabel) return json({ error: "A time is required" }, 400);
+        if (!title) return json({ error: "A title is required" }, 400);
+        if (timeLabel.length > 20) return json({ error: "Time is too long" }, 400);
+        if (title.length > 100) return json({ error: "Title is too long" }, 400);
+        const description = body.description ? String(body.description).trim().slice(0, 300) : null;
+        const teamLabel = body.teamLabel ? String(body.teamLabel).trim().slice(0, 60) : null;
+        const posRow = await env.DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_runsheet_items WHERE group_id = ?").bind(id).first();
+        const itemId = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO event_runsheet_items (id, group_id, time_label, title, description, team_label, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(itemId, id, timeLabel, title, description, teamLabel, posRow.maxPos + 1, new Date().toISOString()).run();
+        const row = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(itemId).first();
+        return json({ item: rowToRunsheetItem(row) }, 201);
+      }
+
+      if (method === "PATCH" && p.startsWith("/api/runsheet/")) {
+        const id = decodeURIComponent(p.slice("/api/runsheet/".length));
+        const item = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        if (!item) return json({ error: "Run sheet item not found" }, 404);
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(item.group_id).first();
+        const requester = request._staff;
+        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+          return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
+        }
+        const body = await readJsonBody(request);
+        if (typeof body.timeLabel === "string" && body.timeLabel.trim()) {
+          await env.DB.prepare("UPDATE event_runsheet_items SET time_label = ? WHERE id = ?").bind(body.timeLabel.trim().slice(0, 20), id).run();
+        }
+        if (typeof body.title === "string" && body.title.trim()) {
+          await env.DB.prepare("UPDATE event_runsheet_items SET title = ? WHERE id = ?").bind(body.title.trim().slice(0, 100), id).run();
+        }
+        if (typeof body.description === "string") {
+          await env.DB.prepare("UPDATE event_runsheet_items SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 300) || null, id).run();
+        }
+        if (typeof body.teamLabel === "string") {
+          await env.DB.prepare("UPDATE event_runsheet_items SET team_label = ? WHERE id = ?").bind(body.teamLabel.trim().slice(0, 60) || null, id).run();
+        }
+        const row = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        return json({ item: rowToRunsheetItem(row) });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/runsheet/")) {
+        const id = decodeURIComponent(p.slice("/api/runsheet/".length));
+        const item = await env.DB.prepare("SELECT group_id FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        if (!item) return json({ error: "Run sheet item not found" }, 404);
+        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(item.group_id).first();
+        const requester = request._staff;
+        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+          return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
+        }
+        await env.DB.prepare("DELETE FROM event_runsheet_items WHERE id = ?").bind(id).run();
+        return json({ ok: true });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/join")) {
