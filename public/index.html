@@ -3689,7 +3689,7 @@ function refreshNow(){
 
 function startPolling(){
   if(pollTimer) return;
-  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); refreshMaintenanceBadge(); pollMissed(); }, 4000);
+  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); refreshMaintenanceBadge(); pollMissed(); }, 1500);
   startTypingPoll();
 }
 
@@ -5523,7 +5523,7 @@ function pollGroupsQuiet(){
     }).catch(function(){});
   });
 }
-setInterval(pollGroupsQuiet, 4000);
+setInterval(pollGroupsQuiet, 1500);
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", function(){
