@@ -324,6 +324,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-status .ticks{display:inline-flex;color:var(--text-faint)}
 .msg-status.read .ticks{color:var(--accent)}
 .msg-status .ticks svg{width:15px;height:10px}
+.bubble-meta-inline{float:right;display:inline-flex;align-items:center;gap:3px;margin:4px 0 0 8px;padding:0;line-height:1;white-space:nowrap;font-size:10.5px}
+.msg-row.out .bubble-meta-inline{color:rgba(255,255,255,.75)}
+.msg-row.in .bubble-meta-inline{color:var(--text-faint)}
+.msg-row.out .bubble-meta-inline.read .ticks{color:#fff}
+.msg-row.out .bubble-meta-inline .ticks{color:rgba(255,255,255,.6)}
 
 .bubble.img-bubble{padding:5px;border-radius:19px;overflow:hidden;max-width:280px}
 .bubble.img-bubble img{display:block;width:100%;border-radius:15px}
@@ -1401,11 +1406,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </div>
         <div>
           <div class="sb-title">Asset exchange</div>
-          <div class="sb-sub">Borrow shared kit from other departments</div>
+          <div class="sb-sub">Swap stock and items between departments</div>
         </div>
       </div>
       <form class="maint-new-form" id="newAssetForm">
-        <input type="text" id="newAssetItem" placeholder="Item, e.g. Champagne chillers" required maxlength="80">
+        <input type="text" id="newAssetItem" placeholder="Item, e.g. Wine for the kitchen, champagne chillers" required maxlength="80">
         <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
         <button type="submit" class="admin-add-btn">Request item</button>
       </form>
@@ -3764,9 +3769,10 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   if(m.signoff) wrap.appendChild(buildSignoffCard(m));
   if(m.poll) wrap.appendChild(buildPollCard(m));
 
+  var canInlineMeta = m.type === "text" && !isEmptyPollBubble;
   var meta = document.createElement("div");
   if(out){
-    meta.className = "msg-status" + (m.status === "read" ? " read" : "");
+    meta.className = "msg-status" + (canInlineMeta ? " bubble-meta-inline" : "") + (m.status === "read" ? " read" : "");
     if(m.pending){
       var pendingLabel = document.createElement("span");
       pendingLabel.className = "pending-label";
@@ -3782,12 +3788,12 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
       meta.appendChild(ticks);
     }
   } else {
-    meta.className = "msg-time";
+    meta.className = "msg-time" + (canInlineMeta ? " bubble-meta-inline" : "");
     var timeSpan2 = document.createElement("span");
     timeSpan2.textContent = (m.edited ? "Edited · " : "") + fmtClock(m.t);
     meta.appendChild(timeSpan2);
   }
-  wrap.appendChild(meta);
+  if(canInlineMeta) bubble.appendChild(meta); else wrap.appendChild(meta);
 
   row.appendChild(wrap);
   return row;
@@ -4768,12 +4774,14 @@ function startPolling(){
   pollTimer = setInterval(function(){
     refreshActiveThread().catch(function(){});
     refreshMaintenanceBadge();
-    refreshAssetsBadge();
-    if(!tabEventsBtn.hidden) refreshEventsBadge();
     pollMissed();
     flushOfflineQueue();
   }, 1500);
-  slowPollTimer = setInterval(function(){ refreshNow().catch(function(){}); }, 6000);
+  slowPollTimer = setInterval(function(){
+    refreshNow().catch(function(){});
+    refreshAssetsBadge();
+    if(!tabEventsBtn.hidden) refreshEventsBadge();
+  }, 6000);
   startTypingPoll();
 }
 
@@ -4839,12 +4847,14 @@ function enterApp(staff){
   boot();
   startPolling();
   refreshMaintenanceBadge();
-  refreshAssetsBadge();
-  if(!tabEventsBtn.hidden) refreshEventsBadge();
   if(staff.departmentId === "concierge") refreshGuestsBadge();
   pollMissed();
   checkPushPrompt();
   loadStories();
+  setTimeout(function(){
+    refreshAssetsBadge();
+    if(!tabEventsBtn.hidden) refreshEventsBadge();
+  }, 800);
 }
 
 function showSetup(staff){
