@@ -4532,17 +4532,19 @@ function renderEventList(){
         '<div class="event-card-actions">'+
           (canManage && isEmpty ? '<button type="button" class="event-card-end event-card-delete" data-group-id="'+g.id+'">Delete</button>' : '')+
           (canManage && !isEmpty ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">End event</button>' : '')+
+          '<button type="button" class="event-card-details-btn" data-group-id="'+g.id+'">'+(canManage ? "Edit details" : "Details")+'</button>'+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
         '</div>'+
       '</div>'+
       '<div class="event-card-members">'+membersHtml+'</div>'+
-      (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>');
+      (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>')+
+      '<div class="event-card-hint event-card-tap-hint">'+(canManage ? "Tap for the banner, stations & run sheet" : "Tap for event details")+'</div>';
     eventList.appendChild(card);
 
     card.addEventListener("click", function(e){
-      if(e.target.closest(".event-card-open, .event-card-end, .event-card-delete, .event-member-chip")) return;
+      if(e.target.closest(".event-card-open, .event-card-end, .event-card-delete, .event-card-details-btn, .event-member-chip")) return;
       openEventDetail(g.id);
     });
     card.querySelectorAll(".event-member-chip").forEach(function(chip){
@@ -4555,6 +4557,7 @@ function renderEventList(){
     if(canManage && !isEmpty){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); archiveEvent(g.id); });
     }
+    card.querySelector(".event-card-details-btn").addEventListener("click", function(e){ e.stopPropagation(); openEventDetail(g.id); });
     card.querySelector(".event-card-open").addEventListener("click", function(e){ e.stopPropagation(); openGroupThread(g.id); });
   });
 
@@ -4577,18 +4580,21 @@ function renderEventList(){
         '<div class="event-card-actions">'+
           '<span class="event-card-ended-pill">Ended</span>'+
           (canShare ? '<button type="button" class="event-card-end" data-group-id="'+g.id+'">Share</button>' : '')+
+          '<button type="button" class="event-card-details-btn" data-group-id="'+g.id+'">Details</button>'+
           '<button type="button" class="event-card-open" data-group-id="'+g.id+'">Open chat '+
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'+
           '</button>'+
         '</div>'+
       '</div>'+
       '<div class="event-card-members">'+membersHtml+'</div>'+
-      (canShare ? '<div class="event-card-hint">Only you can see this. Share to give every department head access.</div>' : '');
+      (canShare ? '<div class="event-card-hint">Only you can see this. Share to give every department head access.</div>' : '')+
+      '<div class="event-card-hint event-card-tap-hint">Tap for event details</div>';
     pastEventList.appendChild(card);
     card.addEventListener("click", function(e){
-      if(e.target.closest(".event-card-open, .event-card-end, .event-member-chip")) return;
+      if(e.target.closest(".event-card-open, .event-card-end, .event-card-details-btn, .event-member-chip")) return;
       openEventDetail(g.id);
     });
+    card.querySelector(".event-card-details-btn").addEventListener("click", function(e){ e.stopPropagation(); openEventDetail(g.id); });
     if(canShare){
       card.querySelector(".event-card-end").addEventListener("click", function(e){ e.stopPropagation(); shareEvent(g.id); });
     }
