@@ -182,6 +182,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .chat-filter-row{display:flex;gap:6px;padding:12px 16px 0}
 .chat-filter-chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700}
 .chat-filter-chip.active{border-color:transparent;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
+.chat-filter-chip-urgent.active{background:linear-gradient(150deg,var(--urgent),var(--urgent-2))}
 .sb-list-label{padding:18px 20px 9px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint)}
 .push-prompt{margin:14px 20px 0;padding:12px 14px;border-radius:14px;background:var(--active-tint);}
 .push-prompt-text{font-size:12px;line-height:1.4;color:var(--text-dim)}
@@ -441,12 +442,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .story-editor-scrim{position:absolute;left:0;right:0;bottom:0;height:50%;background:linear-gradient(to top, rgba(0,0,0,.6), rgba(0,0,0,0));pointer-events:none}
 .story-editor-caption{position:absolute;left:20px;right:20px;bottom:12%;background:none;border:none;color:#fff;font-size:19px;font-weight:700;text-align:center;line-height:1.35;text-shadow:0 2px 10px rgba(0,0,0,.6);resize:none;overflow:hidden;max-height:38%;font-family:inherit}
 .story-editor-caption::placeholder{color:rgba(255,255,255,.7);font-weight:700}
-.story-editor-head{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;flex-shrink:0}
-.story-editor-icon-btn{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.story-editor-close{position:absolute;top:calc(14px + env(safe-area-inset-top));left:16px}
+.story-editor-icon-btn{background:rgba(255,255,255,.14);border:none;color:#fff;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);box-shadow:0 3px 10px -3px rgba(0,0,0,.5)}
+.story-editor-icon-btn:active{transform:scale(.92)}
 .story-editor-icon-btn svg{width:17px;height:17px}
-.story-editor-post-btn{border:none;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:14px;padding:9px 18px;border-radius:999px;box-shadow:0 6px 16px -4px rgba(47,174,106,.65)}
-.story-editor-post-btn:disabled{opacity:.5}
-.story-editor-error{position:absolute;bottom:20px;left:16px;right:16px;text-align:center;color:#ff9187;font-size:13px;font-weight:600}
+.story-editor-rail{position:absolute;right:14px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:14px}
+.story-editor-send-btn{width:52px;height:52px;background:linear-gradient(150deg,var(--accent),var(--accent-2));box-shadow:0 8px 20px -4px rgba(47,174,106,.65)}
+.story-editor-send-btn svg{width:21px;height:21px;margin-left:-2px}
+.story-editor-send-btn:disabled{opacity:.5}
+.story-editor-error{position:absolute;bottom:20px;left:16px;right:80px;text-align:center;color:#ff9187;font-size:13px;font-weight:600}
 
 .story-viewer{position:fixed;inset:0;background:#000;z-index:200;display:flex;flex-direction:column}
 .story-progress-row{display:flex;gap:4px;padding:10px 10px 0;flex-shrink:0}
@@ -1223,6 +1227,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <div class="chat-filter-row" id="chatFilterRow">
       <button type="button" class="chat-filter-chip active" data-filter="all">All</button>
       <button type="button" class="chat-filter-chip" data-filter="unread">Unread</button>
+      <button type="button" class="chat-filter-chip chat-filter-chip-urgent" data-filter="urgent">Urgent</button>
     </div>
     <div class="pull-refresh" id="listPullRefresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg></div>
     <div class="sb-list-label" id="listLabel">Conversations</div>
@@ -1726,15 +1731,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   <div class="story-editor-stage">
     <img class="story-editor-img" id="storyEditorImg" alt="">
     <div class="story-editor-scrim"></div>
-    <textarea class="story-editor-caption" id="storyCaptionInput" placeholder="Write something…" rows="1" maxlength="200"></textarea>
-  </div>
-  <div class="story-editor-head">
-    <button type="button" class="story-editor-icon-btn" id="postStoryClose" aria-label="Cancel">
+    <button type="button" class="story-editor-icon-btn story-editor-close" id="postStoryClose" aria-label="Cancel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
-    <button type="button" class="story-editor-post-btn" id="storyPostBtn">
-      Post update
-    </button>
+    <div class="story-editor-rail">
+      <button type="button" class="story-editor-icon-btn" id="storyRetakeBtn" aria-label="Choose a different photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      </button>
+      <button type="button" class="story-editor-icon-btn story-editor-send-btn" id="storyPostBtn" aria-label="Post update">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
+      </button>
+    </div>
+    <textarea class="story-editor-caption" id="storyCaptionInput" placeholder="Write something…" rows="1" maxlength="200"></textarea>
   </div>
   <div class="story-editor-error" id="storyPostError"></div>
 </div>
@@ -2258,6 +2266,7 @@ function renderList(){
   var matches = {};
   var ids = sortedDeptIds().filter(function(id){
     if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
+    if(STATE.chatFilter === "urgent" && !hasUrgentUnread(id)) return false;
     var r = findSearchMatch(id, term);
     if(r.match) matches[id] = r.message;
     return r.match;
@@ -2265,9 +2274,10 @@ function renderList(){
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
   if(ids.length === 0){
-    var unreadEmpty = STATE.chatFilter === "unread" && !term;
-    searchEmptyUnread.hidden = !unreadEmpty;
-    searchEmptyMatch.hidden = unreadEmpty;
+    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent") && !term;
+    searchEmptyUnread.hidden = !filterEmpty;
+    searchEmptyMatch.hidden = filterEmpty;
+    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : "No unread conversations";
     searchEmptyTerm.textContent = STATE.searchTerm;
     return;
   }
@@ -4942,6 +4952,7 @@ function renderStoriesRow(){
 var storyEditor = document.getElementById("storyEditor");
 var storyEditorImg = document.getElementById("storyEditorImg");
 var postStoryClose = document.getElementById("postStoryClose");
+var storyRetakeBtn = document.getElementById("storyRetakeBtn");
 var storyPhotoInput = document.getElementById("storyPhotoInput");
 var storyCaptionInput = document.getElementById("storyCaptionInput");
 var storyPostBtn = document.getElementById("storyPostBtn");
@@ -4958,11 +4969,12 @@ storyPhotoInput.addEventListener("change", function(){
   var file = storyPhotoInput.files[0];
   storyPhotoInput.value = "";
   if(!file) return;
+  var isFreshOpen = storyEditor.hidden;
   storyPendingFile = file;
   var reader = new FileReader();
   reader.onload = function(){
     storyEditorImg.src = reader.result;
-    storyCaptionInput.value = "";
+    if(isFreshOpen) storyCaptionInput.value = "";
     storyPostError.textContent = "";
     storyEditor.hidden = false;
     autoGrowStoryCaption();
@@ -4970,6 +4982,7 @@ storyPhotoInput.addEventListener("change", function(){
   reader.readAsDataURL(file);
 });
 postStoryClose.addEventListener("click", function(){ storyEditor.hidden = true; storyPendingFile = null; });
+storyRetakeBtn.addEventListener("click", function(){ storyPhotoInput.click(); });
 storyCaptionInput.addEventListener("input", autoGrowStoryCaption);
 storyPostBtn.addEventListener("click", function(){
   if(!storyPendingFile) return;
