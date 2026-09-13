@@ -487,7 +487,7 @@ export default {
         return json({ ok: true, duplicate: false, messageId: row.id }, 201);
       }
 
-      // ---- Guest concierge requests (public, no staff session — reached via a room QR code) ----
+      // ---- Guest concierge requests (public, no staff session, reached via a room QR code) ----
       if (method === "POST" && p === "/api/guest-requests") {
         const body = await readJsonBody(request);
         const roomNumber = String(body.roomNumber || "").trim();
@@ -505,7 +505,7 @@ export default {
         const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
 
         const notifyPromise = notifyDepartment(env, "concierge", {
-          title: "🛎️ Guest request — Room " + roomNumber,
+          title: "🛎️ Guest request, Room " + roomNumber,
           body: text,
           url: "/",
           tag: "hotel-ping-guest-request-" + id,

@@ -413,13 +413,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .poll-head svg{width:12px;height:12px}
 .poll-question{font-size:14px;font-weight:700;color:var(--text);margin-bottom:9px;line-height:1.3}
 .poll-options{display:flex;flex-direction:column;gap:6px}
-.poll-option{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:none;border-radius:10px;background:var(--surface-3);padding:8px 10px;text-align:left}
+.poll-option{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:5px;width:100%;border:none;border-radius:10px;background:var(--surface-3);padding:8px 10px;text-align:left}
 .poll-option.voted{box-shadow:0 0 0 1.5px var(--accent) inset}
 .poll-option-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(47,174,106,.3);transition:width .3s ease;z-index:0}
-.poll-option-label{position:relative;z-index:1;display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);min-width:0}
+.poll-option-top{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.poll-option-label{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);min-width:0}
 .poll-option.voted .poll-option-label{font-weight:800}
 .poll-check{width:12px;height:12px;flex:none;color:var(--accent)}
-.poll-option-pct{position:relative;z-index:1;font-size:11.5px;font-weight:700;color:var(--text-dim);flex:none;font-variant-numeric:tabular-nums}
+.poll-option-pct{font-size:11.5px;font-weight:700;color:var(--text-dim);flex:none;font-variant-numeric:tabular-nums}
+.poll-voter-avatars{position:relative;z-index:1;display:flex;align-items:center;flex-wrap:wrap}
+.poll-voter-avatar{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background-size:cover;background-position:center;margin-left:-6px;box-shadow:0 0 0 2px var(--surface-3)}
+.poll-voter-avatar:first-child{margin-left:0}
+.poll-voter-avatar svg{width:9px;height:9px}
 .poll-meta{margin-top:8px;font-size:11px;color:var(--text-faint)}
 .dept-photo-preview-wrap{position:relative;display:block;width:96px;margin:4px auto 16px;border:none;background:none;padding:0;transition:transform .12s ease}
 .dept-photo-preview-wrap:active{transform:scale(.96)}
@@ -724,6 +729,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-msg-time{font-size:10.5px;color:var(--text-faint);margin-top:3px}
 .admin-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
 .admin-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-pop);padding:24px}
+.confirm-overlay{z-index:300;background:rgba(6,6,6,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.confirm-modal{width:300px;max-width:calc(100vw - 48px);padding:26px 22px 20px;text-align:center;border-radius:24px;box-shadow:0 24px 60px -12px rgba(0,0,0,.6),var(--shadow-pop);transform:scale(.92);opacity:0;transition:transform .18s cubic-bezier(.3,1.4,.4,1),opacity .15s ease}
+.confirm-overlay.open .confirm-modal{transform:scale(1);opacity:1}
+.confirm-modal-icon{width:52px;height:52px;border-radius:50%;background:rgba(214,73,60,.14);color:var(--urgent);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.confirm-modal-icon svg{width:24px;height:24px}
+.confirm-modal-icon.neutral{background:rgba(47,174,106,.14);color:var(--accent)}
+.confirm-modal-title{font-size:16.5px;font-weight:800;color:var(--text);margin-bottom:6px;line-height:1.3}
+.confirm-modal-body{font-size:13.5px;color:var(--text-dim);line-height:1.45;margin-bottom:20px}
+.confirm-modal-body:empty{display:none;margin-bottom:4px}
+.confirm-modal-actions{display:flex;gap:10px}
+.confirm-modal-btn{flex:1;border:none;border-radius:14px;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer}
+.confirm-modal-btn.cancel{background:var(--surface-3);color:var(--text)}
+.confirm-modal-btn.confirm{background:linear-gradient(150deg,var(--urgent),var(--urgent-2));color:#fff;box-shadow:0 8px 18px -4px rgba(214,73,60,.5)}
+.confirm-modal-btn.confirm.neutral{background:linear-gradient(150deg,var(--accent),var(--accent-2));box-shadow:0 8px 18px -4px rgba(47,174,106,.5)}
 .admin-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .admin-modal-head h2{font-family:Manrope,sans-serif;font-size:16.5px;font-weight:800;margin:0}
 .admin-close{border:none;background:var(--surface-3);width:28px;height:28px;border-radius:50%;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
@@ -1339,6 +1358,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         </div>
       </form>
       <div class="admin-add-error" id="maintError"></div>
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="maintSearchInput" placeholder="Search maintenance jobs">
+        <button id="maintSearchClear" hidden aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
       <div class="maint-feed" id="maintFeed"></div>
     </div>
 
@@ -1351,6 +1377,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <div class="sb-title">Guest requests</div>
           <div class="sb-sub">Noir House &middot; Concierge</div>
         </div>
+      </div>
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="guestsSearchInput" placeholder="Search guest requests">
+        <button id="guestsSearchClear" hidden aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
       <div class="sb-list-label">Today</div>
       <div class="guests-feed" id="guestsFeed"></div>
@@ -1365,6 +1398,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <button type="submit" class="admin-add-btn">Request item</button>
       </form>
       <div class="admin-add-error" id="assetError"></div>
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="assetSearchInput" placeholder="Search asset requests">
+        <button id="assetSearchClear" hidden aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
       <div class="maint-feed" id="assetFeed"></div>
     </div>
 
@@ -1380,6 +1420,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="bottom-tab" id="tabEventsBtn" type="button" aria-label="Events" title="Events">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg>
         <span>Events</span>
+        <span class="tab-badge" id="tabEventsBadge" hidden></span>
       </button>
       <button class="bottom-tab" id="tabMaintBtn" type="button" aria-label="Maintenance repairs" title="Maintenance repairs">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
@@ -1389,6 +1430,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button class="bottom-tab" id="tabAssetsBtn" type="button" aria-label="Asset exchange" title="Asset exchange">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         <span>Asset exchange</span>
+        <span class="tab-badge" id="tabAssetsBadge" hidden></span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg>
@@ -1910,6 +1952,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <div class="admin-add-error" id="pollComposeError"></div>
       <button type="submit" class="admin-add-btn" id="pollComposeSubmit">Create poll</button>
     </form>
+  </div>
+</div>
+
+<div class="admin-overlay confirm-overlay" id="confirmOverlay" hidden>
+  <div class="admin-modal confirm-modal">
+    <div class="confirm-modal-icon" id="confirmModalIcon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+    </div>
+    <div class="confirm-modal-title" id="confirmModalTitle">Are you sure?</div>
+    <div class="confirm-modal-body" id="confirmModalBody"></div>
+    <div class="confirm-modal-actions">
+      <button type="button" class="confirm-modal-btn cancel" id="confirmModalCancel">Cancel</button>
+      <button type="button" class="confirm-modal-btn confirm" id="confirmModalConfirm">Delete</button>
+    </div>
   </div>
 </div>
 
@@ -3038,6 +3094,37 @@ function showToast(text){
   }, 1600);
 }
 
+var confirmOverlay = document.getElementById("confirmOverlay");
+var confirmModalIcon = document.getElementById("confirmModalIcon");
+var confirmModalTitle = document.getElementById("confirmModalTitle");
+var confirmModalBody = document.getElementById("confirmModalBody");
+var confirmModalCancel = document.getElementById("confirmModalCancel");
+var confirmModalConfirm = document.getElementById("confirmModalConfirm");
+var CONFIRM_ICON_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+var CONFIRM_ICON_INFO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg>';
+var confirmResolve = null;
+function showConfirm(opts){
+  opts = opts || {};
+  confirmModalIcon.innerHTML = opts.icon || CONFIRM_ICON_TRASH;
+  confirmModalIcon.className = "confirm-modal-icon" + (opts.neutral ? " neutral" : "");
+  confirmModalTitle.textContent = opts.title || "Are you sure?";
+  confirmModalBody.textContent = opts.body || "";
+  confirmModalConfirm.textContent = opts.confirmLabel || "Delete";
+  confirmModalConfirm.className = "confirm-modal-btn confirm" + (opts.neutral ? " neutral" : "");
+  confirmModalCancel.textContent = opts.cancelLabel || "Cancel";
+  confirmOverlay.hidden = false;
+  requestAnimationFrame(function(){ confirmOverlay.classList.add("open"); });
+  return new Promise(function(resolve){ confirmResolve = resolve; });
+}
+function hideConfirm(result){
+  confirmOverlay.classList.remove("open");
+  setTimeout(function(){ confirmOverlay.hidden = true; }, 160);
+  if(confirmResolve){ var r = confirmResolve; confirmResolve = null; r(result); }
+}
+confirmModalCancel.addEventListener("click", function(){ hideConfirm(false); });
+confirmModalConfirm.addEventListener("click", function(){ hideConfirm(true); });
+confirmOverlay.addEventListener("click", function(e){ if(e.target === confirmOverlay) hideConfirm(false); });
+
 var msgActionMenu = document.getElementById("msgActionMenu");
 var msgActionBackdrop = document.getElementById("msgActionBackdrop");
 var ACTION_ICONS = {
@@ -3395,13 +3482,19 @@ function buildPollCard(m){
   optionsWrap.className = "poll-options";
   p.options.forEach(function(opt, i){
     var pct = total ? Math.round((counts[i] / total) * 100) : 0;
+    var voters = Object.keys(votes).filter(function(dept){ return votes[dept] === i; });
     var optBtn = document.createElement("button");
     optBtn.type = "button";
     optBtn.className = "poll-option" + (myVote === i ? " voted" : "");
     optBtn.innerHTML =
       '<div class="poll-option-fill" style="width:' + pct + '%"></div>' +
-      '<span class="poll-option-label">' + (myVote === i ? '<svg class="poll-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') + esc(opt) + '</span>' +
-      '<span class="poll-option-pct">' + pct + '%</span>';
+      '<div class="poll-option-top">' +
+        '<span class="poll-option-label">' + (myVote === i ? '<svg class="poll-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') + esc(opt) + '</span>' +
+        '<span class="poll-option-pct">' + pct + '%</span>' +
+      '</div>' +
+      (voters.length ? '<div class="poll-voter-avatars">' + voters.map(function(dept){
+        return '<span class="poll-voter-avatar" style="'+avatarStyleAttr(dept)+'" title="'+esc(DEPTS[dept] ? DEPTS[dept].name : dept)+'">'+avatarInnerHtml(dept)+'</span>';
+      }).join("") + '</div>' : '');
     optBtn.addEventListener("click", function(){ voteOnPoll(m, i); });
     optionsWrap.appendChild(optBtn);
   });
@@ -3543,7 +3636,13 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
       speakBtn.title = "Read aloud";
       speakBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
       speakBtn.addEventListener("click", function(){
-        if(confirm("Read this message aloud?\n\nAnyone nearby will be able to hear it.")) speakText(m.text);
+        showConfirm({
+          title: "Read this message aloud?",
+          body: "Anyone nearby will be able to hear it.",
+          confirmLabel: "Read aloud",
+          neutral: true,
+          icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>'
+        }).then(function(ok){ if(ok) speakText(m.text); });
       });
       bubble.appendChild(speakBtn);
     }
@@ -3634,15 +3733,20 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
 }
 
 function confirmDeleteMessage(id){
-  if(!confirm("Delete this message?\n\nIt will be hidden from this conversation, but it is not erased. Management can still see the original message.")) return;
-  apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
-    var msgs = currentMessagesArray();
-    var idx = msgs.findIndex(function(x){ return x.id === id; });
-    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-    renderList();
-    renderThread();
-  }).catch(function(){
-    alert("Couldn't delete that message. Check your connection and try again.");
+  showConfirm({
+    title: "Delete this message?",
+    body: "It will be hidden from this conversation, but it is not erased. Management can still see the original message."
+  }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
+      var msgs = currentMessagesArray();
+      var idx = msgs.findIndex(function(x){ return x.id === id; });
+      if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+      renderList();
+      renderThread();
+    }).catch(function(){
+      showToast("Couldn't delete that message");
+    });
   });
 }
 
@@ -4601,6 +4705,8 @@ function startPolling(){
   pollTimer = setInterval(function(){
     refreshActiveThread().catch(function(){});
     refreshMaintenanceBadge();
+    refreshAssetsBadge();
+    if(!tabEventsBtn.hidden) refreshEventsBadge();
     pollMissed();
     flushOfflineQueue();
   }, 1500);
@@ -4670,6 +4776,8 @@ function enterApp(staff){
   boot();
   startPolling();
   refreshMaintenanceBadge();
+  refreshAssetsBadge();
+  if(!tabEventsBtn.hidden) refreshEventsBadge();
   if(staff.departmentId === "concierge") refreshGuestsBadge();
   pollMissed();
   checkPushPrompt();
@@ -4856,10 +4964,10 @@ function buildStaffRow(s){
   resetPin.addEventListener("click", function(){
     var newPin = prompt("New 4-6 digit PIN for " + s.name + ":");
     if(newPin === null) return;
-    if(!/^\d{4,6}$/.test(newPin)){ alert("PIN must be 4-6 digits."); return; }
+    if(!/^\d{4,6}$/.test(newPin)){ showToast("PIN must be 4-6 digits"); return; }
     apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { pin: newPin }).then(function(){
       showToast("PIN reset for " + s.name);
-    }).catch(function(){ alert("Couldn't reset that PIN. Try again."); });
+    }).catch(function(){ showToast("Couldn't reset that PIN"); });
   });
 
   var del = document.createElement("button");
@@ -4869,8 +4977,10 @@ function buildStaffRow(s){
   del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
   del.addEventListener("click", function(){
     if(s.id === AUTH.staff.id) return;
-    if(!confirm("Remove " + s.name + "?")) return;
-    apiDelete('/api/staff/' + encodeURIComponent(s.id)).then(loadStaffList).catch(function(){});
+    showConfirm({ title: "Remove " + s.name + "?", confirmLabel: "Remove" }).then(function(ok){
+      if(!ok) return;
+      apiDelete('/api/staff/' + encodeURIComponent(s.id)).then(loadStaffList).catch(function(){});
+    });
   });
   if(s.id === AUTH.staff.id) del.disabled = true;
 
@@ -4925,19 +5035,26 @@ broadcastForm.addEventListener("submit", function(e){
   var text = broadcastText.value.trim();
   if(!text) return;
   if(containsProfanity(text)){ broadcastError.textContent = "Let's keep it professional. That message can't be sent."; return; }
-  if(!confirm("Send this to every department right now?")) return;
-  broadcastSendBtn.disabled = true;
-  broadcastError.textContent = "";
-  apiSend('/api/broadcast', 'POST', { text: text, urgent: broadcastUrgent.checked }).then(function(){
-    broadcastOverlay.hidden = true;
-    return buildData(STATE.self);
-  }).then(function(data){
-    STATE.data = data;
-    renderList();
-    if(STATE.active) renderThread();
-  }).catch(function(err){
-    broadcastError.textContent = err.message || "Couldn't send broadcast.";
-  }).finally(function(){ broadcastSendBtn.disabled = false; });
+  showConfirm({
+    title: "Send this to every department right now?",
+    confirmLabel: "Send",
+    neutral: true,
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l16-7-7 16-2-7-7-2z"/></svg>'
+  }).then(function(ok){
+    if(!ok) return;
+    broadcastSendBtn.disabled = true;
+    broadcastError.textContent = "";
+    apiSend('/api/broadcast', 'POST', { text: text, urgent: broadcastUrgent.checked }).then(function(){
+      broadcastOverlay.hidden = true;
+      return buildData(STATE.self);
+    }).then(function(data){
+      STATE.data = data;
+      renderList();
+      if(STATE.active) renderThread();
+    }).catch(function(err){
+      broadcastError.textContent = err.message || "Couldn't send broadcast.";
+    }).finally(function(){ broadcastSendBtn.disabled = false; });
+  });
 });
 
 var handoverBtn = document.getElementById("handoverBtn");
@@ -4954,9 +5071,21 @@ function fmtNoteTime(ts){
   return new Date(ts).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 
+function panelEmptyHtml(icon, title, sub){
+  return '<div class="thread-empty-state">' +
+    '<div class="thread-empty-icon">'+icon+'</div>' +
+    '<div class="thread-empty-title">'+esc(title)+'</div>' +
+    (sub ? '<div class="thread-empty-sub">'+esc(sub)+'</div>' : '') +
+  '</div>';
+}
+var PANEL_EMPTY_ICONS = {
+  handover: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/><path d="M9 13h6M9 17h4"/></svg>',
+  feed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+};
 function renderHandoverNotes(notes){
   if(!notes.length){
-    handoverList.innerHTML = '<div class="handover-empty">No handover notes yet.</div>';
+    handoverList.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.handover, "No handover notes yet", "Add one below so the next shift knows what's going on.");
     return;
   }
   handoverList.innerHTML = "";
@@ -4977,11 +5106,13 @@ function renderHandoverNotes(notes){
       del.setAttribute("aria-label", "Remove note");
       del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
       del.addEventListener("click", function(){
-        if(!confirm("Remove this handover note?")) return;
-        apiDelete('/api/handover/' + encodeURIComponent(n.id)).then(function(){
-          notes = notes.filter(function(x){ return x.id !== n.id; });
-          renderHandoverNotes(notes);
-        }).catch(function(){});
+        showConfirm({ title: "Remove this handover note?", confirmLabel: "Remove" }).then(function(ok){
+          if(!ok) return;
+          apiDelete('/api/handover/' + encodeURIComponent(n.id)).then(function(){
+            notes = notes.filter(function(x){ return x.id !== n.id; });
+            renderHandoverNotes(notes);
+          }).catch(function(){});
+        });
       });
       row.querySelector(".handover-note-head").appendChild(del);
     }
@@ -5582,14 +5713,16 @@ storyViewerDelete.addEventListener("click", function(){
   var reel = currentReel();
   var story = reel[storyViewState.storyIdx];
   if(!story) return;
-  if(!confirm("Delete this update?")) return;
-  apiDelete('/api/stories/' + encodeURIComponent(story.id)).then(function(){
-    STATE.stories = STATE.stories.filter(function(s){ return s.id !== story.id; });
-    var newReel = currentReel();
-    if(!newReel.length){ storyAdvance(1); return; }
-    if(storyViewState.storyIdx >= newReel.length) storyViewState.storyIdx = newReel.length - 1;
-    renderStoryFrame();
-  }).catch(function(){ showToast("Couldn't delete that update"); });
+  showConfirm({ title: "Delete this update?" }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/stories/' + encodeURIComponent(story.id)).then(function(){
+      STATE.stories = STATE.stories.filter(function(s){ return s.id !== story.id; });
+      var newReel = currentReel();
+      if(!newReel.length){ storyAdvance(1); return; }
+      if(storyViewState.storyIdx >= newReel.length) storyViewState.storyIdx = newReel.length - 1;
+      renderStoryFrame();
+    }).catch(function(){ showToast("Couldn't delete that update"); });
+  });
 });
 
 var notifSettingsBtn = document.getElementById("notifSettingsBtn");
@@ -5911,7 +6044,7 @@ function openFeedItem(m){
 
 function renderFeed(messages){
   if(!messages.length){
-    feedList.innerHTML = '<div class="handover-empty">No messages yet.</div>';
+    feedList.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.feed, "Nothing here yet", "Every conversation across the hotel will show up here, most recent first.");
     return;
   }
   feedList.innerHTML = "";
@@ -5963,7 +6096,7 @@ function fmtDuration(seconds){
 function renderResponseTimes(departments, targetEl){
   targetEl = targetEl || responseList;
   if(!departments.length){
-    targetEl.innerHTML = '<div class="handover-empty">No urgent messages read in the last 7 days.</div>';
+    targetEl.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.clock, "No urgent messages yet", "Once a department reads an urgent message, its response time shows up here.");
     return;
   }
   departments.sort(function(a, b){ return b.avgSeconds - a.avgSeconds; });
@@ -6203,41 +6336,59 @@ function renderEventPalette(){
 }
 
 function deleteEmptyEvent(groupId){
-  if(!confirm("Delete this event? There's nothing in it yet, so this can't be undone.")) return;
-  apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
-    return loadGroups();
-  }).then(function(){
-    if(STATE.activeGroupId === groupId){ STATE.activeGroupId = null; closeThreadView(); }
-    renderEventList();
-    showToast("Event deleted");
-  }).catch(function(err){
-    showToast(err.message || "Couldn't delete that event");
+  showConfirm({ title: "Delete this event?", body: "There's nothing in it yet, so this can't be undone.", confirmLabel: "Delete" }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/groups/' + encodeURIComponent(groupId)).then(function(){
+      return loadGroups();
+    }).then(function(){
+      if(STATE.activeGroupId === groupId){ STATE.activeGroupId = null; closeThreadView(); }
+      renderEventList();
+      showToast("Event deleted");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't delete that event");
+    });
   });
 }
 
 function archiveEvent(groupId){
-  if(!confirm("End this event? It'll become read only and move to Past events, kept there for training.")) return;
-  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/archive', 'POST', {}).then(function(){
-    return loadGroups();
-  }).then(function(){
-    renderEventList();
-    if(STATE.activeGroupId === groupId){ renderHeader(); updateComposerLock(); }
-    showToast("Event ended");
-  }).catch(function(err){
-    showToast(err.message || "Couldn't end that event");
+  showConfirm({
+    title: "End this event?",
+    body: "It'll become read only and move to Past events, kept there for training.",
+    confirmLabel: "End event",
+    neutral: true,
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+  }).then(function(ok){
+    if(!ok) return;
+    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/archive', 'POST', {}).then(function(){
+      return loadGroups();
+    }).then(function(){
+      renderEventList();
+      if(STATE.activeGroupId === groupId){ renderHeader(); updateComposerLock(); }
+      showToast("Event ended");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't end that event");
+    });
   });
 }
 
 function shareEvent(groupId){
-  if(!confirm("Share this event with every department head? They'll be able to read back through it.")) return;
-  apiSend('/api/groups/' + encodeURIComponent(groupId) + '/share', 'POST', {}).then(function(){
-    return loadGroups();
-  }).then(function(){
-    renderEventList();
-    if(STATE.activeGroupId === groupId) renderHeader();
-    showToast("Shared with every department");
-  }).catch(function(err){
-    showToast(err.message || "Couldn't share that event");
+  showConfirm({
+    title: "Share this event with every department head?",
+    body: "They'll be able to read back through it.",
+    confirmLabel: "Share",
+    neutral: true,
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>'
+  }).then(function(ok){
+    if(!ok) return;
+    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/share', 'POST', {}).then(function(){
+      return loadGroups();
+    }).then(function(){
+      renderEventList();
+      if(STATE.activeGroupId === groupId) renderHeader();
+      showToast("Shared with every department");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't share that event");
+    });
   });
 }
 
@@ -6336,10 +6487,20 @@ newEventForm.addEventListener("submit", function(e){
   });
 });
 
+var tabEventsBadge = document.getElementById("tabEventsBadge");
+function refreshEventsBadge(){
+  loadGroups().then(function(){
+    var n = STATE.groups.filter(function(g){ return !g.archivedAt; }).length;
+    tabEventsBadge.hidden = n === 0;
+    tabEventsBadge.textContent = n > 99 ? "99+" : String(n);
+    if(!eventsPage.hidden) renderEventList();
+  });
+}
+
 function openEventsTab(){
   renderEventPalette();
   eventList.innerHTML = '<div class="event-empty">Loading…</div>';
-  loadGroups().then(renderEventList);
+  refreshEventsBadge();
 }
 
 /* ---- Maintenance ticket board ---- */
@@ -6377,11 +6538,28 @@ function openMaintenanceTab(){
   renderMaintOffDutyBanner();
 }
 
+var maintSearchInput = document.getElementById("maintSearchInput");
+var maintSearchClear = document.getElementById("maintSearchClear");
+STATE.maintSearchTerm = "";
+maintSearchInput.addEventListener("input", function(){
+  STATE.maintSearchTerm = maintSearchInput.value;
+  maintSearchClear.hidden = STATE.maintSearchTerm.length === 0;
+  renderMaintenanceBoard();
+});
+maintSearchClear.addEventListener("click", function(){
+  maintSearchInput.value = "";
+  STATE.maintSearchTerm = "";
+  maintSearchClear.hidden = true;
+  renderMaintenanceBoard();
+  maintSearchInput.focus();
+});
+
 var MAINT_PRIORITY_ORDER = { safety: 0, guest: 1, problem: 2, routine: 3 };
 function sortedTickets(){
   var order = { reported: 0, in_progress: 1, fixed: 2 };
   return (STATE.tickets || []).slice().sort(function(a, b){
     if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    if(order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
     var pa = MAINT_PRIORITY_ORDER[a.priority] != null ? MAINT_PRIORITY_ORDER[a.priority] : 2;
     var pb = MAINT_PRIORITY_ORDER[b.priority] != null ? MAINT_PRIORITY_ORDER[b.priority] : 2;
     if(pa !== pb) return pa - pb;
@@ -6389,7 +6567,6 @@ function sortedTickets(){
     var bDeadline = b.status !== "fixed" && b.deadline;
     if(!!aDeadline !== !!bDeadline) return aDeadline ? -1 : 1;
     if(aDeadline && bDeadline && a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1;
-    if(order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 }
@@ -6633,18 +6810,20 @@ ticketDetailNext.addEventListener("click", function(){
   if(STATE.ticketDetailIndex < STATE.ticketDetailQueue.length - 1){ STATE.ticketDetailIndex += 1; renderTicketDetail(); }
 });
 function deleteTicketFromDetail(id){
-  if(!confirm("Delete this job? This can't be undone.")) return;
-  apiDelete('/api/maintenance/' + encodeURIComponent(id)).then(function(){
-    STATE.tickets = STATE.tickets.filter(function(x){ return x.id !== id; });
-    STATE.ticketDetailQueue.splice(STATE.ticketDetailIndex, 1);
-    if(!STATE.ticketDetailQueue.length){ closeTicketDetail(); } else {
-      if(STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length) STATE.ticketDetailIndex = STATE.ticketDetailQueue.length - 1;
-      renderTicketDetail();
-    }
-    renderMaintenanceBoard();
-    showToast("Deleted");
-  }).catch(function(err){
-    showToast(err.message || "Couldn't delete that");
+  showConfirm({ title: "Delete this job?", body: "This can't be undone." }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/maintenance/' + encodeURIComponent(id)).then(function(){
+      STATE.tickets = STATE.tickets.filter(function(x){ return x.id !== id; });
+      STATE.ticketDetailQueue.splice(STATE.ticketDetailIndex, 1);
+      if(!STATE.ticketDetailQueue.length){ closeTicketDetail(); } else {
+        if(STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length) STATE.ticketDetailIndex = STATE.ticketDetailQueue.length - 1;
+        renderTicketDetail();
+      }
+      renderMaintenanceBoard();
+      showToast("Deleted");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't delete that");
+    });
   });
 }
 
@@ -6659,11 +6838,20 @@ function refreshMaintenanceBadge(){
   }).catch(function(){});
 }
 
+function matchesSearch(term, fields){
+  if(!term) return true;
+  term = term.toLowerCase();
+  return fields.some(function(f){ return f && String(f).toLowerCase().indexOf(term) !== -1; });
+}
+
 function renderMaintenanceBoard(){
-  var tickets = sortedTickets();
+  var term = STATE.maintSearchTerm || "";
+  var tickets = sortedTickets().filter(function(t){
+    return matchesSearch(term, [t.description, t.roomNumber, DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy]);
+  });
   maintFeed.innerHTML = "";
   if(!tickets.length){
-    maintFeed.innerHTML = '<div class="maint-col-empty">No maintenance jobs yet</div>';
+    maintFeed.innerHTML = '<div class="maint-col-empty">'+(term ? "No jobs match \""+esc(term)+"\"" : "No maintenance jobs yet")+'</div>';
     return;
   }
   tickets.forEach(function(t){ maintFeed.appendChild(buildMaintCard(t)); });
@@ -6697,6 +6885,22 @@ function openGuestsTab(){
   refreshGuestsBadge();
 }
 
+var guestsSearchInput = document.getElementById("guestsSearchInput");
+var guestsSearchClear = document.getElementById("guestsSearchClear");
+STATE.guestsSearchTerm = "";
+guestsSearchInput.addEventListener("input", function(){
+  STATE.guestsSearchTerm = guestsSearchInput.value;
+  guestsSearchClear.hidden = STATE.guestsSearchTerm.length === 0;
+  renderGuestsBoard();
+});
+guestsSearchClear.addEventListener("click", function(){
+  guestsSearchInput.value = "";
+  STATE.guestsSearchTerm = "";
+  guestsSearchClear.hidden = true;
+  renderGuestsBoard();
+  guestsSearchInput.focus();
+});
+
 function sortedGuestRequests(){
   return (STATE.guestRequests || []).slice().sort(function(a, b){
     if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
@@ -6716,10 +6920,13 @@ function refreshGuestsBadge(){
 }
 
 function renderGuestsBoard(){
-  var requests = sortedGuestRequests();
+  var term = STATE.guestsSearchTerm || "";
+  var requests = sortedGuestRequests().filter(function(r){
+    return matchesSearch(term, [r.text, r.roomNumber]);
+  });
   guestsFeed.innerHTML = "";
   if(!requests.length){
-    guestsFeed.innerHTML = '<div class="maint-col-empty">No guest requests yet</div>';
+    guestsFeed.innerHTML = '<div class="maint-col-empty">'+(term ? "No requests match \""+esc(term)+"\"" : "No guest requests yet")+'</div>';
     return;
   }
   requests.forEach(function(r){ guestsFeed.appendChild(buildGuestCard(r)); });
@@ -6919,15 +7126,37 @@ var ASSET_STATUS_ORDER = { requested: 0, borrowed: 1, returned: 2 };
 var ASSET_NEXT_STATUS = { requested: "borrowed", borrowed: "returned" };
 var ASSET_NEXT_LABEL = { requested: "Mark borrowed", borrowed: "Mark returned" };
 
-function openAssetsTab(){
-  assetFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
+var tabAssetsBadge = document.getElementById("tabAssetsBadge");
+function refreshAssetsBadge(){
   apiGet('/api/assets').then(function(res){
     STATE.assetRequests = res.requests;
+    var n = res.requests.filter(function(r){ return r.status === "requested"; }).length;
+    tabAssetsBadge.hidden = n === 0;
+    tabAssetsBadge.textContent = n > 99 ? "99+" : String(n);
     if(!assetsPage.hidden) renderAssetsBoard();
-  }).catch(function(){
-    assetFeed.innerHTML = '<div class="maint-col-empty">Couldn\'t load asset requests</div>';
-  });
+  }).catch(function(){});
 }
+
+function openAssetsTab(){
+  assetFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
+  refreshAssetsBadge();
+}
+
+var assetSearchInput = document.getElementById("assetSearchInput");
+var assetSearchClear = document.getElementById("assetSearchClear");
+STATE.assetSearchTerm = "";
+assetSearchInput.addEventListener("input", function(){
+  STATE.assetSearchTerm = assetSearchInput.value;
+  assetSearchClear.hidden = STATE.assetSearchTerm.length === 0;
+  renderAssetsBoard();
+});
+assetSearchClear.addEventListener("click", function(){
+  assetSearchInput.value = "";
+  STATE.assetSearchTerm = "";
+  assetSearchClear.hidden = true;
+  renderAssetsBoard();
+  assetSearchInput.focus();
+});
 
 function sortedAssetRequests(){
   return (STATE.assetRequests || []).slice().sort(function(a, b){
@@ -6937,10 +7166,13 @@ function sortedAssetRequests(){
 }
 
 function renderAssetsBoard(){
-  var requests = sortedAssetRequests();
+  var term = STATE.assetSearchTerm || "";
+  var requests = sortedAssetRequests().filter(function(r){
+    return matchesSearch(term, [r.itemName, r.notes, DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy]);
+  });
   assetFeed.innerHTML = "";
   if(!requests.length){
-    assetFeed.innerHTML = '<div class="maint-col-empty">No asset requests yet</div>';
+    assetFeed.innerHTML = '<div class="maint-col-empty">'+(term ? "No requests match \""+esc(term)+"\"" : "No asset requests yet")+'</div>';
     return;
   }
   requests.forEach(function(r){ assetFeed.appendChild(buildAssetCard(r)); });
@@ -6964,12 +7196,14 @@ function updateAssetStatus(id, status){
 }
 
 function deleteAssetRequest(id){
-  if(!confirm("Remove this request?")) return;
-  apiDelete('/api/assets/' + encodeURIComponent(id)).then(function(){
-    STATE.assetRequests = STATE.assetRequests.filter(function(x){ return x.id !== id; });
-    renderAssetsBoard();
-  }).catch(function(err){
-    showToast(err.message || "Couldn't remove that");
+  showConfirm({ title: "Remove this request?", confirmLabel: "Remove" }).then(function(ok){
+    if(!ok) return;
+    apiDelete('/api/assets/' + encodeURIComponent(id)).then(function(){
+      STATE.assetRequests = STATE.assetRequests.filter(function(x){ return x.id !== id; });
+      renderAssetsBoard();
+    }).catch(function(err){
+      showToast(err.message || "Couldn't remove that");
+    });
   });
 }
 

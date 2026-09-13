@@ -322,7 +322,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { ok: true, duplicate: false, messageId: row.id });
     }
 
-    // ---- Guest concierge requests (public, no staff session — reached via a room QR code) ----
+    // ---- Guest concierge requests (public, no staff session, reached via a room QR code) ----
     if (req.method === 'POST' && p === '/api/guest-requests') {
       const body = await readJsonBody(req);
       const roomNumber = String(body.roomNumber || '').trim();
