@@ -40,7 +40,7 @@
   --wallpaper-dot:rgba(255,255,255,.045);
   --outline-soft:rgba(148,222,184,.18);
 }
-/* Hotel Ping: premium black + emerald identity — a fixed dark design, does not switch to a light palette. */
+/* Hotel Ping: premium black + emerald identity, a fixed dark design that does not switch to a light palette. */
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
@@ -1122,8 +1122,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <button class="sb-profile-card" id="myProfileBtn" type="button">
       <span class="sb-profile-avatar" id="myProfileAvatar"></span>
       <span class="sb-profile-info">
-        <span class="sb-profile-name" id="myProfileName">—</span>
-        <span class="sb-profile-role" id="myProfileRole">—</span>
+        <span class="sb-profile-name" id="myProfileName"></span>
+        <span class="sb-profile-role" id="myProfileRole"></span>
         <span class="sb-profile-status" id="myProfileStatus" hidden></span>
       </span>
       <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
@@ -1358,7 +1358,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
     <div class="sb-page" id="assetsPage" hidden>
       <div class="sb-list-label">Asset exchange</div>
-      <p class="broadcast-hint events-hint">Borrow shared kit from other departments — request it here, then mark it borrowed and returned as it moves.</p>
+      <p class="broadcast-hint events-hint">Borrow shared kit from other departments. Request it here, then mark it borrowed and returned as it moves.</p>
       <form class="maint-new-form" id="newAssetForm">
         <input type="text" id="newAssetItem" placeholder="Item, e.g. Champagne chillers" required maxlength="80">
         <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
@@ -1387,7 +1387,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <span class="tab-badge" id="tabMaintBadge" hidden></span>
       </button>
       <button class="bottom-tab" id="tabAssetsBtn" type="button" aria-label="Asset exchange" title="Asset exchange">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         <span>Asset exchange</span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
@@ -1737,7 +1737,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <input type="tel" id="myProfilePhoneInput" placeholder="Your phone number, for the Call button (optional)" maxlength="30">
       <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save</button>
     </form>
-    <p class="broadcast-hint" id="myProfileNameHint" hidden style="margin-top:14px">You're viewing as this department, but this only renames your own account (<b id="myProfileNameHintWho"></b>). To rename someone else, use <b>Manage staff</b> instead — tap their name in that list.</p>
+    <p class="broadcast-hint" id="myProfileNameHint" hidden style="margin-top:14px">You're viewing as this department, but this only renames your own account (<b id="myProfileNameHintWho"></b>). To rename someone else, use <b>Manage staff</b> instead, and tap their name in that list.</p>
     <div class="admin-add-error" id="deptPhotoError"></div>
   </div>
 </div>
@@ -3042,7 +3042,7 @@ var msgActionMenu = document.getElementById("msgActionMenu");
 var msgActionBackdrop = document.getElementById("msgActionBackdrop");
 var ACTION_ICONS = {
   reply: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17l-5-5 5-5"/><path d="M4 12h10a5 5 0 0 1 5 5v1"/></svg>',
-  forward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+  forward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5"/><path d="M20 12H10a5 5 0 0 0-5 5v1"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
