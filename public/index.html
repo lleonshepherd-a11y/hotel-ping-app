@@ -120,8 +120,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bottom-tab.drag-hover{background:rgba(10,10,10,.88);color:#fff;transform:scale(1.08);box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .bottom-tab .tab-badge{
   position:absolute;top:1px;right:1px;min-width:16px;height:16px;padding:0 4px;
-  border-radius:10px;background:var(--urgent);color:#fff;font-size:10px;font-weight:800;
-  display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px #fff;
+  border-radius:10px;background:rgba(255,255,255,.18);color:#fff;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;
+  backdrop-filter:blur(8px) saturate(1.8);-webkit-backdrop-filter:blur(8px) saturate(1.8);
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.4), inset 0 0 0 1px rgba(255,255,255,.28), 0 2px 6px rgba(0,0,0,.4);
 }
 .sb-head{padding:26px 20px 18px;flex-shrink:0}
 .sb-brand{display:flex;align-items:center;gap:12px}
@@ -743,6 +745,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .confirm-modal-btn.cancel{background:var(--surface-3);color:var(--text)}
 .confirm-modal-btn.confirm{background:linear-gradient(150deg,var(--urgent),var(--urgent-2));color:#fff;box-shadow:0 8px 18px -4px rgba(214,73,60,.5)}
 .confirm-modal-btn.confirm.neutral{background:linear-gradient(150deg,var(--accent),var(--accent-2));box-shadow:0 8px 18px -4px rgba(47,174,106,.5)}
+.prompt-modal-input{width:100%;box-sizing:border-box;padding:11px 13px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font-size:16px;font-family:inherit;margin-bottom:18px;text-align:left}
+.prompt-modal-input:focus{outline:none;border-color:var(--accent)}
 .admin-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 .admin-modal-head h2{font-family:Manrope,sans-serif;font-size:16.5px;font-weight:800;margin:0}
 .admin-close{border:none;background:var(--surface-3);width:28px;height:28px;border-radius:50%;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
@@ -862,7 +866,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-photo-preview img,.maint-photo-preview video{width:84px;height:84px;object-fit:cover;border-radius:10px;display:block;background:#000}
 .maint-photo-remove{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--urgent);color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .maint-photo-remove svg{width:11px;height:11px}
-.maint-feed{display:flex;flex-direction:column;gap:7px;padding:4px 20px 20px}
+.maint-feed{display:flex;flex-direction:column;gap:7px;padding:14px 20px 20px}
 .maint-col-empty{font-size:11.5px;color:var(--text-faint);text-align:center;padding:16px 0}
 .maint-card{position:relative;background:var(--surface-2);border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3)}
 .maint-card.pinned{box-shadow:0 0 0 2px rgba(255,159,10,.55),0 1px 3px rgba(0,0,0,.08)}
@@ -911,8 +915,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .guests-header{display:flex;align-items:center;gap:9px;padding:14px 20px 4px}
 .guests-header-icon{width:30px;height:30px;border-radius:9px;background:rgba(184,151,92,.14);color:#b8975c;display:flex;align-items:center;justify-content:center;flex:none}
+.assets-header-icon{background:rgba(47,174,106,.14);color:var(--accent)}
 .guests-header-icon svg{width:15px;height:15px}
-.guests-feed{display:flex;flex-direction:column;gap:7px;padding:4px 20px 20px}
+.guests-feed{display:flex;flex-direction:column;gap:7px;padding:14px 20px 20px}
 .guest-card{position:relative;background:var(--surface-2);border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid #e0902c}
 .guest-card.status-in_progress{border-left-color:#3b82c4}
 .guest-card.status-completed{border-left-color:#2f9a5c;opacity:.88}
@@ -1390,8 +1395,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
 
     <div class="sb-page" id="assetsPage" hidden>
-      <div class="sb-list-label">Asset exchange</div>
-      <p class="broadcast-hint events-hint">Borrow shared kit from other departments. Request it here, then mark it borrowed and returned as it moves.</p>
+      <div class="guests-header assets-header">
+        <div class="guests-header-icon assets-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </div>
+        <div>
+          <div class="sb-title">Asset exchange</div>
+          <div class="sb-sub">Borrow shared kit from other departments</div>
+        </div>
+      </div>
       <form class="maint-new-form" id="newAssetForm">
         <input type="text" id="newAssetItem" placeholder="Item, e.g. Champagne chillers" required maxlength="80">
         <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
@@ -1965,6 +1977,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <div class="confirm-modal-actions">
       <button type="button" class="confirm-modal-btn cancel" id="confirmModalCancel">Cancel</button>
       <button type="button" class="confirm-modal-btn confirm" id="confirmModalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-overlay confirm-overlay" id="promptOverlay" hidden>
+  <div class="admin-modal confirm-modal">
+    <div class="confirm-modal-title" id="promptModalTitle">Are you sure?</div>
+    <div class="confirm-modal-body" id="promptModalBody"></div>
+    <input type="text" class="prompt-modal-input" id="promptModalInput">
+    <div class="confirm-modal-actions">
+      <button type="button" class="confirm-modal-btn cancel" id="promptModalCancel">Cancel</button>
+      <button type="button" class="confirm-modal-btn confirm neutral" id="promptModalConfirm">Save</button>
     </div>
   </div>
 </div>
@@ -3125,6 +3149,43 @@ confirmModalCancel.addEventListener("click", function(){ hideConfirm(false); });
 confirmModalConfirm.addEventListener("click", function(){ hideConfirm(true); });
 confirmOverlay.addEventListener("click", function(e){ if(e.target === confirmOverlay) hideConfirm(false); });
 
+var promptOverlay = document.getElementById("promptOverlay");
+var promptModalTitle = document.getElementById("promptModalTitle");
+var promptModalBody = document.getElementById("promptModalBody");
+var promptModalInput = document.getElementById("promptModalInput");
+var promptModalCancel = document.getElementById("promptModalCancel");
+var promptModalConfirm = document.getElementById("promptModalConfirm");
+var promptResolve = null;
+function showPrompt(opts){
+  opts = opts || {};
+  promptModalTitle.textContent = opts.title || "";
+  promptModalBody.textContent = opts.body || "";
+  promptModalBody.hidden = !opts.body;
+  promptModalInput.placeholder = opts.placeholder || "";
+  promptModalInput.value = opts.value || "";
+  promptModalInput.maxLength = opts.maxLength || 200;
+  promptModalConfirm.textContent = opts.confirmLabel || "Save";
+  promptOverlay.hidden = false;
+  requestAnimationFrame(function(){
+    promptOverlay.classList.add("open");
+    promptModalInput.focus();
+    promptModalInput.select();
+  });
+  return new Promise(function(resolve){ promptResolve = resolve; });
+}
+function hidePrompt(result){
+  promptOverlay.classList.remove("open");
+  setTimeout(function(){ promptOverlay.hidden = true; }, 160);
+  if(promptResolve){ var r = promptResolve; promptResolve = null; r(result); }
+}
+promptModalCancel.addEventListener("click", function(){ hidePrompt(null); });
+promptModalConfirm.addEventListener("click", function(){ hidePrompt(promptModalInput.value); });
+promptModalInput.addEventListener("keydown", function(e){
+  if(e.key === "Enter"){ e.preventDefault(); hidePrompt(promptModalInput.value); }
+  if(e.key === "Escape"){ e.preventDefault(); hidePrompt(null); }
+});
+promptOverlay.addEventListener("click", function(e){ if(e.target === promptOverlay) hidePrompt(null); });
+
 var msgActionMenu = document.getElementById("msgActionMenu");
 var msgActionBackdrop = document.getElementById("msgActionBackdrop");
 var ACTION_ICONS = {
@@ -4027,16 +4088,17 @@ function sendQuickReply(text){
 }
 
 function editQuickReply(r){
-  var next = prompt("Edit quick reply", r.text);
-  if(next === null) return;
-  next = next.trim();
-  if(!next){ removeQuickReply(r.id); return; }
-  next = next.slice(0, 24);
-  apiSend('/api/quick-replies/' + encodeURIComponent(r.id), 'PATCH', { text: next }).then(function(res){
-    var idx = STATE.quickReplies.findIndex(function(x){ return x.id === r.id; });
-    if(idx !== -1) STATE.quickReplies[idx] = res.reply;
-    renderQuickReplies();
-  }).catch(function(err){ showToast(err.message || "Couldn't update that"); });
+  showPrompt({ title: "Edit quick reply", value: r.text, maxLength: 24, confirmLabel: "Save" }).then(function(next){
+    if(next === null) return;
+    next = next.trim();
+    if(!next){ removeQuickReply(r.id); return; }
+    next = next.slice(0, 24);
+    apiSend('/api/quick-replies/' + encodeURIComponent(r.id), 'PATCH', { text: next }).then(function(res){
+      var idx = STATE.quickReplies.findIndex(function(x){ return x.id === r.id; });
+      if(idx !== -1) STATE.quickReplies[idx] = res.reply;
+      renderQuickReplies();
+    }).catch(function(err){ showToast(err.message || "Couldn't update that"); });
+  });
 }
 
 function removeQuickReply(id){
@@ -4081,15 +4143,16 @@ function renderQuickReplies(){
 }
 
 qrAddChip.addEventListener("click", function(){
-  var text = prompt("Add a quick reply (max 24 characters)");
-  if(!text) return;
-  text = text.trim();
-  if(!text) return;
-  text = text.slice(0, 24);
-  apiSend('/api/quick-replies', 'POST', { text: text }).then(function(res){
-    STATE.quickReplies.push(res.reply);
-    renderQuickReplies();
-  }).catch(function(err){ showToast(err.message || "Couldn't add that"); });
+  showPrompt({ title: "Add a quick reply", placeholder: "Max 24 characters", maxLength: 24, confirmLabel: "Add" }).then(function(text){
+    if(!text) return;
+    text = text.trim();
+    if(!text) return;
+    text = text.slice(0, 24);
+    apiSend('/api/quick-replies', 'POST', { text: text }).then(function(res){
+      STATE.quickReplies.push(res.reply);
+      renderQuickReplies();
+    }).catch(function(err){ showToast(err.message || "Couldn't add that"); });
+  });
 });
 
 qrEditToggle.addEventListener("click", function(){
@@ -4962,12 +5025,13 @@ function buildStaffRow(s){
   resetPin.title = "Reset PIN";
   resetPin.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
   resetPin.addEventListener("click", function(){
-    var newPin = prompt("New 4-6 digit PIN for " + s.name + ":");
-    if(newPin === null) return;
-    if(!/^\d{4,6}$/.test(newPin)){ showToast("PIN must be 4-6 digits"); return; }
-    apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { pin: newPin }).then(function(){
-      showToast("PIN reset for " + s.name);
-    }).catch(function(){ showToast("Couldn't reset that PIN"); });
+    showPrompt({ title: "Reset PIN for " + s.name, placeholder: "New 4-6 digit PIN", maxLength: 6, confirmLabel: "Reset" }).then(function(newPin){
+      if(newPin === null) return;
+      if(!/^\d{4,6}$/.test(newPin)){ showToast("PIN must be 4-6 digits"); return; }
+      apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { pin: newPin }).then(function(){
+        showToast("PIN reset for " + s.name);
+      }).catch(function(){ showToast("Couldn't reset that PIN"); });
+    });
   });
 
   var del = document.createElement("button");
