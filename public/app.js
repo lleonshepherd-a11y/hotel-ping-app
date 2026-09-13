@@ -2737,6 +2737,11 @@ function boot(){
 }
 
 var pollTimer = null;
+function messagesChangeSignature(msgs){
+  return msgs.map(function(m){
+    return m.id+":"+m.status+":"+(m.edited?1:0)+":"+(m.deleted?1:0)+":"+(m.taskStatus||"")+":"+(m.completed?1:0)+":"+(m.pinned?1:0)+":"+(m.signoff?JSON.stringify(m.signoff):"")+":"+(m.poll?JSON.stringify(m.poll):"");
+  }).join("|");
+}
 function refreshNow(){
   if(STATE.loading) return Promise.resolve();
   var prevIds = {};
@@ -2754,7 +2759,7 @@ function refreshNow(){
     Object.keys(data).forEach(function(id){
       var oldMsgs = STATE.data[id] || [];
       var newMsgs = data[id] || [];
-      if(oldMsgs.length !== newMsgs.length) changed = true;
+      if(oldMsgs.length !== newMsgs.length || messagesChangeSignature(oldMsgs) !== messagesChangeSignature(newMsgs)) changed = true;
       newMsgs.forEach(function(m){
         if(m.from !== "self" && (!prevIds[id] || !prevIds[id][m.id])){
           hasNew = true;
@@ -2778,7 +2783,7 @@ function refreshActiveThread(){
   return apiGet('/api/messages?self=' + encodeURIComponent(STATE.self) + '&with=' + encodeURIComponent(id)).then(function(res){
     var newMsgs = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
     var oldMsgs = STATE.data[id] || [];
-    if(oldMsgs.length === newMsgs.length) return;
+    if(oldMsgs.length === newMsgs.length && messagesChangeSignature(oldMsgs) === messagesChangeSignature(newMsgs)) return;
     var hasNew = false, hasUrgent = false;
     newMsgs.forEach(function(m){
       if(m.from !== "self" && !prevIds[m.id]){ hasNew = true; if(m.urgent) hasUrgent = true; }
@@ -2808,6 +2813,7 @@ function startPolling(){
     refreshNow().catch(function(){});
     refreshAssetsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
+    if(!tabGuestsBtn.hidden) refreshGuestsBadge();
   }, 6000);
   startTypingPoll();
 }
@@ -2950,6 +2956,7 @@ logoutBtn.addEventListener("click", function(){
     if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
     if(slowPollTimer){ clearInterval(slowPollTimer); slowPollTimer = null; }
     if(typingPollTimer){ clearInterval(typingPollTimer); typingPollTimer = null; }
+    if(groupsPollTimer){ clearInterval(groupsPollTimer); groupsPollTimer = null; }
     showLogin();
   });
 });
@@ -5414,14 +5421,15 @@ function openGroupThread(groupId){
 }
 
 function pollGroupsQuiet(){
-  if(!AUTH.staff) return;
+  if(document.hidden || !AUTH.staff) return;
   loadGroups().then(function(){
     if(!eventsPage.hidden) renderEventList();
     var groupId = STATE.activeGroupId;
     if(!groupId) return;
     apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
       var mapped = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
-      if(mapped.length !== (STATE.groupMessages[groupId] || []).length){
+      var existing = STATE.groupMessages[groupId] || [];
+      if(mapped.length !== existing.length || messagesChangeSignature(existing) !== messagesChangeSignature(mapped)){
         STATE.groupMessages[groupId] = mapped;
         if(STATE.activeGroupId === groupId){
           renderThread();
@@ -5431,7 +5439,7 @@ function pollGroupsQuiet(){
     }).catch(function(){});
   });
 }
-setInterval(pollGroupsQuiet, 1500);
+var groupsPollTimer = setInterval(pollGroupsQuiet, 1500);
 
 if("serviceWorker" in navigator){
   window.addEventListener("load", function(){
