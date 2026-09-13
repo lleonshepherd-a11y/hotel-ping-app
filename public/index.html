@@ -3687,9 +3687,39 @@ function refreshNow(){
   }).finally(function(){ flushOfflineQueue(); });
 }
 
+function refreshActiveThread(){
+  if(!STATE.active || STATE.loading) return Promise.resolve();
+  var id = STATE.active;
+  var prevIds = {};
+  (STATE.data[id] || []).forEach(function(m){ prevIds[m.id] = true; });
+  return apiGet('/api/messages?self=' + encodeURIComponent(STATE.self) + '&with=' + encodeURIComponent(id)).then(function(res){
+    var newMsgs = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+    var oldMsgs = STATE.data[id] || [];
+    if(oldMsgs.length === newMsgs.length) return;
+    var hasNew = false, hasUrgent = false;
+    newMsgs.forEach(function(m){
+      if(m.from !== "self" && !prevIds[m.id]){ hasNew = true; if(m.urgent) hasUrgent = true; }
+    });
+    var patch = {};
+    patch[id] = newMsgs;
+    mergePendingIntoData(patch);
+    STATE.data[id] = patch[id];
+    renderList();
+    if(STATE.active === id) renderThread();
+    if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
+  });
+}
+
+var slowPollTimer = null;
 function startPolling(){
   if(pollTimer) return;
-  pollTimer = setInterval(function(){ refreshNow().catch(function(){}); refreshMaintenanceBadge(); pollMissed(); }, 1500);
+  pollTimer = setInterval(function(){
+    refreshActiveThread().catch(function(){});
+    refreshMaintenanceBadge();
+    pollMissed();
+    flushOfflineQueue();
+  }, 1500);
+  slowPollTimer = setInterval(function(){ refreshNow().catch(function(){}); }, 6000);
   startTypingPoll();
 }
 
@@ -3817,6 +3847,7 @@ setupForm.addEventListener("submit", function(e){
 logoutBtn.addEventListener("click", function(){
   apiSend('/api/auth/logout', 'POST', {}).catch(function(){}).finally(function(){
     if(pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+    if(slowPollTimer){ clearInterval(slowPollTimer); slowPollTimer = null; }
     if(typingPollTimer){ clearInterval(typingPollTimer); typingPollTimer = null; }
     showLogin();
   });
