@@ -279,6 +279,25 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_quick_replies_dept ON quick_replies(department_id, position);
+
+  CREATE TABLE IF NOT EXISTS stories (
+    id TEXT PRIMARY KEY,
+    department_id TEXT NOT NULL,
+    staff_name TEXT,
+    photo_path TEXT NOT NULL,
+    caption TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_stories_dept ON stories(department_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+
+  CREATE TABLE IF NOT EXISTS story_views (
+    story_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    viewed_at TEXT NOT NULL,
+    PRIMARY KEY (story_id, department_id)
+  );
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

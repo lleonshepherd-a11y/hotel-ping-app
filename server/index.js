@@ -136,6 +136,18 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
 function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined };
 }
+function rowToStory(row, viewed) {
+  return {
+    id: row.id,
+    departmentId: row.department_id,
+    staffName: row.staff_name || undefined,
+    photoUrl: '/uploads/' + row.photo_path,
+    caption: row.caption || undefined,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    viewed: !!viewed,
+  };
+}
 
 const URGENT_ESCALATION_MINUTES = 10;
 const NORMAL_ESCALATION_MINUTES = 25;
@@ -1055,6 +1067,61 @@ const server = http.createServer(async (req, res) => {
       const requester = staffFromToken(req);
       const dept = requester.department_id;
       db.prepare('DELETE FROM quick_replies WHERE id = ? AND department_id = ?').run(id, dept);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/stories') {
+      const now = new Date().toISOString();
+      db.prepare('DELETE FROM stories WHERE expires_at < ?').run(now);
+      const rows = db.prepare('SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC').all(now);
+      const requester = staffFromToken(req);
+      const viewerDept = requester.department_id;
+      const viewedRows = db.prepare('SELECT story_id FROM story_views WHERE department_id = ?').all(viewerDept);
+      const viewedIds = new Set(viewedRows.map((r) => r.story_id));
+      return send(res, 200, { stories: rows.map((r) => rowToStory(r, r.department_id === viewerDept || viewedIds.has(r.id))) });
+    }
+
+    if (req.method === 'POST' && p === '/api/stories') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      if (!body.fileBase64) return send(res, 400, { error: 'Photo is required' });
+      const buf = Buffer.from(body.fileBase64, 'base64');
+      if (buf.length > 10 * 1024 * 1024) return send(res, 400, { error: 'Photo is too large (10MB max)' });
+      const ext = (body.fileMime && body.fileMime.split('/')[1]) ? '.' + body.fileMime.split('/')[1].split(';')[0] : '';
+      const safeName = 'story-' + crypto.randomUUID() + ext;
+      fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
+      const id = crypto.randomUUID();
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
+      db.prepare(
+        'INSERT INTO stories (id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, requester.department_id, requester.name, safeName, caption, now.toISOString(), expiresAt);
+      const row = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
+      return send(res, 201, { story: rowToStory(row, true) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/view')) {
+      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/view'.length));
+      const story = db.prepare('SELECT 1 FROM stories WHERE id = ?').get(id);
+      if (!story) return send(res, 404, { error: 'Story not found' });
+      const requester = staffFromToken(req);
+      db.prepare(
+        'INSERT INTO story_views (story_id, department_id, viewed_at) VALUES (?, ?, ?) ON CONFLICT(story_id, department_id) DO NOTHING'
+      ).run(id, requester.department_id, new Date().toISOString());
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/stories/')) {
+      const id = decodeURIComponent(p.slice('/api/stories/'.length));
+      const existing = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Story not found' });
+      const requester = staffFromToken(req);
+      if (existing.department_id !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: "You can only delete your own department's stories" });
+      }
+      db.prepare('DELETE FROM stories WHERE id = ?').run(id);
+      db.prepare('DELETE FROM story_views WHERE story_id = ?').run(id);
       return send(res, 200, { ok: true });
     }
 

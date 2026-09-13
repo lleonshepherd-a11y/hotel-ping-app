@@ -314,6 +314,18 @@ function rowToGuestRequest(row) {
     completedAt: row.completed_at || undefined,
   };
 }
+function rowToStory(row, viewed) {
+  return {
+    id: row.id,
+    departmentId: row.department_id,
+    staffName: row.staff_name || undefined,
+    photoUrl: "/uploads/" + row.photo_path,
+    caption: row.caption || undefined,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    viewed: !!viewed,
+  };
+}
 function rowToGroup(row, members) {
   return { id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [], archivedAt: row.archived_at || undefined, sharedAt: row.shared_at || undefined };
 }
@@ -1279,6 +1291,62 @@ export default {
         const id = decodeURIComponent(p.slice("/api/quick-replies/".length));
         const dept = request._staff.department_id;
         await env.DB.prepare("DELETE FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).run();
+        return json({ ok: true });
+      }
+
+      if (method === "GET" && p === "/api/stories") {
+        const now = new Date().toISOString();
+        await env.DB.prepare("DELETE FROM stories WHERE expires_at < ?").bind(now).run();
+        const rows = await env.DB.prepare("SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC").bind(now).all();
+        const viewerDept = request._staff.department_id;
+        const viewedRows = await env.DB.prepare("SELECT story_id FROM story_views WHERE department_id = ?").bind(viewerDept).all();
+        const viewedIds = new Set(viewedRows.results.map((r) => r.story_id));
+        return json({ stories: rows.results.map((r) => rowToStory(r, r.department_id === viewerDept || viewedIds.has(r.id))) });
+      }
+
+      if (method === "POST" && p === "/api/stories") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
+        const binary = atob(body.fileBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length > 10 * 1024 * 1024) return json({ error: "Photo is too large (10MB max)" }, 400);
+        const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
+        const safeName = "story-" + crypto.randomUUID() + ext;
+        await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
+        const id = crypto.randomUUID();
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+        const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
+        await env.DB.prepare(
+          "INSERT INTO stories (id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(id, requester.department_id, requester.name, safeName, caption, now.toISOString(), expiresAt).run();
+        const row = await env.DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        return json({ story: rowToStory(row, true) }, 201);
+      }
+
+      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/view")) {
+        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/view".length));
+        const story = await env.DB.prepare("SELECT 1 FROM stories WHERE id = ?").bind(id).first();
+        if (!story) return json({ error: "Story not found" }, 404);
+        const viewerDept = request._staff.department_id;
+        await env.DB.prepare(
+          "INSERT INTO story_views (story_id, department_id, viewed_at) VALUES (?, ?, ?) ON CONFLICT(story_id, department_id) DO NOTHING"
+        ).bind(id, viewerDept, new Date().toISOString()).run();
+        return json({ ok: true });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/stories/")) {
+        const id = decodeURIComponent(p.slice("/api/stories/".length));
+        const existing = await env.DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Story not found" }, 404);
+        const requester = request._staff;
+        if (existing.department_id !== requester.department_id && !requester.is_admin) {
+          return json({ error: "You can only delete your own department's stories" }, 403);
+        }
+        await env.DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
+        await env.DB.prepare("DELETE FROM story_views WHERE story_id = ?").bind(id).run();
         return json({ ok: true });
       }
 

@@ -405,6 +405,47 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .dept-photo-preview{width:96px;height:96px;border-radius:50%;margin:4px auto 16px;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center}
 .dept-photo-preview svg{width:34px;height:34px}
 .dept-photo-remove-btn{background:var(--surface-3);color:#c0392b;margin-top:8px}
+
+.stories-row{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 10px;flex-shrink:0}
+.stories-row:empty{display:none}
+.story-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;width:60px;background:none;border:none;padding:0}
+.story-ring{width:56px;height:56px;border-radius:50%;padding:2.5px;background:linear-gradient(135deg,var(--border),var(--border))}
+.story-item.unseen .story-ring{background:linear-gradient(135deg,#e0902c,#d6493c,#7c62a8)}
+.story-item.mine .story-ring{background:var(--border)}
+.story-avatar-inner{width:100%;height:100%;border-radius:50%;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;position:relative}
+.story-avatar-inner svg{width:20px;height:20px}
+.story-add-badge{position:absolute;right:-2px;bottom:-2px;width:19px;height:19px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface)}
+.story-add-badge svg{width:11px;height:11px}
+.story-item-label{font-size:10.5px;color:var(--text-dim);max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.story-post-preview{width:100%;aspect-ratio:1;border-radius:14px;overflow:hidden;margin-bottom:12px;background:var(--surface-3)}
+.story-post-preview img{width:100%;height:100%;object-fit:cover}
+.story-caption-input{width:100%;border:1px solid var(--border);border-radius:12px;padding:10px 12px;font:inherit;resize:none;margin:10px 0;background:var(--surface-2);color:var(--text)}
+
+.story-viewer{position:fixed;inset:0;background:#000;z-index:200;display:flex;flex-direction:column}
+.story-progress-row{display:flex;gap:4px;padding:10px 10px 0;flex-shrink:0}
+.story-progress-seg{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.3);overflow:hidden}
+.story-progress-fill{height:100%;width:0%;background:#fff;border-radius:2px}
+.story-progress-seg.done .story-progress-fill{width:100%}
+.story-progress-seg.active .story-progress-fill{animation:storyfill linear forwards}
+@keyframes storyfill{from{width:0%}to{width:100%}}
+.story-viewer-head{display:flex;align-items:center;gap:10px;padding:12px 14px;flex-shrink:0}
+.story-viewer-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(155deg,#2c2c30,#131315);flex-shrink:0;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;color:#fff}
+.story-viewer-avatar svg{width:16px;height:16px}
+.story-viewer-meta{flex:1;min-width:0}
+.story-viewer-name{color:#fff;font-weight:700;font-size:14px}
+.story-viewer-sub{color:rgba(255,255,255,.6);font-size:11.5px}
+.story-viewer-delete,.story-viewer-close{background:none;border:none;color:#fff;opacity:.85;width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.story-viewer-delete svg,.story-viewer-close svg{width:19px;height:19px}
+.story-viewer-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0}
+.story-viewer-img{max-width:100%;max-height:100%;object-fit:contain}
+.story-viewer-tap{position:absolute;top:0;bottom:0;width:35%}
+.story-viewer-tap-left{left:0}
+.story-viewer-tap-right{right:0}
+.story-viewer-footer{padding:14px 16px calc(18px + env(safe-area-inset-bottom));flex-shrink:0}
+.story-viewer-caption{color:#fff;font-size:14px;margin-bottom:8px}
+.story-viewer-visibility{display:inline-flex;align-items:center;gap:5px;color:rgba(255,255,255,.55);font-size:11px}
+.story-viewer-visibility svg{width:12px;height:12px}
 .reply-quote{
   display:flex;gap:7px;align-items:stretch;margin-bottom:3px;padding:4px 8px;
   background:rgba(0,0,0,.05);border-radius:8px;cursor:pointer;max-width:100%;
@@ -1114,6 +1155,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
+
+    <div class="stories-row" id="storiesRow"></div>
+
     <div class="push-prompt" id="installPrompt" hidden>
       <div class="push-prompt-text">
         To get notifications on iPhone, add Hotel Ping to your Home Screen first:
@@ -1628,6 +1672,50 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <button type="submit" class="admin-add-btn">Attach to message</button>
       <div class="admin-add-error" id="signoffFormError"></div>
     </form>
+  </div>
+</div>
+
+<div class="admin-overlay" id="postStoryOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Post an update</h2>
+      <button class="admin-close" id="postStoryClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Share a photo update visible to every head of department. It disappears after 24 hours.</p>
+    <div class="story-post-preview" id="storyPostPreview" hidden><img id="storyPostPreviewImg" alt=""></div>
+    <input type="file" accept="image/*" id="storyPhotoInput" hidden>
+    <button type="button" class="admin-add-btn" id="storyPickPhotoBtn">Choose photo</button>
+    <textarea id="storyCaptionInput" class="story-caption-input" placeholder="Add a caption (optional)" maxlength="200" rows="2"></textarea>
+    <button type="button" class="admin-add-btn" id="storyPostBtn" disabled>Post update</button>
+    <div class="admin-add-error" id="storyPostError"></div>
+  </div>
+</div>
+
+<div class="story-viewer" id="storyViewer" hidden>
+  <div class="story-progress-row" id="storyProgressRow"></div>
+  <div class="story-viewer-head">
+    <span class="story-viewer-avatar" id="storyViewerAvatar"></span>
+    <div class="story-viewer-meta">
+      <div class="story-viewer-name" id="storyViewerName"></div>
+      <div class="story-viewer-sub" id="storyViewerSub"></div>
+    </div>
+    <button type="button" class="story-viewer-delete" id="storyViewerDelete" hidden aria-label="Delete this update">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
+    </button>
+    <button type="button" class="story-viewer-close" id="storyViewerClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="story-viewer-stage">
+    <div class="story-viewer-tap story-viewer-tap-left" id="storyTapLeft"></div>
+    <div class="story-viewer-tap story-viewer-tap-right" id="storyTapRight"></div>
+    <img class="story-viewer-img" id="storyViewerImg" alt="">
+  </div>
+  <div class="story-viewer-footer">
+    <div class="story-viewer-caption" id="storyViewerCaption"></div>
+    <div class="story-viewer-visibility"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg> Visible to all Department Heads</div>
   </div>
 </div>
 
@@ -3989,7 +4077,7 @@ function refreshNow(){
     renderList();
     if(STATE.active) renderThread();
     if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
-  }).finally(function(){ flushOfflineQueue(); });
+  }).finally(function(){ flushOfflineQueue(); loadStories(); });
 }
 
 function refreshActiveThread(){
@@ -4093,6 +4181,7 @@ function enterApp(staff){
   if(staff.departmentId === "concierge") refreshGuestsBadge();
   pollMissed();
   checkPushPrompt();
+  loadStories();
 }
 
 function showSetup(staff){
@@ -4560,6 +4649,228 @@ deptPhotoRemoveBtn.addEventListener("click", function(){
   }).catch(function(err){
     deptPhotoError.textContent = err.message || "Couldn't remove that photo.";
   }).finally(function(){ deptPhotoRemoveBtn.disabled = false; });
+});
+
+/* ---- Stories ---- */
+var storiesRow = document.getElementById("storiesRow");
+STATE.stories = [];
+function fmtStoryAge(iso){
+  var diff = Math.max(0, Math.round((Date.now() - new Date(iso).getTime())/60000));
+  if(diff < 1) return "Just now";
+  if(diff < 60) return diff + (diff === 1 ? " min ago" : " mins ago");
+  var h = Math.round(diff/60);
+  return h + (h === 1 ? " hour ago" : " hours ago");
+}
+function storiesByDept(){
+  var grouped = {};
+  STATE.stories.forEach(function(s){
+    grouped[s.departmentId] = grouped[s.departmentId] || [];
+    grouped[s.departmentId].push(s);
+  });
+  Object.keys(grouped).forEach(function(id){ grouped[id].sort(function(a,b){ return new Date(a.createdAt) - new Date(b.createdAt); }); });
+  return grouped;
+}
+function loadStories(){
+  return apiGet('/api/stories').then(function(res){
+    STATE.stories = res.stories || [];
+    renderStoriesRow();
+  }).catch(function(){});
+}
+function renderStoriesRow(){
+  var grouped = storiesByDept();
+  var mine = grouped[STATE.self] || [];
+  var others = DEPT_ORDER.filter(function(id){ return id !== STATE.self && grouped[id] && grouped[id].length; });
+  others.sort(function(a,b){
+    var aUnseen = grouped[a].some(function(s){ return !s.viewed; });
+    var bUnseen = grouped[b].some(function(s){ return !s.viewed; });
+    if(aUnseen !== bUnseen) return aUnseen ? -1 : 1;
+    var aLast = grouped[a][grouped[a].length-1].createdAt;
+    var bLast = grouped[b][grouped[b].length-1].createdAt;
+    return new Date(bLast) - new Date(aLast);
+  });
+  var order = [STATE.self].concat(others);
+  storiesRow.innerHTML = "";
+  order.forEach(function(id){
+    var reel = grouped[id] || [];
+    var isMine = id === STATE.self;
+    var hasUnseen = reel.some(function(s){ return !s.viewed; });
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "story-item" + (isMine ? " mine" : "") + (hasUnseen ? " unseen" : "");
+    var d = DEPTS[id];
+    btn.innerHTML =
+      '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+
+        (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
+      '</span></span>' +
+      '<span class="story-item-label">'+(isMine ? "Your update" : esc(d ? d.name : id))+'</span>';
+    btn.addEventListener("click", function(e){
+      if(isMine && e.target.closest(".story-add-badge")){ openPostStoryOverlay(); return; }
+      if(reel.length) openStoryViewer(id);
+      else if(isMine) openPostStoryOverlay();
+    });
+    storiesRow.appendChild(btn);
+  });
+}
+
+var postStoryOverlay = document.getElementById("postStoryOverlay");
+var postStoryClose = document.getElementById("postStoryClose");
+var storyPostPreview = document.getElementById("storyPostPreview");
+var storyPostPreviewImg = document.getElementById("storyPostPreviewImg");
+var storyPhotoInput = document.getElementById("storyPhotoInput");
+var storyPickPhotoBtn = document.getElementById("storyPickPhotoBtn");
+var storyCaptionInput = document.getElementById("storyCaptionInput");
+var storyPostBtn = document.getElementById("storyPostBtn");
+var storyPostError = document.getElementById("storyPostError");
+var storyPendingFile = null;
+function openPostStoryOverlay(){
+  storyPostError.textContent = "";
+  storyCaptionInput.value = "";
+  storyPendingFile = null;
+  storyPostPreview.hidden = true;
+  storyPostBtn.disabled = true;
+  postStoryOverlay.hidden = false;
+}
+postStoryClose.addEventListener("click", function(){ postStoryOverlay.hidden = true; });
+postStoryOverlay.addEventListener("click", function(e){ if(e.target === postStoryOverlay) postStoryOverlay.hidden = true; });
+storyPickPhotoBtn.addEventListener("click", function(){ storyPhotoInput.click(); });
+storyPhotoInput.addEventListener("change", function(){
+  var file = storyPhotoInput.files[0];
+  storyPhotoInput.value = "";
+  if(!file) return;
+  storyPendingFile = file;
+  var reader = new FileReader();
+  reader.onload = function(){
+    storyPostPreviewImg.src = reader.result;
+    storyPostPreview.hidden = false;
+    storyPostBtn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+});
+storyPostBtn.addEventListener("click", function(){
+  if(!storyPendingFile) return;
+  storyPostError.textContent = "";
+  storyPostBtn.disabled = true;
+  blobToBase64(storyPendingFile).then(function(b64){
+    return apiSend('/api/stories', 'POST', { fileBase64: b64, fileMime: storyPendingFile.type, caption: storyCaptionInput.value.trim() || undefined });
+  }).then(function(res){
+    STATE.stories.push(res.story);
+    renderStoriesRow();
+    postStoryOverlay.hidden = true;
+    showToast("Update posted");
+  }).catch(function(err){
+    storyPostError.textContent = err.message || "Couldn't post that update.";
+    storyPostBtn.disabled = false;
+  });
+});
+
+var storyViewer = document.getElementById("storyViewer");
+var storyProgressRow = document.getElementById("storyProgressRow");
+var storyViewerAvatar = document.getElementById("storyViewerAvatar");
+var storyViewerName = document.getElementById("storyViewerName");
+var storyViewerSub = document.getElementById("storyViewerSub");
+var storyViewerImg = document.getElementById("storyViewerImg");
+var storyViewerCaption = document.getElementById("storyViewerCaption");
+var storyViewerClose = document.getElementById("storyViewerClose");
+var storyViewerDelete = document.getElementById("storyViewerDelete");
+var storyTapLeft = document.getElementById("storyTapLeft");
+var storyTapRight = document.getElementById("storyTapRight");
+var STORY_DURATION_MS = 5000;
+var storyViewState = null;
+
+function storyReelOrder(){
+  var grouped = storiesByDept();
+  var order = [STATE.self].concat(DEPT_ORDER.filter(function(id){ return id !== STATE.self; }));
+  return order.filter(function(id){ return grouped[id] && grouped[id].length; });
+}
+function openStoryViewer(deptId){
+  var grouped = storiesByDept();
+  var deptOrder = storyReelOrder();
+  var idx = deptOrder.indexOf(deptId);
+  if(idx === -1) return;
+  storyViewState = { deptOrder: deptOrder, deptIdx: idx, storyIdx: 0, timer: null };
+  storyViewer.hidden = false;
+  renderStoryFrame();
+}
+function currentReel(){
+  if(!storyViewState) return [];
+  var grouped = storiesByDept();
+  return grouped[storyViewState.deptOrder[storyViewState.deptIdx]] || [];
+}
+function renderStoryFrame(){
+  if(!storyViewState) return;
+  if(storyViewState.timer){ clearTimeout(storyViewState.timer); storyViewState.timer = null; }
+  var reel = currentReel();
+  if(!reel.length){ closeStoryViewer(); return; }
+  var deptId = storyViewState.deptOrder[storyViewState.deptIdx];
+  var story = reel[storyViewState.storyIdx];
+
+  storyProgressRow.innerHTML = "";
+  reel.forEach(function(s, i){
+    var seg = document.createElement("div");
+    seg.className = "story-progress-seg" + (i < storyViewState.storyIdx ? " done" : (i === storyViewState.storyIdx ? " active" : ""));
+    seg.innerHTML = '<div class="story-progress-fill"></div>';
+    if(i === storyViewState.storyIdx){
+      seg.querySelector(".story-progress-fill").style.animationDuration = STORY_DURATION_MS + "ms";
+    }
+    storyProgressRow.appendChild(seg);
+  });
+
+  storyViewerAvatar.setAttribute("style", avatarStyleAttr(deptId));
+  storyViewerAvatar.innerHTML = avatarInnerHtml(deptId);
+  storyViewerName.textContent = (story.staffName ? story.staffName : (DEPTS[deptId] ? DEPTS[deptId].name : deptId));
+  storyViewerSub.textContent = (DEPTS[deptId] ? DEPTS[deptId].name : "") + " · " + fmtStoryAge(story.createdAt);
+  storyViewerImg.src = story.photoUrl;
+  storyViewerCaption.textContent = story.caption || "";
+  storyViewerCaption.hidden = !story.caption;
+  storyViewerDelete.hidden = !(deptId === STATE.self || (AUTH.staff && AUTH.staff.isAdmin));
+
+  if(!story.viewed){
+    story.viewed = true;
+    apiSend('/api/stories/' + encodeURIComponent(story.id) + '/view', 'POST', {}).catch(function(){});
+  }
+
+  storyViewState.timer = setTimeout(function(){ storyAdvance(1); }, STORY_DURATION_MS);
+}
+function storyAdvance(dir){
+  if(!storyViewState) return;
+  var reel = currentReel();
+  var nextStoryIdx = storyViewState.storyIdx + dir;
+  if(nextStoryIdx >= 0 && nextStoryIdx < reel.length){
+    storyViewState.storyIdx = nextStoryIdx;
+    renderStoryFrame();
+    return;
+  }
+  var nextDeptIdx = storyViewState.deptIdx + dir;
+  if(nextDeptIdx >= 0 && nextDeptIdx < storyViewState.deptOrder.length){
+    storyViewState.deptIdx = nextDeptIdx;
+    storyViewState.storyIdx = dir > 0 ? 0 : (storiesByDept()[storyViewState.deptOrder[nextDeptIdx]] || []).length - 1;
+    renderStoryFrame();
+    return;
+  }
+  closeStoryViewer();
+}
+function closeStoryViewer(){
+  if(storyViewState && storyViewState.timer) clearTimeout(storyViewState.timer);
+  storyViewState = null;
+  storyViewer.hidden = true;
+  renderStoriesRow();
+}
+storyViewerClose.addEventListener("click", closeStoryViewer);
+storyTapLeft.addEventListener("click", function(){ storyAdvance(-1); });
+storyTapRight.addEventListener("click", function(){ storyAdvance(1); });
+storyViewerDelete.addEventListener("click", function(){
+  if(!storyViewState) return;
+  var reel = currentReel();
+  var story = reel[storyViewState.storyIdx];
+  if(!story) return;
+  if(!confirm("Delete this update?")) return;
+  apiDelete('/api/stories/' + encodeURIComponent(story.id)).then(function(){
+    STATE.stories = STATE.stories.filter(function(s){ return s.id !== story.id; });
+    var newReel = currentReel();
+    if(!newReel.length){ storyAdvance(1); return; }
+    if(storyViewState.storyIdx >= newReel.length) storyViewState.storyIdx = newReel.length - 1;
+    renderStoryFrame();
+  }).catch(function(){ showToast("Couldn't delete that update"); });
 });
 
 var notifSettingsBtn = document.getElementById("notifSettingsBtn");
