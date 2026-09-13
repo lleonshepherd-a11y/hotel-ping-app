@@ -41,6 +41,8 @@ function avatarStyleAttr(deptId){
   return "background:"+avatarGradient(deptId);
 }
 function avatarInnerHtml(deptId){
+  var meta = DEPT_META[deptId];
+  if(meta && meta.photoUrl) return "";
   return iconSvg(deptId);
 }
 
