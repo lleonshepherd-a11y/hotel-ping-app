@@ -1675,6 +1675,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
       <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save name</button>
     </form>
+    <p class="broadcast-hint" id="myProfileNameHint" hidden style="margin-top:14px">You're viewing as this department, but this only renames your own account (<b id="myProfileNameHintWho"></b>). To rename someone else, use <b>Manage staff</b> instead — tap their name in that list.</p>
     <div class="admin-add-error" id="deptPhotoError"></div>
   </div>
 </div>
@@ -4850,18 +4851,20 @@ function renderMyProfileCard(){
   myProfileName.textContent = AUTH.staff.name;
   myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
 }
-myProfileBtn.addEventListener("click", function(){
+var myProfileNameHint = document.getElementById("myProfileNameHint");
+var myProfileNameHintWho = document.getElementById("myProfileNameHintWho");
+function openMyProfileOverlay(){
   deptPhotoError.textContent = "";
   myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
+  var impersonating = AUTH.staff && STATE.self !== AUTH.staff.departmentId;
+  myProfileNameForm.hidden = impersonating;
+  myProfileNameHint.hidden = !impersonating;
+  if(impersonating) myProfileNameHintWho.textContent = AUTH.staff.name + ", " + (DEPTS[AUTH.staff.departmentId] ? DEPTS[AUTH.staff.departmentId].name : AUTH.staff.departmentId);
   renderDeptPhotoPreview();
   deptPhotoOverlay.hidden = false;
-});
-deptPhotoBtn.addEventListener("click", function(){
-  deptPhotoError.textContent = "";
-  myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
-  renderDeptPhotoPreview();
-  deptPhotoOverlay.hidden = false;
-});
+}
+myProfileBtn.addEventListener("click", openMyProfileOverlay);
+deptPhotoBtn.addEventListener("click", openMyProfileOverlay);
 deptPhotoClose.addEventListener("click", function(){ deptPhotoOverlay.hidden = true; });
 deptPhotoOverlay.addEventListener("click", function(e){ if(e.target === deptPhotoOverlay) deptPhotoOverlay.hidden = true; });
 deptPhotoPreviewWrap.addEventListener("click", function(){ deptPhotoFileInput.click(); });
