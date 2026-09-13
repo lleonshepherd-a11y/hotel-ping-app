@@ -57,7 +57,8 @@ body{
   justify-content:center;
 }
 button{font-family:inherit;cursor:pointer}
-input,textarea{font-family:inherit}
+input,textarea,select{font-family:inherit;color:var(--text)}
+input::placeholder,textarea::placeholder{color:var(--text-faint)}
 ::-webkit-scrollbar{width:8px;height:8px}
 ::-webkit-scrollbar-thumb{background:rgba(128,128,140,.28);border-radius:8px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -406,7 +407,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.12)}
 .signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 .signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
-.dept-photo-preview{width:96px;height:96px;border-radius:50%;margin:4px auto 16px;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center}
+.dept-photo-preview-wrap{position:relative;display:block;width:96px;margin:4px auto 16px;border:none;background:none;padding:0;transition:transform .12s ease}
+.dept-photo-preview-wrap:active{transform:scale(.96)}
+.dept-photo-preview{width:96px;height:96px;border-radius:50%;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+.dept-photo-cam-badge{position:absolute;right:-2px;bottom:-2px;width:30px;height:30px;border-radius:50%;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;display:flex;align-items:center;justify-content:center;border:2.5px solid var(--surface);box-shadow:0 3px 8px -2px rgba(47,174,106,.6)}
+.dept-photo-cam-badge svg{width:15px;height:15px}
+.dept-photo-preview-wrap.uploading .dept-photo-preview{opacity:.5}
+.dept-photo-preview-wrap.uploading .dept-photo-cam-badge{opacity:.5}
 .sb-profile-card{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:12px 14px;background:var(--surface-2);border-radius:16px;border:none;width:calc(100% - 40px);text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sb-profile-avatar{width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .sb-profile-avatar svg{width:20px;height:20px}
@@ -692,11 +699,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-close{border:none;background:var(--surface-3);width:28px;height:28px;border-radius:50%;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
 .admin-close svg{width:14px;height:14px}
 .staff-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
-.staff-row-name{font-weight:700;font-size:13.5px;flex:1}
+.staff-row-name{font-weight:700;font-size:13.5px;flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .staff-row-name-text{cursor:pointer;border-bottom:1px dashed var(--border)}
 .staff-row-name-text:hover{color:var(--accent)}
 .staff-row-name-input{font-size:16px;font-weight:700;font-family:inherit;border:1.5px solid var(--accent);border-radius:6px;padding:1px 5px;width:140px}
-.staff-row-name span{display:block;font-weight:600;font-size:11.5px;color:var(--text-faint)}
+.staff-row-name-sub{display:block;width:100%;font-weight:600;font-size:11.5px;color:var(--text-faint)}
 .staff-row select{font-size:12.5px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface-2);transition:border-color .15s ease}
 .staff-row select:focus{outline:none}
 .staff-row-admin{font-size:10.5px;font-weight:700;color:var(--accent);background:var(--active-tint);padding:3px 7px;border-radius:8px}
@@ -917,6 +924,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .handover-note-del:hover{color:var(--urgent);opacity:1;background:var(--urgent-tint)}
 .handover-note-del svg{width:12px;height:12px}
 .handover-empty{font-size:13px;color:var(--text-faint);padding:20px 0;text-align:center}
+.thread-empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:5px;padding:20px}
+.thread-empty-icon{width:52px;height:52px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text-faint);margin-bottom:6px;box-shadow:inset 0 0 0 1px var(--border)}
+.thread-empty-icon svg{width:22px;height:22px}
+.thread-empty-title{font-size:14px;font-weight:700;color:var(--text-dim)}
+.thread-empty-sub{font-size:12.5px;color:var(--text-faint)}
 .feed-list{display:flex;flex-direction:column;gap:2px;margin-top:14px;max-height:420px;overflow-y:auto}
 .feed-row{display:flex;align-items:flex-start;gap:11px;padding:11px 6px;border-radius:12px;text-align:left;border:none;background:none;width:100%}
 .feed-row:hover{background:var(--surface-2)}
@@ -1617,9 +1629,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       </button>
     </div>
     <p class="broadcast-hint">Change the photo and name shown across chats. Anyone on your team can update it — the General Manager controls who's allowed on the app at all.</p>
-    <div class="dept-photo-preview" id="deptPhotoPreview"></div>
+    <button type="button" class="dept-photo-preview-wrap" id="deptPhotoPreviewWrap" aria-label="Change photo">
+      <div class="dept-photo-preview" id="deptPhotoPreview"></div>
+      <span class="dept-photo-cam-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13.3" r="3.6"/></svg></span>
+    </button>
     <input type="file" accept="image/*" id="deptPhotoFileInput" hidden>
-    <button type="button" class="admin-add-btn" id="deptPhotoUploadBtn">Upload photo</button>
     <button type="button" class="admin-add-btn dept-photo-remove-btn" id="deptPhotoRemoveBtn" hidden>Remove photo</button>
     <form class="admin-add-form" id="myProfileNameForm" style="margin-top:14px">
       <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
@@ -2629,7 +2643,12 @@ function renderThread(){
   threadScroll.innerHTML = "";
   var msgs = STATE.activeGroupId ? (STATE.groupMessages[STATE.activeGroupId] || []) : STATE.data[STATE.active];
   if(!msgs.length){
-    threadScroll.innerHTML = '<div class="handover-empty">No messages yet. Say hello!</div>';
+    threadScroll.innerHTML =
+      '<div class="thread-empty-state">'+
+        '<div class="thread-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>'+
+        '<div class="thread-empty-title">No messages yet</div>'+
+        '<div class="thread-empty-sub">Say hello to start the conversation.</div>'+
+      '</div>';
     return;
   }
   var prevDay = null;
@@ -4760,8 +4779,8 @@ var deptPhotoBtn = document.getElementById("deptPhotoBtn");
 var deptPhotoOverlay = document.getElementById("deptPhotoOverlay");
 var deptPhotoClose = document.getElementById("deptPhotoClose");
 var deptPhotoPreview = document.getElementById("deptPhotoPreview");
+var deptPhotoPreviewWrap = document.getElementById("deptPhotoPreviewWrap");
 var deptPhotoFileInput = document.getElementById("deptPhotoFileInput");
-var deptPhotoUploadBtn = document.getElementById("deptPhotoUploadBtn");
 var deptPhotoRemoveBtn = document.getElementById("deptPhotoRemoveBtn");
 var deptPhotoError = document.getElementById("deptPhotoError");
 var myProfileBtn = document.getElementById("myProfileBtn");
@@ -4804,7 +4823,7 @@ deptPhotoBtn.addEventListener("click", function(){
 });
 deptPhotoClose.addEventListener("click", function(){ deptPhotoOverlay.hidden = true; });
 deptPhotoOverlay.addEventListener("click", function(e){ if(e.target === deptPhotoOverlay) deptPhotoOverlay.hidden = true; });
-deptPhotoUploadBtn.addEventListener("click", function(){ deptPhotoFileInput.click(); });
+deptPhotoPreviewWrap.addEventListener("click", function(){ deptPhotoFileInput.click(); });
 myProfileNameForm.addEventListener("submit", function(e){
   e.preventDefault();
   var name = myProfileNameInput.value.trim();
@@ -4828,7 +4847,7 @@ deptPhotoFileInput.addEventListener("change", function(){
   deptPhotoFileInput.value = "";
   if(!file) return;
   deptPhotoError.textContent = "";
-  deptPhotoUploadBtn.disabled = true;
+  deptPhotoPreviewWrap.classList.add("uploading");
   blobToBase64(file).then(function(b64){
     return apiSend('/api/departments/' + encodeURIComponent(STATE.self) + '/photo', 'POST', { fileBase64: b64, fileMime: file.type });
   }).then(function(res){
@@ -4841,7 +4860,7 @@ deptPhotoFileInput.addEventListener("change", function(){
     showToast("Photo updated");
   }).catch(function(err){
     deptPhotoError.textContent = err.message || "Couldn't upload that photo.";
-  }).finally(function(){ deptPhotoUploadBtn.disabled = false; });
+  }).finally(function(){ deptPhotoPreviewWrap.classList.remove("uploading"); });
 });
 deptPhotoRemoveBtn.addEventListener("click", function(){
   deptPhotoError.textContent = "";
