@@ -2025,6 +2025,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 <script>
 (function(){
 "use strict";
+var __perfT0 = performance.now();
+console.log("[PERF] script-start", __perfT0.toFixed(1) + "ms since navigation");
+function perfLogAfterPaint(label, since){
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      var now = performance.now();
+      console.log("[PERF] " + label, (now - since).toFixed(1) + "ms (elapsed since navigation: " + now.toFixed(1) + "ms)");
+    });
+  });
+}
 
 var ICONS = {
   gm: '<path d="M12 3l7 7-7 11-7-11z"/>',
@@ -2663,6 +2673,7 @@ function markRead(deptId){
 }
 
 function openThread(deptId){
+  var __openT0 = performance.now();
   if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; saveCurrentDraft(); }
   STATE.active = deptId;
   STATE.activeGroupId = null;
@@ -2678,6 +2689,11 @@ function openThread(deptId){
   if(window.innerWidth <= 720 && !(history.state && history.state.dashThread)){
     history.pushState({ dashThread: true }, "");
   }
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      console.log("[PERF] openThread->visible", (performance.now() - __openT0).toFixed(1) + "ms", "dept=" + deptId, "msgCount=" + ((STATE.data[deptId]||[]).length));
+    });
+  });
 }
 
 function closeThreadView(){
@@ -4721,6 +4737,8 @@ function renderBooted(){
   }
 }
 function boot(){
+  var __bootT0 = performance.now();
+  console.log("[PERF] boot-start", (__bootT0 - __perfT0).toFixed(1) + "ms after script-start");
   STATE.loading = true;
   var cache = loadBootCache();
   if(cache && cache.data){
@@ -4730,6 +4748,7 @@ function boot(){
     Object.keys(cache.deptMeta || {}).forEach(function(id){ DEPT_META[id] = cache.deptMeta[id]; });
     STATE.muted = cache.muted || {};
     renderBooted();
+    perfLogAfterPaint("boot: cached-data painted", __perfT0);
   } else {
     renderList();
   }
@@ -4738,6 +4757,7 @@ function boot(){
     flushOfflineQueue();
     renderBooted();
     saveBootCache();
+    perfLogAfterPaint("boot: fresh-data painted (full startup)", __perfT0);
   }).finally(function(){ STATE.loading = false; });
 }
 
@@ -4867,6 +4887,7 @@ var logoutBtn = document.getElementById("logoutBtn");
 var TOKEN_KEY = "mdash_token";
 
 function enterApp(staff){
+  console.log("[PERF] enterApp-start", (performance.now() - __perfT0).toFixed(1) + "ms after script-start");
   AUTH.staff = staff;
   STATE.self = staff.departmentId;
   loginScreen.hidden = true;
