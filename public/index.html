@@ -38,7 +38,7 @@
   --shadow-soft:0 1px 2px rgba(0,0,0,.45), 0 8px 22px rgba(0,0,0,.35);
   --shadow-pop:0 26px 60px rgba(0,0,0,.6), 0 6px 16px rgba(0,0,0,.45);
   --wallpaper-dot:rgba(255,255,255,.045);
-  --outline-soft:rgba(148,222,184,.28);
+  --outline-soft:rgba(148,222,184,.18);
 }
 /* Hotel Ping: premium black + emerald identity — a fixed dark design, does not switch to a light palette. */
 
@@ -199,6 +199,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .thread-item:hover{background:var(--surface-3)}
 .thread-item.active{background:var(--active-tint);border-color:rgba(148,222,184,.5)}
+.thread-item.reorder-source-hidden{opacity:0}
+.thread-drag-ghost{position:fixed;z-index:150;pointer-events:none;background:var(--surface-3);box-shadow:0 18px 34px -10px rgba(0,0,0,.65), 0 0 0 1px var(--outline-soft);transform:scale(1.03);will-change:top}
 .t-avatar{width:44px;height:44px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 2px 6px rgba(15,15,20,.18)}
 .t-avatar svg{width:19px;height:19px}
 .t-avatar.urgent-ring::before{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--urgent);animation:ringPulse 1.8s ease-in-out infinite}
@@ -407,7 +409,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .dept-photo-preview svg{width:34px;height:34px}
 .dept-photo-remove-btn{background:var(--surface-3);color:#c0392b;margin-top:8px}
 
-.stories-row{display:flex;gap:14px;overflow-x:auto;padding:2px 4px 10px;flex-shrink:0}
+.stories-row{display:flex;gap:14px;overflow-x:auto;padding:14px 4px 10px 16px;flex-shrink:0}
 .stories-row:empty{display:none}
 .story-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;width:60px;background:none;border:none;padding:0}
 .story-ring{width:56px;height:56px;border-radius:50%;padding:2.5px;background:linear-gradient(135deg,var(--border),var(--border));position:relative}
@@ -2149,8 +2151,24 @@ function renderSwitcher(){
   });
 }
 
+function threadOrderKey(){ return "hp_thread_order_" + (AUTH.staff ? AUTH.staff.id : "anon"); }
+function loadCustomThreadOrder(){
+  try{ return JSON.parse(localStorage.getItem(threadOrderKey()) || "null"); }catch(e){ return null; }
+}
+function saveCustomThreadOrder(order){
+  try{ localStorage.setItem(threadOrderKey(), JSON.stringify(order)); }catch(e){}
+}
 function sortedDeptIds(){
-  return Object.keys(STATE.data).sort(function(a,b){
+  var ids = Object.keys(STATE.data);
+  var custom = loadCustomThreadOrder();
+  if(custom && custom.length){
+    var known = {};
+    ids.forEach(function(id){ known[id] = true; });
+    var ordered = custom.filter(function(id){ return known[id]; });
+    ids.forEach(function(id){ if(ordered.indexOf(id) === -1) ordered.push(id); });
+    return ordered;
+  }
+  return ids.sort(function(a,b){
     var la = lastOf(STATE.data[a]), lb = lastOf(STATE.data[b]);
     return (lb ? lb.t : 0) - (la ? la.t : 0);
   });
@@ -2199,6 +2217,7 @@ function findSearchMatch(id, term){
 }
 
 function renderList(){
+  if(STATE.reordering) return;
   listLabel.textContent = DEPTS[STATE.self].name + " · Conversations";
   threadList.innerHTML = "";
   var term = (STATE.searchTerm || "").trim().toLowerCase();
@@ -2229,6 +2248,7 @@ function renderList(){
 
     var el = document.createElement("button");
     el.className = "thread-item" + (id === STATE.active ? " active" : "") + (unread ? " unread" : "");
+    el.setAttribute("data-dept-id", id);
     el.innerHTML =
       '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'<span class="t-duty-dot '+(isOnDuty(id)?'on':'off')+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'"></span></div>'+
       '<div class="t-body">'+
@@ -2238,6 +2258,7 @@ function renderList(){
         '</div>'+
       '</div>';
     el.addEventListener("click", function(){
+      if(el._suppressClick){ el._suppressClick = false; return; }
       openThread(id);
       if(searchHit){
         setTimeout(function(){
@@ -2250,8 +2271,122 @@ function renderList(){
         }, 80);
       }
     });
+    attachThreadReorder(el, id);
     threadList.appendChild(el);
   });
+}
+
+function attachThreadReorder(el, deptId){
+  var LONG_PRESS_MS = 350, MOVE_TOLERANCE = 10;
+  var timer = null, startX = 0, startY = 0, pointerId = null;
+  var dragging = false, ghost = null, rowH = 0, grabOffsetY = 0;
+  var order = [], elems = [], startRect = null, lastTargetIndex = null;
+
+  function teardown(){
+    document.removeEventListener("pointermove", onPreMove);
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    clearTimeout(timer);
+    pointerId = null;
+  }
+  function onDown(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    pointerId = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ startLift(e); }, LONG_PRESS_MS);
+    document.addEventListener("pointermove", onPreMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
+  }
+  function onPreMove(e){
+    if(e.pointerId !== pointerId || dragging) return;
+    if(Math.abs(e.clientX-startX) > MOVE_TOLERANCE || Math.abs(e.clientY-startY) > MOVE_TOLERANCE){
+      clearTimeout(timer);
+    }
+  }
+  function startLift(e){
+    dragging = true;
+    STATE.reordering = true;
+    document.removeEventListener("pointermove", onPreMove);
+    document.addEventListener("pointermove", onMove);
+    if(navigator.vibrate) navigator.vibrate(12);
+    elems = Array.prototype.slice.call(threadList.querySelectorAll(".thread-item"));
+    order = elems.map(function(x){ return x.getAttribute("data-dept-id"); });
+    startRect = el.getBoundingClientRect();
+    var next = el.nextElementSibling;
+    rowH = startRect.height + (next ? next.getBoundingClientRect().top - startRect.bottom : 8);
+    grabOffsetY = startY - startRect.top;
+    ghost = el.cloneNode(true);
+    ghost.classList.add("thread-drag-ghost");
+    ghost.style.position = "fixed";
+    ghost.style.left = startRect.left + "px";
+    ghost.style.top = startRect.top + "px";
+    ghost.style.width = startRect.width + "px";
+    ghost.style.margin = "0";
+    document.body.appendChild(ghost);
+    el.classList.add("reorder-source-hidden");
+  }
+  function applyShifts(targetIndex){
+    var fromIndex = order.indexOf(deptId);
+    elems.forEach(function(node, i){
+      if(node === el) return;
+      var shift = 0;
+      if(fromIndex < targetIndex){
+        if(i > fromIndex && i <= targetIndex) shift = -rowH;
+      } else if(fromIndex > targetIndex){
+        if(i >= targetIndex && i < fromIndex) shift = rowH;
+      }
+      node.style.transform = shift ? "translateY(" + shift + "px)" : "";
+      node.style.transition = "transform .15s ease";
+    });
+  }
+  function onMove(e){
+    if(e.pointerId !== pointerId || !dragging) return;
+    e.preventDefault();
+    var y = e.clientY - grabOffsetY;
+    ghost.style.top = y + "px";
+    var fromIndex = order.indexOf(deptId);
+    var idx = fromIndex + Math.round((e.clientY - startY) / rowH);
+    idx = Math.max(0, Math.min(order.length - 1, idx));
+    if(idx !== lastTargetIndex){
+      lastTargetIndex = idx;
+      applyShifts(idx);
+    }
+  }
+  function settle(){
+    elems.forEach(function(node){ node.style.transform = ""; node.style.transition = ""; });
+    el.classList.remove("reorder-source-hidden");
+    if(ghost){ ghost.remove(); ghost = null; }
+    STATE.reordering = false;
+  }
+  function onUp(e){
+    if(e.pointerId !== pointerId) return;
+    var wasDragging = dragging;
+    teardown();
+    if(!wasDragging){ return; }
+    el._suppressClick = true;
+    dragging = false;
+    var fromIndex = order.indexOf(deptId);
+    var toIndex = lastTargetIndex === null ? fromIndex : lastTargetIndex;
+    settle();
+    if(toIndex !== fromIndex){
+      var newOrder = order.slice();
+      newOrder.splice(fromIndex, 1);
+      newOrder.splice(toIndex, 0, deptId);
+      saveCustomThreadOrder(newOrder);
+      if(navigator.vibrate) navigator.vibrate(10);
+    }
+    lastTargetIndex = null;
+    renderList();
+  }
+  function onCancel(e){
+    if(e.pointerId !== pointerId) return;
+    teardown();
+    if(dragging){ dragging = false; lastTargetIndex = null; settle(); }
+  }
+  el.addEventListener("pointerdown", onDown);
 }
 
 function markRead(deptId){
