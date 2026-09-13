@@ -5113,6 +5113,7 @@ function isTicketVideo(t){
 function buildStatusActions(t, onAfterUpdate){
   var actions = document.createElement("div");
   actions.className = "maint-card-actions";
+  if(STATE.self !== "maintenance" && !(AUTH.staff && AUTH.staff.isAdmin)) return actions;
   function go(status){
     updateTicketStatus(t.id, status);
     if(onAfterUpdate) onAfterUpdate();
@@ -5737,7 +5738,8 @@ function buildAssetCard(r){
 
   var actions = document.createElement("div");
   actions.className = "asset-card-actions";
-  if(ASSET_NEXT_STATUS[r.status]){
+  var isMine = AUTH.staff && (r.requestedBy === STATE.self || AUTH.staff.isAdmin);
+  if(ASSET_NEXT_STATUS[r.status] && isMine){
     var nextBtn = document.createElement("button");
     nextBtn.type = "button";
     nextBtn.className = "asset-card-btn primary";
@@ -5745,7 +5747,6 @@ function buildAssetCard(r){
     nextBtn.addEventListener("click", function(){ updateAssetStatus(r.id, ASSET_NEXT_STATUS[r.status]); });
     actions.appendChild(nextBtn);
   }
-  var isMine = AUTH.staff && (r.requestedBy === STATE.self || AUTH.staff.isAdmin);
   if(isMine){
     var delBtn = document.createElement("button");
     delBtn.type = "button";

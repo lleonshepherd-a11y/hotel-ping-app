@@ -453,10 +453,17 @@ async function ensureSeeded(env) {
   const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM staff").first();
   if (count && count.n > 0) return;
   const salt = randomSaltHex();
-  const hash = await hashPin("1234", salt);
+  // Never seed a hardcoded/guessable PIN - anyone who has read this source file would
+  // know it. Generate a random one and log it so whoever triggered this bootstrap
+  // (staff table was completely empty) can retrieve it from the Worker logs.
+  const pinBytes = new Uint32Array(1);
+  crypto.getRandomValues(pinBytes);
+  const pin = String(100000 + (pinBytes[0] % 900000));
+  const hash = await hashPin(pin, salt);
   await env.DB.prepare(
     `INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, created_at) VALUES (?, 'Dave', 'gm', ?, ?, 1, ?)`
   ).bind(crypto.randomUUID(), hash, salt, new Date().toISOString()).run();
+  console.log("First-run admin account seeded: name 'Dave', PIN " + pin + " - sign in and change this PIN immediately.");
 }
 
 export default {
@@ -1406,8 +1413,12 @@ export default {
         const bodyIn = await readJsonBody(request);
         if (!["approved", "declined"].includes(bodyIn.decision)) return json({ error: "Invalid decision" }, 400);
         const now = new Date().toISOString();
-        await env.DB.prepare("UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ?")
-          .bind(bodyIn.decision, requester.name, now, id).run();
+        const decisionResult = await env.DB.prepare(
+          "UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ? AND signoff_status = 'pending'"
+        ).bind(bodyIn.decision, requester.name, now, id).run();
+        if (!decisionResult.meta || decisionResult.meta.changes === 0) {
+          return json({ error: "This request has already been decided" }, 400);
+        }
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         const verb = bodyIn.decision === "approved" ? "Approved" : "Declined";
         await insertMessage(env, ctx, {
@@ -1432,9 +1443,12 @@ export default {
         if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
           return json({ error: "Invalid poll option" }, 400);
         }
-        const votes = JSON.parse(existing.poll_votes || "{}");
-        votes[requester.department_id] = optionIndex;
-        await env.DB.prepare("UPDATE messages SET poll_votes = ? WHERE id = ?").bind(JSON.stringify(votes), id).run();
+        // Merge this one vote in with an atomic SQL json_set, rather than reading the whole
+        // votes blob into JS and writing it back - two people voting at once would otherwise
+        // race and one vote could silently overwrite the other.
+        await env.DB.prepare(
+          "UPDATE messages SET poll_votes = json_set(COALESCE(poll_votes, '{}'), '$.' || ?, ?) WHERE id = ?"
+        ).bind(requester.department_id, optionIndex, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
@@ -1804,6 +1818,9 @@ export default {
         if (!MAINT_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
         const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
+        if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
+          return json({ error: "Only Maintenance can update a ticket's status" }, 403);
+        }
         const now = new Date().toISOString();
         await env.DB.prepare(
           "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?"
@@ -1931,6 +1948,9 @@ export default {
         if (!ASSET_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
         const existing = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Request not found" }, 404);
+        if (existing.requested_by !== request._staff.department_id && !request._staff.is_admin) {
+          return json({ error: "You can only update your own department's requests" }, 403);
+        }
         const now = new Date().toISOString();
         await env.DB.prepare(
           "UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?"

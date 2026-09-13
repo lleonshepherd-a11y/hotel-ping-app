@@ -423,11 +423,13 @@ const crypto = require('node:crypto');
 const staffCount = db.prepare('SELECT COUNT(*) AS n FROM staff').get().n;
 if (staffCount === 0) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync('1234', salt, 64).toString('hex');
+  const pin = String(100000 + (crypto.randomBytes(4).readUInt32BE(0) % 900000));
+  const hash = crypto.scryptSync(pin, salt, 64).toString('hex');
   db.prepare(`
     INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, profile_complete, created_at)
     VALUES (?, 'Dave', 'gm', ?, ?, 1, 1, ?)
   `).run(crypto.randomUUID(), hash, salt, new Date().toISOString());
+  console.log("First-run admin account seeded: name 'Dave', PIN " + pin);
 }
 
 module.exports = { db, DEPARTMENTS };

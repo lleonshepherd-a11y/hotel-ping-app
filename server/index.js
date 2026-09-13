@@ -1192,8 +1192,10 @@ const server = http.createServer(async (req, res) => {
       const bodyIn = await readJsonBody(req);
       if (!['approved', 'declined'].includes(bodyIn.decision)) return send(res, 400, { error: 'Invalid decision' });
       const now = new Date().toISOString();
-      db.prepare('UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ?')
-        .run(bodyIn.decision, requester.name, now, id);
+      const decisionResult = db.prepare(
+        "UPDATE messages SET signoff_status = ?, signoff_decided_by = ?, signoff_decided_at = ? WHERE id = ? AND signoff_status = 'pending'"
+      ).run(bodyIn.decision, requester.name, now, id);
+      if (!decisionResult.changes) return send(res, 400, { error: 'This request has already been decided' });
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       const verb = bodyIn.decision === 'approved' ? 'Approved' : 'Declined';
       insertMessage({
@@ -1218,9 +1220,9 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
         return send(res, 400, { error: 'Invalid poll option' });
       }
-      const votes = JSON.parse(existing.poll_votes || '{}');
-      votes[requester.department_id] = optionIndex;
-      db.prepare('UPDATE messages SET poll_votes = ? WHERE id = ?').run(JSON.stringify(votes), id);
+      db.prepare(
+        "UPDATE messages SET poll_votes = json_set(COALESCE(poll_votes, '{}'), '$.' || ?, ?) WHERE id = ?"
+      ).run(requester.department_id, optionIndex, id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
@@ -1554,6 +1556,10 @@ const server = http.createServer(async (req, res) => {
       if (!MAINT_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const maintRequester = staffFromToken(req);
+      if (maintRequester.department_id !== 'maintenance' && !maintRequester.is_admin) {
+        return send(res, 403, { error: "Only Maintenance can update a ticket's status" });
+      }
       const now = new Date().toISOString();
       db.prepare('UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?')
         .run(status, now, status === 'fixed' ? now : null, id);
@@ -1668,6 +1674,10 @@ const server = http.createServer(async (req, res) => {
       if (!ASSET_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
       const existing = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Request not found' });
+      const assetRequester = staffFromToken(req);
+      if (existing.requested_by !== assetRequester.department_id && !assetRequester.is_admin) {
+        return send(res, 403, { error: "You can only update your own department's requests" });
+      }
       const now = new Date().toISOString();
       db.prepare('UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?')
         .run(status, now, status === 'returned' ? now : null, id);
