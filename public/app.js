@@ -36,14 +36,20 @@ function avatarGradient(deptId){
   return "linear-gradient(155deg, #2c2c30, #131315)";
 }
 function avatarStyleAttr(deptId){
-  var meta = DEPT_META[deptId];
-  if(meta && meta.photoUrl) return "background:#131315 url('"+meta.photoUrl+"') center/cover no-repeat";
-  return "background:"+avatarGradient(deptId);
+  return "position:relative;overflow:hidden;background:"+avatarGradient(deptId);
 }
 function avatarInnerHtml(deptId){
   var meta = DEPT_META[deptId];
-  if(meta && meta.photoUrl) return "";
-  return iconSvg(deptId);
+  var icon = iconSvg(deptId);
+  // The icon always renders first so it's the visible fallback the instant
+  // the avatar paints, and stays the fallback if the photo ever fails to
+  // load. The photo, when it loads, is a separate opaque <img> painted on
+  // top (later in DOM order) that fully covers the icon underneath - so
+  // there's never a gap where the circle is blank/flat.
+  if(meta && meta.photoUrl){
+    return icon + '<img src="'+esc(meta.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">';
+  }
+  return icon;
 }
 
 var DEPTS = {
