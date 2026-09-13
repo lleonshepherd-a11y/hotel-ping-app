@@ -4251,6 +4251,9 @@ responseOverlay.addEventListener("click", function(e){ if(e.target === responseO
 /* ---------------- Events (ad-hoc group chats) ---------------- */
 var eventPalette = document.getElementById("eventPalette");
 var eventList = document.getElementById("eventList");
+var eventsActiveSection = document.getElementById("eventsActiveSection");
+var eventsPastSection = document.getElementById("eventsPastSection");
+var eventsFilterRow = document.getElementById("eventsFilterRow");
 var pastEventsLabel = document.getElementById("pastEventsLabel");
 var pastEventsHint = document.getElementById("pastEventsHint");
 var pastEventList = document.getElementById("pastEventList");
@@ -4259,6 +4262,16 @@ var eventDropZone = document.getElementById("eventDropZone");
 var eventDropZoneLabel = document.getElementById("eventDropZoneLabel");
 var newEventForm = document.getElementById("newEventForm");
 var newEventName = document.getElementById("newEventName");
+
+STATE.eventsFilter = "active";
+eventsFilterRow.addEventListener("click", function(e){
+  var btn = e.target.closest(".chat-filter-chip");
+  if(!btn) return;
+  STATE.eventsFilter = btn.dataset.filter;
+  eventsFilterRow.querySelectorAll(".chat-filter-chip").forEach(function(c){ c.classList.toggle("active", c === btn); });
+  eventsActiveSection.hidden = STATE.eventsFilter !== "active";
+  eventsPastSection.hidden = STATE.eventsFilter !== "past";
+});
 
 STATE.groups = [];
 var pendingLandedGroupId = null;
@@ -4567,9 +4580,11 @@ function renderEventList(){
     card.querySelector(".event-card-open").addEventListener("click", function(e){ e.stopPropagation(); openGroupThread(g.id); });
   });
 
-  pastEventsLabel.hidden = !past.length;
+  var pastFilterBtn = eventsFilterRow.querySelector('[data-filter="past"]');
+  pastFilterBtn.textContent = past.length ? "Past (" + past.length + ")" : "Past";
+  pastEventsLabel.hidden = true;
   pastEventsHint.hidden = !past.length;
-  pastEventList.innerHTML = "";
+  pastEventList.innerHTML = past.length ? "" : '<div class="event-empty">No past events yet.</div>';
   past.forEach(function(g){
     var card = document.createElement("div");
     card.className = "event-card past";
@@ -5071,6 +5086,16 @@ maintSearchClear.addEventListener("click", function(){
   maintSearchInput.focus();
 });
 
+var maintFilterRow = document.getElementById("maintFilterRow");
+STATE.maintFilter = "todo";
+maintFilterRow.addEventListener("click", function(e){
+  var btn = e.target.closest(".chat-filter-chip");
+  if(!btn) return;
+  STATE.maintFilter = btn.dataset.filter;
+  maintFilterRow.querySelectorAll(".chat-filter-chip").forEach(function(c){ c.classList.toggle("active", c === btn); });
+  renderMaintenanceBoard();
+});
+
 var MAINT_PRIORITY_ORDER = { safety: 0, guest: 1, problem: 2, routine: 3 };
 function sortedTickets(){
   var order = { reported: 0, in_progress: 1, fixed: 2 };
@@ -5364,12 +5389,21 @@ function matchesSearch(term, fields){
 
 function renderMaintenanceBoard(){
   var term = STATE.maintSearchTerm || "";
-  var tickets = sortedTickets().filter(function(t){
+  var all = sortedTickets().filter(function(t){
     return matchesSearch(term, [t.description, t.roomNumber, DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy]);
+  });
+  var todoCount = all.filter(function(t){ return t.status !== "fixed"; }).length;
+  var doneCount = all.filter(function(t){ return t.status === "fixed"; }).length;
+  maintFilterRow.querySelector('[data-filter="todo"]').textContent = todoCount ? "To do (" + todoCount + ")" : "To do";
+  maintFilterRow.querySelector('[data-filter="done"]').textContent = doneCount ? "Done (" + doneCount + ")" : "Done";
+
+  var tickets = all.filter(function(t){
+    return STATE.maintFilter === "done" ? t.status === "fixed" : t.status !== "fixed";
   });
   maintFeed.innerHTML = "";
   if(!tickets.length){
-    maintFeed.innerHTML = '<div class="maint-col-empty">'+(term ? "No jobs match \""+esc(term)+"\"" : "No maintenance jobs yet")+'</div>';
+    var emptyMsg = term ? "No jobs match \""+esc(term)+"\"" : (STATE.maintFilter === "done" ? "No fixed jobs yet" : "No open maintenance jobs");
+    maintFeed.innerHTML = '<div class="maint-col-empty">'+emptyMsg+'</div>';
     return;
   }
   tickets.forEach(function(t){ maintFeed.appendChild(buildMaintCard(t)); });

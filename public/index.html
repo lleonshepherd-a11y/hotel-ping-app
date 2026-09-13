@@ -252,19 +252,31 @@
     <div class="sb-empty" id="searchEmpty" hidden><span id="searchEmptyLoading" hidden>Loading conversations&hellip;</span><span id="searchEmptyUnread" hidden>No unread conversations</span><span id="searchEmptyMatch">No conversations match "<span id="searchEmptyTerm"></span>"</span></div>
     </div>
 
-    <div class="sb-page" id="eventsPage" hidden>
-      <div class="sb-list-label">Events</div>
-      <p class="broadcast-hint events-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
-      <div class="event-palette" id="eventPalette"></div>
-      <form class="event-new-form" id="newEventForm">
-        <input type="text" id="newEventName" placeholder="Event name, e.g. Wedding" required maxlength="60">
-        <button type="submit" class="admin-add-btn">Create event</button>
-      </form>
-      <div class="admin-add-error" id="eventError"></div>
-      <div class="event-list" id="eventList"></div>
-      <div class="sb-list-label" id="pastEventsLabel" hidden>Past events</div>
-      <p class="broadcast-hint events-hint" id="pastEventsHint" hidden>Kept for training, read only now. Only the General Manager can see these unless one is shared with every department.</p>
-      <div class="event-list past-event-list" id="pastEventList"></div>
+    <div class="sb-page events-page" id="eventsPage" hidden>
+      <div class="events-page-header">
+        <div class="sb-list-label">Events</div>
+        <p class="broadcast-hint events-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
+        <div class="event-palette" id="eventPalette"></div>
+        <form class="event-new-form" id="newEventForm">
+          <input type="text" id="newEventName" placeholder="Event name, e.g. Wedding" required maxlength="60">
+          <button type="submit" class="admin-add-btn">Create event</button>
+        </form>
+        <div class="admin-add-error" id="eventError"></div>
+        <div class="chat-filter-row" id="eventsFilterRow">
+          <button type="button" class="chat-filter-chip active" data-filter="active">Active</button>
+          <button type="button" class="chat-filter-chip" data-filter="past">Past</button>
+        </div>
+      </div>
+      <div class="events-page-scroll">
+        <div id="eventsActiveSection">
+          <div class="event-list" id="eventList"></div>
+        </div>
+        <div id="eventsPastSection" hidden>
+          <div class="sb-list-label" id="pastEventsLabel" hidden>Past events</div>
+          <p class="broadcast-hint events-hint" id="pastEventsHint" hidden>Kept for training, read only now. Only the General Manager can see these unless one is shared with every department.</p>
+          <div class="event-list past-event-list" id="pastEventList"></div>
+        </div>
+      </div>
     </div>
     <div class="event-drop-zone" id="eventDropZone">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
@@ -313,6 +325,10 @@
         <button id="maintSearchClear" hidden aria-label="Clear search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
+      </div>
+      <div class="chat-filter-row" id="maintFilterRow">
+        <button type="button" class="chat-filter-chip active" data-filter="todo">To do</button>
+        <button type="button" class="chat-filter-chip" data-filter="done">Done</button>
       </div>
       <div class="maint-feed" id="maintFeed"></div>
     </div>
