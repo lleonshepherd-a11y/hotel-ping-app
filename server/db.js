@@ -128,6 +128,15 @@ if (!messageColumns.includes('signoff_decided_by')) {
 if (!messageColumns.includes('signoff_decided_at')) {
   db.exec('ALTER TABLE messages ADD COLUMN signoff_decided_at TEXT');
 }
+if (!messageColumns.includes('poll_question')) {
+  db.exec('ALTER TABLE messages ADD COLUMN poll_question TEXT');
+}
+if (!messageColumns.includes('poll_options')) {
+  db.exec('ALTER TABLE messages ADD COLUMN poll_options TEXT');
+}
+if (!messageColumns.includes('poll_votes')) {
+  db.exec('ALTER TABLE messages ADD COLUMN poll_votes TEXT');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -298,6 +307,18 @@ db.exec(`
     viewed_at TEXT NOT NULL,
     PRIMARY KEY (story_id, department_id)
   );
+
+  CREATE TABLE IF NOT EXISTS asset_requests (
+    id TEXT PRIMARY KEY,
+    item_name TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','borrowed','returned')),
+    requested_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    returned_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

@@ -40,7 +40,10 @@ CREATE TABLE IF NOT EXISTS messages (
   signoff_guest_info TEXT,
   signoff_status TEXT,
   signoff_decided_by TEXT,
-  signoff_decided_at TEXT
+  signoff_decided_at TEXT,
+  poll_question TEXT,
+  poll_options TEXT,
+  poll_votes TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
@@ -203,6 +206,18 @@ CREATE TABLE IF NOT EXISTS story_views (
   viewed_at TEXT NOT NULL,
   PRIMARY KEY (story_id, department_id)
 );
+
+CREATE TABLE IF NOT EXISTS asset_requests (
+  id TEXT PRIMARY KEY,
+  item_name TEXT NOT NULL,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','borrowed','returned')),
+  requested_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  returned_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),

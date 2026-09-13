@@ -408,6 +408,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.12)}
 .signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 .signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
+.poll-card{margin-top:2px;margin-bottom:4px;width:min(300px,78vw);border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,rgba(47,174,106,.14),rgba(47,174,106,.04));border:1px solid rgba(47,174,106,.35)}
+.poll-head{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--accent);margin-bottom:6px}
+.poll-head svg{width:12px;height:12px}
+.poll-question{font-size:14px;font-weight:700;color:var(--text);margin-bottom:9px;line-height:1.3}
+.poll-options{display:flex;flex-direction:column;gap:6px}
+.poll-option{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:none;border-radius:10px;background:var(--surface-3);padding:8px 10px;text-align:left}
+.poll-option.voted{box-shadow:0 0 0 1.5px var(--accent) inset}
+.poll-option-fill{position:absolute;left:0;top:0;bottom:0;background:rgba(47,174,106,.3);transition:width .3s ease;z-index:0}
+.poll-option-label{position:relative;z-index:1;display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);min-width:0}
+.poll-option.voted .poll-option-label{font-weight:800}
+.poll-check{width:12px;height:12px;flex:none;color:var(--accent)}
+.poll-option-pct{position:relative;z-index:1;font-size:11.5px;font-weight:700;color:var(--text-dim);flex:none;font-variant-numeric:tabular-nums}
+.poll-meta{margin-top:8px;font-size:11px;color:var(--text-faint)}
 .dept-photo-preview-wrap{position:relative;display:block;width:96px;margin:4px auto 16px;border:none;background:none;padding:0;transition:transform .12s ease}
 .dept-photo-preview-wrap:active{transform:scale(.96)}
 .dept-photo-preview{width:96px;height:96px;border-radius:50%;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
@@ -548,8 +561,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .plus-btn.open{transform:rotate(45deg);background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .plus-menu{
   position:absolute;bottom:calc(100% + 10px);left:0;
-  display:flex;align-items:center;gap:4px;padding:6px;
-  background:rgba(255,255,255,.12);border-radius:999px;
+  display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:6px;
+  max-width:min(320px,calc(100vw - 32px));
+  background:rgba(255,255,255,.12);border-radius:26px;
   backdrop-filter:blur(22px) saturate(2.4);-webkit-backdrop-filter:blur(22px) saturate(2.4);
   box-shadow:0 10px 28px -8px rgba(20,20,16,.32), 0 2px 8px rgba(20,20,16,.1), inset 0 1px 1px rgba(255,255,255,.7), inset 0 0 0 1px rgba(255,255,255,.35);
   transform-origin:20px 100%;
@@ -731,6 +745,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px}
 .admin-add-form .admin-add-btn{width:100%;padding:10px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
+#pollOptionsList{display:flex;flex-direction:column;gap:8px}
+.poll-option-input{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
 .admin-modal-head-actions{display:flex;align-items:center;gap:4px}
 .events-hint{padding:0 20px;margin:0 0 14px}
@@ -856,6 +872,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .maint-card-btn.fixed-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
 .maint-card{cursor:pointer}
+.asset-card{position:relative;background:var(--surface-2);border-radius:12px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3);margin-bottom:8px}
+.asset-card.status-requested{border-left-color:#e0902c}
+.asset-card.status-borrowed{border-left-color:#3b82c4}
+.asset-card.status-returned{border-left-color:#2f9a5c}
+.asset-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
+.asset-card-item{font-size:14px;font-weight:700;color:var(--text)}
+.asset-card-notes{font-size:12.5px;color:var(--text-dim);margin-bottom:4px;line-height:1.35}
+.asset-card-meta{font-size:10.5px;color:var(--text-faint);margin-bottom:8px}
+.asset-status-pill{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:3px 8px;border-radius:8px;flex:none}
+.asset-status-pill.requested{color:#e0902c;background:rgba(224,144,44,.14)}
+.asset-status-pill.borrowed{color:#3b82c4;background:rgba(59,130,196,.14)}
+.asset-status-pill.returned{color:#2f9a5c;background:rgba(47,154,92,.12)}
+.asset-card-actions{display:flex;gap:6px}
+.asset-card-btn{flex:1;border:none;border-radius:8px;padding:7px 8px;font-size:11.5px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
+.asset-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
+.asset-card-btn.danger{background:rgba(214,73,60,.12);color:var(--urgent)}
 
 .guests-header{display:flex;align-items:center;gap:9px;padding:14px 20px 4px}
 .guests-header-icon{width:30px;height:30px;border-radius:9px;background:rgba(184,151,92,.14);color:#b8975c;display:flex;align-items:center;justify-content:center;flex:none}
@@ -1323,6 +1355,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
       <div class="guests-feed" id="guestsFeed"></div>
     </div>
 
+    <div class="sb-page" id="assetsPage" hidden>
+      <div class="sb-list-label">Asset exchange</div>
+      <p class="broadcast-hint events-hint">Borrow shared kit from other departments — request it here, then mark it borrowed and returned as it moves.</p>
+      <form class="maint-new-form" id="newAssetForm">
+        <input type="text" id="newAssetItem" placeholder="Item, e.g. Champagne chillers" required maxlength="80">
+        <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
+        <button type="submit" class="admin-add-btn">Request item</button>
+      </form>
+      <div class="admin-add-error" id="assetError"></div>
+      <div class="maint-feed" id="assetFeed"></div>
+    </div>
+
     <div class="bottom-tabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button" aria-label="Profile" title="Profile">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1340,6 +1384,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
         <span>Maintenance repairs</span>
         <span class="tab-badge" id="tabMaintBadge" hidden></span>
+      </button>
+      <button class="bottom-tab" id="tabAssetsBtn" type="button" aria-label="Asset exchange" title="Asset exchange">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+        <span>Asset exchange</span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg>
@@ -1475,6 +1523,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
                 <button class="plus-opt" id="optSignoff" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" stroke-width="1.7"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-width="1.7"/></svg></span>
                   <span class="plus-opt-label">Sign-off</span>
+                </button>
+                <button class="plus-opt" id="optPoll" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16" stroke-width="1.7"/><rect x="6" y="12" width="3" height="6" rx="0.5" stroke-width="1.7"/><rect x="11" y="8" width="3" height="10" rx="0.5" stroke-width="1.7"/><rect x="16" y="4" width="3" height="14" rx="0.5" stroke-width="1.7"/></svg></span>
+                  <span class="plus-opt-label">Poll</span>
                 </button>
               </div>
             </div>
@@ -1839,6 +1891,27 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   </div>
 </div>
 
+<div class="admin-overlay" id="pollComposeOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>New poll</h2>
+      <button class="admin-close" id="pollComposeClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <form class="admin-add-form" id="pollComposeForm">
+      <input type="text" id="pollQuestionInput" placeholder="Ask a question…" maxlength="140" required>
+      <div id="pollOptionsList">
+        <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="60" required>
+        <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="60" required>
+      </div>
+      <button type="button" class="qr-add-chip" id="pollAddOptionBtn" style="text-align:left">+ Add option</button>
+      <div class="admin-add-error" id="pollComposeError"></div>
+      <button type="submit" class="admin-add-btn" id="pollComposeSubmit">Create poll</button>
+    </form>
+  </div>
+</div>
+
 <div class="admin-overlay" id="ticketDetailOverlay" hidden>
   <div class="admin-modal ticket-detail-modal">
     <div class="admin-modal-head">
@@ -2028,7 +2101,8 @@ function mapServerMessage(row, self){
     taskStatus: row.taskStatus || undefined,
     edited: !!row.editedAt,
     mentions: row.mentions || undefined,
-    signoff: row.signoff || undefined
+    signoff: row.signoff || undefined,
+    poll: row.poll || undefined
   };
 }
 
@@ -2283,6 +2357,7 @@ function fmtClockDuration(seconds){
   return m + ":" + (s < 10 ? "0" : "") + s;
 }
 function previewText(m){
+  if(m.poll) return (m.from === "self" ? "You: " : "") + "📊 Poll: " + m.poll.question;
   if(m.signoff) return (m.from === "self" ? "You: " : "") + "🖋 Sign-off request: " + m.signoff.title;
   if(m.type === "text") return (m.from === "self" ? "You: " : "") + m.text;
   if(m.type === "image") return (m.from === "self" ? "You: " : "") + "📷 Photo";
@@ -3286,6 +3361,59 @@ function buildSignoffCard(m){
   return card;
 }
 
+function voteOnPoll(m, index){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/vote', 'POST', { optionIndex: index }).then(function(res){
+    var msgs = currentMessagesArray();
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    renderThread();
+  }).catch(function(){ showToast("Couldn't record your vote"); });
+}
+function buildPollCard(m){
+  var p = m.poll;
+  var votes = p.votes || {};
+  var counts = p.options.map(function(_, i){
+    return Object.keys(votes).filter(function(dept){ return votes[dept] === i; }).length;
+  });
+  var total = counts.reduce(function(a, b){ return a + b; }, 0);
+  var myVote = votes[STATE.self];
+
+  var card = document.createElement("div");
+  card.className = "poll-card";
+  var head = document.createElement("div");
+  head.className = "poll-head";
+  head.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><rect x="6" y="12" width="3" height="6" rx="0.5"/><rect x="11" y="8" width="3" height="10" rx="0.5"/><rect x="16" y="4" width="3" height="14" rx="0.5"/></svg> POLL';
+  card.appendChild(head);
+
+  var question = document.createElement("div");
+  question.className = "poll-question";
+  question.textContent = p.question;
+  card.appendChild(question);
+
+  var optionsWrap = document.createElement("div");
+  optionsWrap.className = "poll-options";
+  p.options.forEach(function(opt, i){
+    var pct = total ? Math.round((counts[i] / total) * 100) : 0;
+    var optBtn = document.createElement("button");
+    optBtn.type = "button";
+    optBtn.className = "poll-option" + (myVote === i ? " voted" : "");
+    optBtn.innerHTML =
+      '<div class="poll-option-fill" style="width:' + pct + '%"></div>' +
+      '<span class="poll-option-label">' + (myVote === i ? '<svg class="poll-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') + esc(opt) + '</span>' +
+      '<span class="poll-option-pct">' + pct + '%</span>';
+    optBtn.addEventListener("click", function(){ voteOnPoll(m, i); });
+    optionsWrap.appendChild(optBtn);
+  });
+  card.appendChild(optionsWrap);
+
+  var meta = document.createElement("div");
+  meta.className = "poll-meta";
+  meta.textContent = total + (total === 1 ? " vote" : " votes");
+  card.appendChild(meta);
+
+  return card;
+}
+
 function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var row = document.createElement("div");
   var out = m.from === "self";
@@ -3440,8 +3568,11 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   } else if(m.type === "audio"){
     bubble = buildAudioNode(m);
   }
-  if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
-  wrap.appendChild(bubble);
+  var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
+  if(!isEmptyPollBubble){
+    if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
+    wrap.appendChild(bubble);
+  }
   if(m.type === "audio" && m.transcript){
     var transcriptWrap = document.createElement("div");
     transcriptWrap.className = "voice-transcript-wrap";
@@ -3470,6 +3601,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   }
 
   if(m.signoff) wrap.appendChild(buildSignoffCard(m));
+  if(m.poll) wrap.appendChild(buildPollCard(m));
 
   var meta = document.createElement("div");
   if(out){
@@ -3903,6 +4035,73 @@ optTask.addEventListener("click", function(){
 optSignoff.addEventListener("click", function(){
   closePlusMenu();
   openSignoffOverlay();
+});
+
+var optPoll = document.getElementById("optPoll");
+var pollComposeOverlay = document.getElementById("pollComposeOverlay");
+var pollComposeClose = document.getElementById("pollComposeClose");
+var pollComposeForm = document.getElementById("pollComposeForm");
+var pollQuestionInput = document.getElementById("pollQuestionInput");
+var pollOptionsList = document.getElementById("pollOptionsList");
+var pollAddOptionBtn = document.getElementById("pollAddOptionBtn");
+var pollComposeError = document.getElementById("pollComposeError");
+var pollComposeSubmit = document.getElementById("pollComposeSubmit");
+function addPollOptionInput(){
+  var count = pollOptionsList.querySelectorAll(".poll-option-input").length;
+  if(count >= 4) return;
+  var input = document.createElement("input");
+  input.type = "text";
+  input.className = "poll-option-input";
+  input.maxLength = 60;
+  input.placeholder = "Option " + (count + 1);
+  pollOptionsList.appendChild(input);
+  pollAddOptionBtn.hidden = pollOptionsList.querySelectorAll(".poll-option-input").length >= 4;
+}
+function openPollComposeOverlay(){
+  pollQuestionInput.value = "";
+  pollOptionsList.innerHTML = "";
+  addPollOptionInput();
+  addPollOptionInput();
+  pollComposeError.textContent = "";
+  pollComposeSubmit.disabled = false;
+  pollComposeOverlay.hidden = false;
+}
+optPoll.addEventListener("click", function(){
+  closePlusMenu();
+  openPollComposeOverlay();
+});
+pollAddOptionBtn.addEventListener("click", addPollOptionInput);
+pollComposeClose.addEventListener("click", function(){ pollComposeOverlay.hidden = true; });
+pollComposeOverlay.addEventListener("click", function(e){ if(e.target === pollComposeOverlay) pollComposeOverlay.hidden = true; });
+pollComposeForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var question = pollQuestionInput.value.trim();
+  var options = Array.prototype.map.call(pollOptionsList.querySelectorAll(".poll-option-input"), function(inp){ return inp.value.trim(); }).filter(Boolean);
+  if(!question){ pollComposeError.textContent = "A question is required."; return; }
+  if(options.length < 2){ pollComposeError.textContent = "Add at least 2 options."; return; }
+  pollComposeSubmit.disabled = true;
+  pollComposeError.textContent = "";
+  var groupId = STATE.activeGroupId;
+  var deptId = STATE.active;
+  var payload = { from: STATE.self, type: "text", poll: { question: question, options: options } };
+  if(groupId) payload.groupId = groupId; else payload.to = deptId;
+  apiSend('/api/messages', 'POST', payload).then(function(res){
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
+    pollComposeOverlay.hidden = true;
+  }).catch(function(err){
+    pollComposeError.textContent = err.message || "Couldn't create that poll.";
+  }).then(function(){
+    pollComposeSubmit.disabled = false;
+  });
 });
 
 function handleAttachedFile(file){
@@ -5561,25 +5760,30 @@ var chatPage = document.getElementById("chatPage");
 var eventsPage = document.getElementById("eventsPage");
 var maintenancePage = document.getElementById("maintenancePage");
 var guestsPage = document.getElementById("guestsPage");
+var assetsPage = document.getElementById("assetsPage");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
 var tabEventsBtn = document.getElementById("tabEventsBtn");
 var tabMaintBtn = document.getElementById("tabMaintBtn");
 var tabGuestsBtn = document.getElementById("tabGuestsBtn");
+var tabAssetsBtn = document.getElementById("tabAssetsBtn");
 function showTab(tab){
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
   eventsPage.hidden = tab !== "events";
   maintenancePage.hidden = tab !== "maintenance";
   guestsPage.hidden = tab !== "guests";
+  assetsPage.hidden = tab !== "assets";
   tabProfileBtn.classList.toggle("active", tab === "profile");
   tabChatBtn.classList.toggle("active", tab === "chat");
   tabEventsBtn.classList.toggle("active", tab === "events");
   tabMaintBtn.classList.toggle("active", tab === "maintenance");
   tabGuestsBtn.classList.toggle("active", tab === "guests");
+  tabAssetsBtn.classList.toggle("active", tab === "assets");
   if(tab === "events") openEventsTab();
   if(tab === "maintenance") openMaintenanceTab();
   if(tab === "guests") openGuestsTab();
+  if(tab === "assets") openAssetsTab();
   if(tab === "profile") pollMissed();
 }
 tabProfileBtn.addEventListener("click", function(){ showTab("profile"); });
@@ -5587,6 +5791,7 @@ tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
 tabEventsBtn.addEventListener("click", function(){ showTab("events"); });
 tabMaintBtn.addEventListener("click", function(){ showTab("maintenance"); });
 tabGuestsBtn.addEventListener("click", function(){ showTab("guests"); });
+tabAssetsBtn.addEventListener("click", function(){ showTab("assets"); });
 showTab("chat");
 
 (function setupTabBarDrag(){
@@ -6698,6 +6903,138 @@ newMaintForm.addEventListener("submit", function(e){
     showToast(res.merged ? "Already reported. Added your note to it" : (isOnDuty("maintenance") ? "Reported" : "Reported. Maintenance is off duty, they'll see it once they're back on"));
   }).catch(function(err){
     maintError.textContent = err.message || "Couldn't report that issue.";
+  }).finally(function(){ submitBtn.disabled = false; });
+});
+
+/* ---- Hotel asset exchange ---- */
+var assetFeed = document.getElementById("assetFeed");
+var newAssetForm = document.getElementById("newAssetForm");
+var newAssetItem = document.getElementById("newAssetItem");
+var newAssetNotes = document.getElementById("newAssetNotes");
+var assetError = document.getElementById("assetError");
+STATE.assetRequests = STATE.assetRequests || [];
+var ASSET_STATUS_LABEL = { requested: "Requested", borrowed: "Borrowed", returned: "Returned" };
+var ASSET_STATUS_ORDER = { requested: 0, borrowed: 1, returned: 2 };
+var ASSET_NEXT_STATUS = { requested: "borrowed", borrowed: "returned" };
+var ASSET_NEXT_LABEL = { requested: "Mark borrowed", borrowed: "Mark returned" };
+
+function openAssetsTab(){
+  assetFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
+  apiGet('/api/assets').then(function(res){
+    STATE.assetRequests = res.requests;
+    if(!assetsPage.hidden) renderAssetsBoard();
+  }).catch(function(){
+    assetFeed.innerHTML = '<div class="maint-col-empty">Couldn\'t load asset requests</div>';
+  });
+}
+
+function sortedAssetRequests(){
+  return (STATE.assetRequests || []).slice().sort(function(a, b){
+    if(ASSET_STATUS_ORDER[a.status] !== ASSET_STATUS_ORDER[b.status]) return ASSET_STATUS_ORDER[a.status] - ASSET_STATUS_ORDER[b.status];
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
+
+function renderAssetsBoard(){
+  var requests = sortedAssetRequests();
+  assetFeed.innerHTML = "";
+  if(!requests.length){
+    assetFeed.innerHTML = '<div class="maint-col-empty">No asset requests yet</div>';
+    return;
+  }
+  requests.forEach(function(r){ assetFeed.appendChild(buildAssetCard(r)); });
+}
+
+function updateAssetStatus(id, status){
+  var r = STATE.assetRequests.find(function(x){ return x.id === id; });
+  var prevStatus = r ? r.status : null;
+  if(r) r.status = status;
+  renderAssetsBoard();
+  apiSend('/api/assets/' + encodeURIComponent(id) + '/status', 'POST', { status: status }).then(function(res){
+    var idx = STATE.assetRequests.findIndex(function(x){ return x.id === id; });
+    if(idx !== -1) STATE.assetRequests[idx] = res.request;
+    renderAssetsBoard();
+    showToast(ASSET_STATUS_LABEL[status]);
+  }).catch(function(){
+    if(r && prevStatus) r.status = prevStatus;
+    renderAssetsBoard();
+    showToast("Couldn't update that");
+  });
+}
+
+function deleteAssetRequest(id){
+  if(!confirm("Remove this request?")) return;
+  apiDelete('/api/assets/' + encodeURIComponent(id)).then(function(){
+    STATE.assetRequests = STATE.assetRequests.filter(function(x){ return x.id !== id; });
+    renderAssetsBoard();
+  }).catch(function(err){
+    showToast(err.message || "Couldn't remove that");
+  });
+}
+
+function buildAssetCard(r){
+  var card = document.createElement("div");
+  card.className = "asset-card status-" + r.status;
+
+  var top = document.createElement("div");
+  top.className = "asset-card-top";
+  top.innerHTML = '<span class="asset-card-item">' + esc(r.itemName) + '</span>' +
+    '<span class="asset-status-pill ' + r.status + '">' + ASSET_STATUS_LABEL[r.status] + '</span>';
+  card.appendChild(top);
+
+  if(r.notes){
+    var notes = document.createElement("div");
+    notes.className = "asset-card-notes";
+    notes.textContent = r.notes;
+    card.appendChild(notes);
+  }
+
+  var meta = document.createElement("div");
+  meta.className = "asset-card-meta";
+  var deptName = DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy;
+  meta.textContent = deptName + " · " + (r.status === "returned" ? "Returned " + fmtNoteTime(r.returnedAt) : "Requested " + fmtNoteTime(r.createdAt));
+  card.appendChild(meta);
+
+  var actions = document.createElement("div");
+  actions.className = "asset-card-actions";
+  if(ASSET_NEXT_STATUS[r.status]){
+    var nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "asset-card-btn primary";
+    nextBtn.textContent = ASSET_NEXT_LABEL[r.status];
+    nextBtn.addEventListener("click", function(){ updateAssetStatus(r.id, ASSET_NEXT_STATUS[r.status]); });
+    actions.appendChild(nextBtn);
+  }
+  var isMine = AUTH.staff && (r.requestedBy === STATE.self || AUTH.staff.isAdmin);
+  if(isMine){
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "asset-card-btn danger";
+    delBtn.textContent = "Remove";
+    delBtn.addEventListener("click", function(){ deleteAssetRequest(r.id); });
+    actions.appendChild(delBtn);
+  }
+  if(actions.childNodes.length) card.appendChild(actions);
+
+  return card;
+}
+
+newAssetForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  assetError.textContent = "";
+  var itemName = newAssetItem.value.trim();
+  if(!itemName) return;
+  var payload = { itemName: itemName, notes: newAssetNotes.value.trim() || undefined };
+  var submitBtn = newAssetForm.querySelector(".admin-add-btn");
+  submitBtn.disabled = true;
+  apiSend('/api/assets', 'POST', payload).then(function(res){
+    STATE.assetRequests.unshift(res.request);
+    renderAssetsBoard();
+    newAssetItem.value = "";
+    newAssetNotes.value = "";
+    showToast("Requested");
+  }).catch(function(err){
+    assetError.textContent = err.message || "Couldn't send that request.";
   }).finally(function(){ submitBtn.disabled = false; });
 });
 

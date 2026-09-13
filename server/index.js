@@ -21,6 +21,7 @@ const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ['new', 'in_progress', 'completed'];
+const ASSET_STATUSES = ['requested', 'borrowed', 'returned'];
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -86,6 +87,18 @@ function rowToGuestRequest(row) {
     completedAt: row.completed_at || undefined,
   };
 }
+function rowToAssetRequest(row) {
+  return {
+    id: row.id,
+    itemName: row.item_name,
+    notes: row.notes || undefined,
+    status: row.status,
+    requestedBy: row.requested_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    returnedAt: row.returned_at || undefined,
+  };
+}
 
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
@@ -131,6 +144,11 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       decidedBy: row.signoff_decided_by || undefined,
       decidedAt: row.signoff_decided_at || undefined,
     } : undefined,
+    poll: row.poll_question ? {
+      question: row.poll_question,
+      options: JSON.parse(row.poll_options || '[]'),
+      votes: JSON.parse(row.poll_votes || '{}'),
+    } : undefined,
   };
 }
 function rowToGroup(row, members) {
@@ -172,9 +190,10 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
+  const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -184,7 +203,10 @@ function insertMessage(opts) {
     opts.signoff && opts.signoff.target ? opts.signoff.target : null,
     opts.signoff && opts.signoff.category ? opts.signoff.category : null,
     opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
-    opts.signoff ? 'pending' : null
+    opts.signoff ? 'pending' : null,
+    opts.poll ? opts.poll.question : null,
+    pollOptionsJson,
+    opts.poll ? '{}' : null
   );
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId && !opts.silent) {
@@ -775,7 +797,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff } = body;
+      const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
       if (!DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
       let validMembers = null;
       if (groupId) {
@@ -788,7 +810,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 400, { error: 'Unknown department' });
       }
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
-      if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
+      if (type === 'text' && !text?.trim() && !poll) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
       if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return send(res, 400, { error: 'Invalid task status' });
       let signoffData = null;
@@ -806,6 +828,18 @@ const server = http.createServer(async (req, res) => {
         const category = signoff.category ? String(signoff.category).trim().slice(0, 60) : null;
         const guestInfo = signoff.guestInfo ? String(signoff.guestInfo).trim().slice(0, 120) : null;
         signoffData = { title, amount, target, category, guestInfo };
+      }
+      let pollData = null;
+      if (poll) {
+        const question = String(poll.question || '').trim();
+        if (!question) return send(res, 400, { error: 'Poll question is required' });
+        if (question.length > 140) return send(res, 400, { error: 'Poll question is too long' });
+        const options = Array.isArray(poll.options)
+          ? poll.options.map((o) => String(o || '').trim()).filter(Boolean)
+          : [];
+        if (options.length < 2 || options.length > 4) return send(res, 400, { error: 'A poll needs 2-4 options' });
+        if (options.some((o) => o.length > 60)) return send(res, 400, { error: 'Poll option is too long' });
+        pollData = { question, options };
       }
       const validMentions = Array.isArray(mentions) && validMembers
         ? mentions.filter((d) => validMembers.has(d) && d !== from)
@@ -834,6 +868,7 @@ const server = http.createServer(async (req, res) => {
         taskStatus: taskStatus || null,
         mentions: validMentions,
         signoff: signoffData,
+        poll: pollData,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
@@ -942,6 +977,28 @@ const server = http.createServer(async (req, res) => {
         from: existing.to_dept, to: existing.from_dept, type: 'text',
         body: verb + ' sign-off: ' + existing.signoff_title,
       });
+      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/vote')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/vote'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      if (!existing.poll_question) return send(res, 400, { error: "This message isn't a poll" });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const bodyIn = await readJsonBody(req);
+      const options = JSON.parse(existing.poll_options || '[]');
+      const optionIndex = Number(bodyIn.optionIndex);
+      if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
+        return send(res, 400, { error: 'Invalid poll option' });
+      }
+      const votes = JSON.parse(existing.poll_votes || '{}');
+      votes[requester.department_id] = optionIndex;
+      db.prepare('UPDATE messages SET poll_votes = ? WHERE id = ?').run(JSON.stringify(votes), id);
+      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 
@@ -1355,6 +1412,54 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE guest_requests SET pinned_at = ? WHERE id = ?').run(newPinned, id);
       const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
       return send(res, 200, { request: rowToGuestRequest(row) });
+    }
+
+    if (req.method === 'GET' && p === '/api/assets') {
+      const rows = db.prepare('SELECT * FROM asset_requests ORDER BY created_at DESC').all();
+      return send(res, 200, { requests: rows.map(rowToAssetRequest) });
+    }
+
+    if (req.method === 'POST' && p === '/api/assets') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const itemName = String(body.itemName || '').trim();
+      if (!itemName) return send(res, 400, { error: 'An item name is required' });
+      if (itemName.length > 80) return send(res, 400, { error: 'Item name is too long' });
+      const notes = body.notes ? String(body.notes).trim().slice(0, 200) : null;
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO asset_requests (id, item_name, notes, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, 'requested', ?, ?, ?)"
+      ).run(id, itemName, notes, requester.department_id, now, now);
+      const row = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
+      console.log('[asset notify] all departments:', (DEPT_NAMES[requester.department_id] || requester.department_id), 'needs:', itemName);
+      return send(res, 201, { request: rowToAssetRequest(row) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/assets/') && p.endsWith('/status')) {
+      const id = decodeURIComponent(p.slice('/api/assets/'.length, -'/status'.length));
+      const body = await readJsonBody(req);
+      const status = body.status;
+      if (!ASSET_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
+      const existing = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Request not found' });
+      const now = new Date().toISOString();
+      db.prepare('UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?')
+        .run(status, now, status === 'returned' ? now : null, id);
+      const row = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
+      return send(res, 200, { request: rowToAssetRequest(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/assets/')) {
+      const id = decodeURIComponent(p.slice('/api/assets/'.length));
+      const existing = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Request not found' });
+      const requester = staffFromToken(req);
+      if (existing.requested_by !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: "You can only remove your own department's requests" });
+      }
+      db.prepare('DELETE FROM asset_requests WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p === '/api/escalations/check') {

@@ -11,6 +11,7 @@ const MAINT_PRIORITIES = ["safety", "guest", "problem", "routine"];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ["new", "in_progress", "completed"];
+const ASSET_STATUSES = ["requested", "borrowed", "returned"];
 const DEFAULT_QUICK_REPLIES = ["On it", "Done", "5 mins", "On my way", "Noted", "Course away", "Hold 10 mins", "Ready for dessert"];
 
 function json(data, status, headers) {
@@ -229,9 +230,10 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
+  const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -241,7 +243,10 @@ async function insertMessage(env, ctx, opts) {
     opts.signoff && opts.signoff.target ? opts.signoff.target : null,
     opts.signoff && opts.signoff.category ? opts.signoff.category : null,
     opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
-    opts.signoff ? "pending" : null
+    opts.signoff ? "pending" : null,
+    opts.poll ? opts.poll.question : null,
+    pollOptionsJson,
+    opts.poll ? "{}" : null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -314,6 +319,18 @@ function rowToGuestRequest(row) {
     completedAt: row.completed_at || undefined,
   };
 }
+function rowToAssetRequest(row) {
+  return {
+    id: row.id,
+    itemName: row.item_name,
+    notes: row.notes || undefined,
+    status: row.status,
+    requestedBy: row.requested_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    returnedAt: row.returned_at || undefined,
+  };
+}
 function rowToStory(row, viewed) {
   return {
     id: row.id,
@@ -373,6 +390,11 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       status: row.signoff_status,
       decidedBy: row.signoff_decided_by || undefined,
       decidedAt: row.signoff_decided_at || undefined,
+    } : undefined,
+    poll: row.poll_question ? {
+      question: row.poll_question,
+      options: JSON.parse(row.poll_options || "[]"),
+      votes: JSON.parse(row.poll_votes || "{}"),
     } : undefined,
   };
 }
@@ -991,7 +1013,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff } = body;
+        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         let validMembers = null;
         if (groupId) {
@@ -1004,7 +1026,7 @@ export default {
           return json({ error: "Unknown department" }, 400);
         }
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
-        if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
+        if (type === "text" && !(text && text.trim()) && !poll) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
         if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return json({ error: "Invalid task status" }, 400);
         let signoffData = null;
@@ -1022,6 +1044,18 @@ export default {
           const category = signoff.category ? String(signoff.category).trim().slice(0, 60) : null;
           const guestInfo = signoff.guestInfo ? String(signoff.guestInfo).trim().slice(0, 120) : null;
           signoffData = { title, amount, target, category, guestInfo };
+        }
+        let pollData = null;
+        if (poll) {
+          const question = String(poll.question || "").trim();
+          if (!question) return json({ error: "Poll question is required" }, 400);
+          if (question.length > 140) return json({ error: "Poll question is too long" }, 400);
+          const options = Array.isArray(poll.options)
+            ? poll.options.map((o) => String(o || "").trim()).filter(Boolean)
+            : [];
+          if (options.length < 2 || options.length > 4) return json({ error: "A poll needs 2-4 options" }, 400);
+          if (options.some((o) => o.length > 60)) return json({ error: "Poll option is too long" }, 400);
+          pollData = { question, options };
         }
         const validMentions = Array.isArray(mentions) && validMembers
           ? mentions.filter((d) => validMembers.has(d) && d !== from)
@@ -1052,6 +1086,7 @@ export default {
           taskStatus: taskStatus || null,
           mentions: validMentions,
           signoff: signoffData,
+          poll: pollData,
         });
 
         return json({ message: rowToMessage(row, from, false) }, 201);
@@ -1158,6 +1193,28 @@ export default {
           from: existing.to_dept, to: existing.from_dept, type: "text",
           body: verb + " sign-off: " + existing.signoff_title,
         });
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/vote")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/vote".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        if (!existing.poll_question) return json({ error: "This message isn't a poll" }, 400);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const bodyIn = await readJsonBody(request);
+        const options = JSON.parse(existing.poll_options || "[]");
+        const optionIndex = Number(bodyIn.optionIndex);
+        if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
+          return json({ error: "Invalid poll option" }, 400);
+        }
+        const votes = JSON.parse(existing.poll_votes || "{}");
+        votes[requester.department_id] = optionIndex;
+        await env.DB.prepare("UPDATE messages SET poll_votes = ? WHERE id = ?").bind(JSON.stringify(votes), id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 
@@ -1611,6 +1668,65 @@ export default {
         await env.DB.prepare("UPDATE guest_requests SET pinned_at = ? WHERE id = ?").bind(newPinned, id).run();
         const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
         return json({ request: rowToGuestRequest(row) });
+      }
+
+      if (method === "GET" && p === "/api/assets") {
+        const rows = await env.DB.prepare("SELECT * FROM asset_requests ORDER BY created_at DESC").all();
+        return json({ requests: rows.results.map(rowToAssetRequest) });
+      }
+
+      if (method === "POST" && p === "/api/assets") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const itemName = String(body.itemName || "").trim();
+        if (!itemName) return json({ error: "An item name is required" }, 400);
+        if (itemName.length > 80) return json({ error: "Item name is too long" }, 400);
+        const notes = body.notes ? String(body.notes).trim().slice(0, 200) : null;
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO asset_requests (id, item_name, notes, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, 'requested', ?, ?, ?)"
+        ).bind(id, itemName, notes, requester.department_id, now, now).run();
+        const row = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+
+        const notifyPromise = Promise.all([...DEPT_IDS].filter((d) => d !== requester.department_id).map((deptId) =>
+          notifyDepartment(env, deptId, {
+            title: "📦 Asset request",
+            body: (DEPT_NAMES[requester.department_id] || requester.department_id) + " needs: " + itemName,
+            url: "/",
+            tag: "hotel-ping-asset-" + id,
+          }, requester.department_id).catch(function(e){ console.error("notifyDepartment (asset) error:", e && e.stack || e); })
+        ));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
+        return json({ request: rowToAssetRequest(row) }, 201);
+      }
+
+      if (method === "POST" && p.startsWith("/api/assets/") && p.endsWith("/status")) {
+        const id = decodeURIComponent(p.slice("/api/assets/".length, -"/status".length));
+        const body = await readJsonBody(request);
+        const status = body.status;
+        if (!ASSET_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
+        const existing = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Request not found" }, 404);
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?"
+        ).bind(status, now, status === "returned" ? now : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        return json({ request: rowToAssetRequest(row) });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/assets/")) {
+        const id = decodeURIComponent(p.slice("/api/assets/".length));
+        const existing = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Request not found" }, 404);
+        const requester = request._staff;
+        if (existing.requested_by !== requester.department_id && !requester.is_admin) {
+          return json({ error: "You can only remove your own department's requests" }, 403);
+        }
+        await env.DB.prepare("DELETE FROM asset_requests WHERE id = ?").bind(id).run();
+        return json({ ok: true });
       }
 
       if (method === "POST" && p === "/api/escalations/check") {
