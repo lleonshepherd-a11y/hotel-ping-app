@@ -1952,7 +1952,8 @@ var STATE = {
   loading: false,
   typingFrom: {},
   replyingTo: null,
-  muted: {}
+  muted: {},
+  threadOpened: false
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -2328,7 +2329,8 @@ function renderList(){
     var searchHit = matches[id];
 
     var el = document.createElement("button");
-    el.className = "thread-item" + (id === STATE.active ? " active" : "") + (unread ? " unread" : "");
+    var showActive = STATE.threadOpened || window.innerWidth > 720;
+    el.className = "thread-item" + (showActive && id === STATE.active ? " active" : "") + (unread ? " unread" : "");
     el.setAttribute("data-dept-id", id);
     el.innerHTML =
       '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'<span class="t-duty-dot '+(isOnDuty(id)?'on':'off')+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'"></span></div>'+
@@ -2480,6 +2482,7 @@ function openThread(deptId){
   if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; saveCurrentDraft(); }
   STATE.active = deptId;
   STATE.activeGroupId = null;
+  STATE.threadOpened = true;
   loadDraftInto(deptId, null);
   markRead(deptId);
   renderList();
@@ -3467,6 +3470,7 @@ function switchSelf(id){
   if(id === STATE.self || STATE.loading) return;
   STATE.self = id;
   STATE.loading = true;
+  STATE.threadOpened = false;
   renderSwitcher();
   renderMyProfileCard();
   updateComposerLock();
