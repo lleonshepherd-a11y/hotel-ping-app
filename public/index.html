@@ -415,6 +415,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .dept-photo-cam-badge svg{width:15px;height:15px}
 .dept-photo-preview-wrap.uploading .dept-photo-preview{opacity:.5}
 .dept-photo-preview-wrap.uploading .dept-photo-cam-badge{opacity:.5}
+
+.photo-crop-overlay{position:fixed;inset:0;background:#000;z-index:220;display:flex;flex-direction:column}
+.photo-crop-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;flex-shrink:0}
+.photo-crop-title{color:#fff;font-weight:700;font-size:14px}
+.photo-crop-use-btn{border:none;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:13.5px;padding:9px 16px;border-radius:999px;box-shadow:0 6px 16px -4px rgba(47,174,106,.65)}
+.photo-crop-stage{flex:1;position:relative;overflow:hidden;touch-action:none;min-height:0;cursor:grab}
+.photo-crop-stage:active{cursor:grabbing}
+.photo-crop-img{position:absolute;left:50%;top:50%;pointer-events:none;will-change:transform}
+.photo-crop-mask{position:absolute;left:50%;top:50%;width:min(78vw,320px);height:min(78vw,320px);transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,.78);pointer-events:none}
+.photo-crop-zoom-row{display:flex;align-items:center;gap:10px;padding:16px 24px calc(20px + env(safe-area-inset-bottom));flex-shrink:0}
+.photo-crop-zoom-row svg{width:16px;height:16px;color:rgba(255,255,255,.6);flex:none}
+.photo-crop-zoom-row input[type=range]{flex:1;accent-color:var(--accent)}
 .sb-profile-card{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:12px 14px;background:var(--surface-2);border-radius:16px;border:none;width:calc(100% - 40px);text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .sb-profile-avatar{width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .sb-profile-avatar svg{width:20px;height:20px}
@@ -1640,6 +1652,25 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </button>
     <input type="file" accept="image/*" id="deptPhotoFileInput" hidden>
     <button type="button" class="admin-add-btn dept-photo-remove-btn" id="deptPhotoRemoveBtn" hidden>Remove photo</button>
+
+    <div class="photo-crop-overlay" id="photoCropOverlay" hidden>
+      <div class="photo-crop-head">
+        <button type="button" class="story-editor-icon-btn" id="photoCropCancel" aria-label="Cancel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="photo-crop-title">Move and scale</div>
+        <button type="button" class="photo-crop-use-btn" id="photoCropUseBtn">Use photo</button>
+      </div>
+      <div class="photo-crop-stage" id="photoCropStage">
+        <img class="photo-crop-img" id="photoCropImg" alt="" draggable="false">
+        <div class="photo-crop-mask"></div>
+      </div>
+      <div class="photo-crop-zoom-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6.5"/><path d="M7.5 10h5"/><path d="M16.5 16.5L21 21"/></svg>
+        <input type="range" id="photoCropZoom" min="100" max="250" value="100">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="6.5"/><path d="M10 7.5v5M7.5 10h5"/><path d="M16.5 16.5L21 21"/></svg>
+      </div>
+    </div>
     <form class="admin-add-form" id="myProfileNameForm" style="margin-top:14px">
       <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
       <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save name</button>
@@ -4852,25 +4883,132 @@ myProfileNameForm.addEventListener("submit", function(e){
     deptPhotoError.textContent = err.message || "Couldn't update your name.";
   }).finally(function(){ myProfileNameSaveBtn.disabled = false; });
 });
+/* ---- Photo crop/zoom editor (used for profile photo uploads) ---- */
+var photoCropOverlay = document.getElementById("photoCropOverlay");
+var photoCropStage = document.getElementById("photoCropStage");
+var photoCropImg = document.getElementById("photoCropImg");
+var photoCropMask = photoCropOverlay.querySelector(".photo-crop-mask");
+var photoCropZoom = document.getElementById("photoCropZoom");
+var photoCropCancel = document.getElementById("photoCropCancel");
+var photoCropUseBtn = document.getElementById("photoCropUseBtn");
+var cropState = null;
+var cropResolveCallback = null;
+var cropObjectUrl = null;
+
+function openPhotoCropper(file){
+  return new Promise(function(resolve){
+    cropObjectUrl = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      photoCropOverlay.hidden = false;
+      photoCropImg.src = cropObjectUrl;
+      requestAnimationFrame(function(){
+        var maskRect = photoCropMask.getBoundingClientRect();
+        var size = maskRect.width;
+        var baseScale = Math.max(size / img.naturalWidth, size / img.naturalHeight);
+        cropState = { img: img, naturalW: img.naturalWidth, naturalH: img.naturalHeight, baseScale: baseScale, zoom: 1, offsetX: 0, offsetY: 0, cropSize: size };
+        photoCropZoom.value = 100;
+        photoCropImg.style.width = img.naturalWidth + "px";
+        photoCropImg.style.height = img.naturalHeight + "px";
+        photoCropImg.style.marginLeft = (-img.naturalWidth/2) + "px";
+        photoCropImg.style.marginTop = (-img.naturalHeight/2) + "px";
+        applyCropTransform();
+        cropResolveCallback = resolve;
+      });
+    };
+    img.src = cropObjectUrl;
+  });
+}
+function clampCropOffsets(){
+  var scale = cropState.baseScale * cropState.zoom;
+  var dispW = cropState.naturalW * scale, dispH = cropState.naturalH * scale;
+  var maxX = Math.max(0, (dispW - cropState.cropSize) / 2);
+  var maxY = Math.max(0, (dispH - cropState.cropSize) / 2);
+  cropState.offsetX = Math.max(-maxX, Math.min(maxX, cropState.offsetX));
+  cropState.offsetY = Math.max(-maxY, Math.min(maxY, cropState.offsetY));
+}
+function applyCropTransform(){
+  if(!cropState) return;
+  clampCropOffsets();
+  var scale = cropState.baseScale * cropState.zoom;
+  photoCropImg.style.transform = "translate("+cropState.offsetX+"px,"+cropState.offsetY+"px) scale("+scale+")";
+}
+function closePhotoCropper(){
+  photoCropOverlay.hidden = true;
+  if(cropObjectUrl){ URL.revokeObjectURL(cropObjectUrl); cropObjectUrl = null; }
+  photoCropImg.src = "";
+  cropState = null;
+}
+var cropDragging = false, cropPointerId = null, cropDragStartX = 0, cropDragStartY = 0, cropStartOffX = 0, cropStartOffY = 0;
+photoCropStage.addEventListener("pointerdown", function(e){
+  if(!cropState) return;
+  cropDragging = true;
+  cropPointerId = e.pointerId;
+  cropDragStartX = e.clientX; cropDragStartY = e.clientY;
+  cropStartOffX = cropState.offsetX; cropStartOffY = cropState.offsetY;
+  photoCropStage.setPointerCapture(cropPointerId);
+});
+photoCropStage.addEventListener("pointermove", function(e){
+  if(!cropDragging || e.pointerId !== cropPointerId || !cropState) return;
+  cropState.offsetX = cropStartOffX + (e.clientX - cropDragStartX);
+  cropState.offsetY = cropStartOffY + (e.clientY - cropDragStartY);
+  applyCropTransform();
+});
+function endCropDrag(e){ if(e.pointerId !== cropPointerId) return; cropDragging = false; }
+photoCropStage.addEventListener("pointerup", endCropDrag);
+photoCropStage.addEventListener("pointercancel", endCropDrag);
+photoCropZoom.addEventListener("input", function(){
+  if(!cropState) return;
+  cropState.zoom = photoCropZoom.value / 100;
+  applyCropTransform();
+});
+photoCropCancel.addEventListener("click", function(){
+  var cb = cropResolveCallback;
+  closePhotoCropper();
+  if(cb) cb(null);
+});
+photoCropUseBtn.addEventListener("click", function(){
+  var scale = cropState.baseScale * cropState.zoom;
+  var outputSize = 480;
+  var canvas = document.createElement("canvas");
+  canvas.width = outputSize; canvas.height = outputSize;
+  var ctx = canvas.getContext("2d");
+  var srcScale = 1 / scale;
+  var srcCropSize = cropState.cropSize * srcScale;
+  var srcCenterX = cropState.naturalW/2 - cropState.offsetX * srcScale;
+  var srcCenterY = cropState.naturalH/2 - cropState.offsetY * srcScale;
+  var sx = srcCenterX - srcCropSize/2;
+  var sy = srcCenterY - srcCropSize/2;
+  ctx.drawImage(cropState.img, sx, sy, srcCropSize, srcCropSize, 0, 0, outputSize, outputSize);
+  canvas.toBlob(function(blob){
+    var cb = cropResolveCallback;
+    closePhotoCropper();
+    if(cb) cb(blob);
+  }, "image/jpeg", 0.92);
+});
+
 deptPhotoFileInput.addEventListener("change", function(){
   var file = deptPhotoFileInput.files[0];
   deptPhotoFileInput.value = "";
   if(!file) return;
-  deptPhotoError.textContent = "";
-  deptPhotoPreviewWrap.classList.add("uploading");
-  blobToBase64(file).then(function(b64){
-    return apiSend('/api/departments/' + encodeURIComponent(STATE.self) + '/photo', 'POST', { fileBase64: b64, fileMime: file.type });
-  }).then(function(res){
-    DEPT_META[STATE.self] = res.department;
-    renderDeptPhotoPreview();
-    renderMyProfileCard();
-    renderList();
-    renderHeader();
-    renderSwitcher();
-    showToast("Photo updated");
-  }).catch(function(err){
-    deptPhotoError.textContent = err.message || "Couldn't upload that photo.";
-  }).finally(function(){ deptPhotoPreviewWrap.classList.remove("uploading"); });
+  openPhotoCropper(file).then(function(blob){
+    if(!blob) return;
+    deptPhotoError.textContent = "";
+    deptPhotoPreviewWrap.classList.add("uploading");
+    return blobToBase64(blob).then(function(b64){
+      return apiSend('/api/departments/' + encodeURIComponent(STATE.self) + '/photo', 'POST', { fileBase64: b64, fileMime: "image/jpeg" });
+    }).then(function(res){
+      DEPT_META[STATE.self] = res.department;
+      renderDeptPhotoPreview();
+      renderMyProfileCard();
+      renderList();
+      renderHeader();
+      renderSwitcher();
+      showToast("Photo updated");
+    }).catch(function(err){
+      deptPhotoError.textContent = err.message || "Couldn't upload that photo.";
+    }).finally(function(){ deptPhotoPreviewWrap.classList.remove("uploading"); });
+  });
 });
 deptPhotoRemoveBtn.addEventListener("click", function(){
   deptPhotoError.textContent = "";
