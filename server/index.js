@@ -505,10 +505,15 @@ const server = http.createServer(async (req, res) => {
       const id = decodeURIComponent(p.slice('/api/departments/'.length));
       if (!DEPT_IDS.has(id)) return send(res, 404, { error: 'Unknown department' });
       const body = await readJsonBody(req);
+      const deptRequester = staffFromToken(req);
       if (typeof body.onDuty === 'boolean') {
+        if (deptRequester.department_id !== id && !deptRequester.is_admin) {
+          return send(res, 403, { error: "You can only change your own department's duty status" });
+        }
         db.prepare('UPDATE departments SET on_duty = ? WHERE id = ?').run(body.onDuty ? 1 : 0, id);
       }
       if (typeof body.contactName === 'string') {
+        if (!deptRequester.is_admin) return send(res, 403, { error: 'Admin access required' });
         db.prepare('UPDATE departments SET contact_name = ? WHERE id = ?').run(body.contactName.trim() || null, id);
       }
       const row = db.prepare('SELECT * FROM departments WHERE id = ?').get(id);

@@ -710,6 +710,9 @@ export default {
         if (!DEPT_IDS.has(id)) return json({ error: "Unknown department" }, 404);
         const body = await readJsonBody(request);
         if (typeof body.onDuty === "boolean") {
+          if (request._staff.department_id !== id && !request._staff.is_admin) {
+            return json({ error: "You can only change your own department's duty status" }, 403);
+          }
           await env.DB.prepare("UPDATE departments SET on_duty = ? WHERE id = ?").bind(body.onDuty ? 1 : 0, id).run();
         }
         if (typeof body.contactName === "string") {
