@@ -1366,6 +1366,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
           <span class="h-group-avatars" id="hGroupAvatars" hidden></span>
         </div>
       </div>
+      <button class="mute-btn" id="callBtn" type="button" aria-label="Call" title="Call" style="right:92px" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
       <button class="mute-btn" id="filesBtn" type="button" aria-label="Shared files" title="Shared files" style="right:54px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg>
       </button>
@@ -1681,6 +1684,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     <form class="admin-add-form" id="myProfileNameForm" style="margin-top:14px">
       <input type="text" id="myProfileNameInput" placeholder="Your name" maxlength="60" required>
       <input type="text" id="myProfileStatusInput" placeholder="Status, e.g. Back at 6pm (optional)" maxlength="60">
+      <input type="tel" id="myProfilePhoneInput" placeholder="Your phone number, for the Call button (optional)" maxlength="30">
       <button type="submit" class="admin-add-btn" id="myProfileNameSaveBtn">Save</button>
     </form>
     <p class="broadcast-hint" id="myProfileNameHint" hidden style="margin-top:14px">You're viewing as this department, but this only renames your own account (<b id="myProfileNameHintWho"></b>). To rename someone else, use <b>Manage staff</b> instead — tap their name in that list.</p>
@@ -1823,6 +1827,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     </div>
     <div class="forward-dept-list" id="forwardDeptList"></div>
     <div class="admin-add-error" id="forwardError"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="callPickerOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Call…</h2>
+      <button class="admin-close" id="callPickerClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="forward-dept-list" id="callPickerList"></div>
   </div>
 </div>
 
@@ -2524,6 +2540,7 @@ var offDutyBanner = document.getElementById("offDutyBanner");
 var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var muteBtn = document.getElementById("muteBtn");
+var callBtn = document.getElementById("callBtn");
 muteBtn.addEventListener("click", function(){
   var deptId = STATE.active;
   var wasMuted = !!STATE.muted[deptId];
@@ -2562,6 +2579,7 @@ function renderHeader(){
     eventNotice.hidden = !!(g && g.archivedAt);
     muteBtn.hidden = true;
     filesBtn.hidden = true;
+    callBtn.hidden = true;
     optTask.hidden = true;
     if(taskActive) setTaskActive(false);
     optSignoff.hidden = true;
@@ -2592,7 +2610,44 @@ function renderHeader(){
   renderOffDutyBanner();
   muteBtn.classList.toggle("active", !!STATE.muted[STATE.active]);
   muteBtn.title = STATE.muted[STATE.active] ? "Unmute this conversation" : "Mute notifications for this conversation";
+  renderCallBtn();
 }
+
+function callablePeopleFor(deptId){
+  return (STAFF_BY_DEPT[deptId] || []).filter(function(s){ return s.phone; });
+}
+function renderCallBtn(){
+  callBtn.hidden = callablePeopleFor(STATE.active).length === 0;
+}
+callBtn.addEventListener("click", function(){
+  var people = callablePeopleFor(STATE.active);
+  if(!people.length) return;
+  if(people.length === 1){
+    window.location.href = "tel:" + people[0].phone;
+    return;
+  }
+  openCallPicker(people);
+});
+var callPickerOverlay = document.getElementById("callPickerOverlay");
+var callPickerClose = document.getElementById("callPickerClose");
+var callPickerList = document.getElementById("callPickerList");
+function openCallPicker(people){
+  callPickerList.innerHTML = people.map(function(s){
+    return '<button type="button" class="forward-dept-opt" data-phone="'+esc(s.phone)+'">'+
+      '<span class="fwd-avatar" style="'+avatarStyleAttr(STATE.active)+'">'+avatarInnerHtml(STATE.active)+'</span>'+
+      '<span>'+esc(s.name)+'<br><span style="font-weight:400;color:var(--text-faint);font-size:12.5px">'+esc(s.phone)+'</span></span>'+
+    '</button>';
+  }).join("");
+  callPickerList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      window.location.href = "tel:" + btn.getAttribute("data-phone");
+      callPickerOverlay.hidden = true;
+    });
+  });
+  callPickerOverlay.hidden = false;
+}
+callPickerClose.addEventListener("click", function(){ callPickerOverlay.hidden = true; });
+callPickerOverlay.addEventListener("click", function(e){ if(e.target === callPickerOverlay) callPickerOverlay.hidden = true; });
 
 function renderOffDutyBanner(){
   var d = DEPTS[STATE.active];
@@ -4845,6 +4900,7 @@ var myProfileStatus = document.getElementById("myProfileStatus");
 var myProfileNameForm = document.getElementById("myProfileNameForm");
 var myProfileNameInput = document.getElementById("myProfileNameInput");
 var myProfileStatusInput = document.getElementById("myProfileStatusInput");
+var myProfilePhoneInput = document.getElementById("myProfilePhoneInput");
 var myProfileNameSaveBtn = document.getElementById("myProfileNameSaveBtn");
 function renderDeptPhotoPreview(){
   var meta = DEPT_META[STATE.self];
@@ -4873,6 +4929,7 @@ function openMyProfileOverlay(){
   deptPhotoError.textContent = "";
   myProfileNameInput.value = AUTH.staff ? AUTH.staff.name : "";
   myProfileStatusInput.value = AUTH.staff && AUTH.staff.statusLine ? AUTH.staff.statusLine : "";
+  myProfilePhoneInput.value = AUTH.staff && AUTH.staff.phone ? AUTH.staff.phone : "";
   var impersonating = AUTH.staff && STATE.self !== AUTH.staff.departmentId;
   myProfileNameForm.hidden = impersonating;
   myProfileNameHint.hidden = !impersonating;
@@ -4891,14 +4948,16 @@ myProfileNameForm.addEventListener("submit", function(e){
   if(!name) return;
   deptPhotoError.textContent = "";
   myProfileNameSaveBtn.disabled = true;
-  apiSend('/api/profile', 'PATCH', { name: name, statusLine: myProfileStatusInput.value.trim() }).then(function(res){
+  apiSend('/api/profile', 'PATCH', { name: name, statusLine: myProfileStatusInput.value.trim(), phone: myProfilePhoneInput.value.trim() }).then(function(res){
     AUTH.staff.name = res.staff.name;
     AUTH.staff.statusLine = res.staff.statusLine;
+    AUTH.staff.phone = res.staff.phone;
     renderMyProfileCard();
     msgInput.placeholder = "Message as " + AUTH.staff.name + " (" + (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "") + ")…";
     return loadStaffMeta();
   }).then(function(){
     renderList();
+    renderHeader();
     showToast("Profile updated");
   }).catch(function(err){
     deptPhotoError.textContent = err.message || "Couldn't update your profile.";

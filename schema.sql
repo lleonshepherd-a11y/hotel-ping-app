@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS staff (
   is_admin INTEGER NOT NULL DEFAULT 0,
   profile_complete INTEGER NOT NULL DEFAULT 0,
   status_line TEXT,
+  phone TEXT,
   created_at TEXT NOT NULL
 );
 

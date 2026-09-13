@@ -333,6 +333,9 @@ if (!staffColumns.includes('profile_complete')) {
 if (!staffColumns.includes('status_line')) {
   db.exec('ALTER TABLE staff ADD COLUMN status_line TEXT');
 }
+if (!staffColumns.includes('phone')) {
+  db.exec('ALTER TABLE staff ADD COLUMN phone TEXT');
+}
 
 const DEPARTMENTS = [
   { id: 'gm', name: 'General Manager', contact: 'Dave' },

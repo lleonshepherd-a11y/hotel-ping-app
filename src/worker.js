@@ -377,7 +377,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
   };
 }
 function rowToStaff(row) {
-  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined };
+  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined, phone: row.phone || undefined };
 }
 
 async function readJsonBody(request) {
@@ -594,6 +594,10 @@ export default {
         if (typeof body.statusLine === "string") {
           const statusLine = body.statusLine.trim().slice(0, 60);
           await env.DB.prepare("UPDATE staff SET status_line = ? WHERE id = ?").bind(statusLine || null, id).run();
+        }
+        if (typeof body.phone === "string") {
+          const phone = body.phone.trim().slice(0, 30);
+          await env.DB.prepare("UPDATE staff SET phone = ? WHERE id = ?").bind(phone || null, id).run();
         }
         if (typeof body.pin === "string" && body.pin) {
           if (!PIN_RE.test(body.pin)) return json({ error: "PIN must be 4-6 digits" }, 400);

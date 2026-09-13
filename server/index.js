@@ -233,7 +233,7 @@ function markThreadRead(self, other) {
 }
 
 function rowToStaff(row) {
-  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined };
+  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined, phone: row.phone || undefined };
 }
 
 function hashPin(pin, salt) {
@@ -391,6 +391,10 @@ const server = http.createServer(async (req, res) => {
       if (typeof body.statusLine === 'string') {
         const statusLine = body.statusLine.trim().slice(0, 60);
         db.prepare('UPDATE staff SET status_line = ? WHERE id = ?').run(statusLine || null, requester.id);
+      }
+      if (typeof body.phone === 'string') {
+        const phone = body.phone.trim().slice(0, 30);
+        db.prepare('UPDATE staff SET phone = ? WHERE id = ?').run(phone || null, requester.id);
       }
       if (typeof body.pin === 'string' && body.pin) {
         if (!/^\d{4,6}$/.test(body.pin)) return send(res, 400, { error: 'PIN must be 4-6 digits' });
