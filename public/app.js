@@ -14,7 +14,7 @@ function perfLogAfterPaint(label, since){
 var ICONS = {
   gm: '<path d="M12 3l7 7-7 11-7-11z"/>',
   foh: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
-  concierge: '<path d="M4 16a8 8 0 0 1 16 0"/><path d="M3 16h18"/><path d="M12 16v-2.5"/><circle cx="12" cy="11" r="1.1" fill="currentColor" stroke="none"/>',
+  concierge: '<path d="M4 16a8 8 0 0 1 16 0"/><path d="M3 16h18"/><circle cx="12" cy="7" r="1.9" fill="currentColor" stroke="none"/>',
   restaurant: '<path d="M7 2v6a1 1 0 0 0 2 0V2"/><path d="M9 2v6a1 1 0 0 0 2 0V2"/><path d="M9 8v13"/><path d="M15 2c-1.5 0-2.5 1.6-2.5 4.2S13.5 10 15 10"/><path d="M15 2v19"/>',
   kitchen: '<path d="M7 18v-3.2c0-.5-.3-.9-.7-1.1a3.5 3.5 0 0 1 1.4-6.4 4.5 4.5 0 0 1 8.6 0 3.5 3.5 0 0 1 1.4 6.4c-.4.2-.7.6-.7 1.1V18"/><path d="M6 18h12"/>',
   bar: '<path d="M4 4h16l-8 9v7"/><path d="M8 20h8"/>',
@@ -37,12 +37,10 @@ function avatarGradient(deptId){
 }
 function avatarStyleAttr(deptId){
   var meta = DEPT_META[deptId];
-  if(meta && meta.photoUrl) return "background-image:url('"+meta.photoUrl+"');background-size:cover;background-position:center";
+  if(meta && meta.photoUrl) return "background:#131315 url('"+meta.photoUrl+"') center/cover no-repeat";
   return "background:"+avatarGradient(deptId);
 }
 function avatarInnerHtml(deptId){
-  var meta = DEPT_META[deptId];
-  if(meta && meta.photoUrl) return "";
   return iconSvg(deptId);
 }
 
