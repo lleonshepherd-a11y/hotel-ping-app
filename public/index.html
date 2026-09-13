@@ -4846,15 +4846,15 @@ function enterApp(staff){
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
   startPolling();
-  refreshMaintenanceBadge();
-  if(staff.departmentId === "concierge") refreshGuestsBadge();
-  pollMissed();
-  checkPushPrompt();
-  loadStories();
   setTimeout(function(){
+    refreshMaintenanceBadge();
     refreshAssetsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
-  }, 800);
+    if(staff.departmentId === "concierge") refreshGuestsBadge();
+    pollMissed();
+    checkPushPrompt();
+    loadStories();
+  }, 400);
 }
 
 function showSetup(staff){
