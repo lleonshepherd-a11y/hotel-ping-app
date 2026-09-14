@@ -36,7 +36,7 @@ function avatarGradient(deptId){
   return "linear-gradient(155deg, #2c2c30, #131315)";
 }
 function avatarStyleAttr(deptId){
-  return "position:relative;overflow:hidden;background:"+avatarGradient(deptId);
+  return "position:relative;background:"+avatarGradient(deptId);
 }
 function avatarInnerHtml(deptId){
   var meta = DEPT_META[deptId];
