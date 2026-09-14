@@ -1344,10 +1344,10 @@ const server = http.createServer(async (req, res) => {
       if (!decisionResult.changes) return send(res, 400, { error: 'This request has already been decided' });
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       const verb = bodyIn.decision === 'approved' ? 'Approved' : 'Declined';
-      insertMessage({
-        from: existing.to_dept, to: existing.from_dept, type: 'text',
-        body: verb + ' sign-off: ' + existing.signoff_title,
-      });
+      // The decision lives on the original request (signoff_status/decided_by/decided_at) -
+      // one message is the whole record. Notify by push only (no local dev simulation for
+      // 1:1 push exists yet), not by sending a second chat message that would fragment it.
+      console.log('[signoff notify]', existing.from_dept, verb.toLowerCase(), 'sign-off:', existing.signoff_title);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 

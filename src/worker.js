@@ -1586,10 +1586,16 @@ export default {
         }
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         const verb = bodyIn.decision === "approved" ? "Approved" : "Declined";
-        await insertMessage(env, ctx, {
-          from: existing.to_dept, to: existing.from_dept, type: "text",
-          body: verb + " sign-off: " + existing.signoff_title,
-        });
+        // The decision lives on the original request (signoff_status/decided_by/decided_at) -
+        // one message is the whole record, so it stays intact as proof. Notify by push only,
+        // not by sending a second chat message that would fragment the record in two.
+        const notifyPromise = notifyDepartment(env, existing.from_dept, {
+          title: verb + " sign-off",
+          body: existing.signoff_title + (existing.signoff_amount != null ? " · £" + Number(existing.signoff_amount).toFixed(2) : ""),
+          url: "/",
+          tag: "hotel-ping-signoff-" + id,
+        }, existing.to_dept).catch((e) => console.error("notifyDepartment (signoff) top-level error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 

@@ -1518,10 +1518,11 @@ function buildSignoffCard(m){
     var badge = document.createElement("div");
     badge.className = "signoff-status-badge " + s.status;
     var byName = s.decidedBy || "";
+    var decidedWhen = s.decidedAt ? fmtClock(s.decidedAt) : "";
     badge.innerHTML = (s.status === "approved"
       ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> EXECUTED'
       : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg> DECLINED') +
-      (byName ? ' <span class="signoff-decided-by">by ' + esc(byName) + '</span>' : '');
+      (byName ? ' <span class="signoff-decided-by">by ' + esc(byName) + (decidedWhen ? ' · ' + decidedWhen : '') + '</span>' : '');
     actions.appendChild(badge);
   }
   card.appendChild(actions);
