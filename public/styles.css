@@ -743,6 +743,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-msg-urgent{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--urgent);background:rgba(255,59,48,.12);padding:1px 6px;border-radius:8px}
 .missed-msg-preview{font-size:13px;color:var(--text);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .missed-msg-time{font-size:10.5px;color:var(--text-faint);margin-top:3px}
+.missed-approval-card{border-left-color:#e6a53e;cursor:default}
+.missed-approval-actions{display:flex;gap:8px;margin-top:8px}
+.missed-approval-decline{flex:1;border:1px solid var(--border);background:var(--surface);color:#c0392b;font-size:12px;font-weight:700;border-radius:10px;padding:7px 10px}
+.missed-approval-approve{flex:1.3;border:none;background:linear-gradient(150deg,#2f9a5c,#227a48);color:#fff;font-size:12px;font-weight:700;border-radius:10px;padding:7px 10px}
+.missed-approval-decline:disabled,.missed-approval-approve:disabled{opacity:.5}
 .admin-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,18,14,.4);display:flex;align-items:center;justify-content:center}
 .admin-modal{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 80px);overflow:auto;background:var(--surface);border-radius:22px;box-shadow:var(--shadow-pop);padding:24px}
 .confirm-overlay{z-index:300;background:rgba(6,6,6,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}

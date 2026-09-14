@@ -1261,10 +1261,20 @@ export default {
         const items = [];
 
         const msgRows = await env.DB.prepare(
-          "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL ORDER BY created_at ASC"
+          "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL AND (signoff_status IS NULL OR signoff_status != 'pending') ORDER BY created_at ASC"
         ).bind(dept).all();
         for (const m of msgRows.results) {
           items.push({ kind: "message", id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+        }
+
+        // Pending sign-off requests stay in "needs a decision" regardless of read
+        // status - opening the thread to look at one shouldn't make it disappear
+        // from view before it's actually been approved or declined.
+        const pendingSignoffRows = await env.DB.prepare(
+          "SELECT * FROM messages WHERE to_dept = ? AND signoff_status = 'pending' AND deleted_at IS NULL ORDER BY created_at ASC"
+        ).bind(dept).all();
+        for (const m of pendingSignoffRows.results) {
+          items.push({ kind: "approval", id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
         }
 
         if (dept === "maintenance") {

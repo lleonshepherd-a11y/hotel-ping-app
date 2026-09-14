@@ -3959,6 +3959,9 @@ myActivityBtn.addEventListener("click", function(){
 myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
 myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
 
+var missedApprovalsBox = document.getElementById("missedApprovalsBox");
+var missedApprovalsList = document.getElementById("missedApprovalsList");
+var missedApprovalsCount = document.getElementById("missedApprovalsCount");
 var missedMsgBox = document.getElementById("missedMsgBox");
 var missedMsgList = document.getElementById("missedMsgList");
 var missedMsgCount = document.getElementById("missedMsgCount");
@@ -3989,7 +3992,55 @@ function buildMissedMessageCard(item){
   return card;
 }
 
+function buildMissedApprovalCard(item){
+  var m = item.message;
+  var s = m.signoff;
+  var dept = DEPTS[m.from] || { name: m.from, initials: "?", color: "#888" };
+  var card = document.createElement("div");
+  card.className = "missed-msg-card missed-approval-card";
+  card.innerHTML =
+    '<span class="missed-msg-avatar" style="background:' + dept.color + '">' + esc(dept.initials) + '</span>' +
+    '<div class="missed-msg-body">' +
+      '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span></div>' +
+      '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
+      '<div class="missed-approval-actions">' +
+        '<button type="button" class="missed-approval-decline">Decline</button>' +
+        '<button type="button" class="missed-approval-approve">Approve</button>' +
+      '</div>' +
+    '</div>';
+  card.querySelector(".missed-msg-body").addEventListener("click", function(e){
+    if(e.target.closest(".missed-approval-actions")) return;
+    showTab("chat");
+    openThread(m.from);
+  });
+  function decide(decision, btn){
+    btn.disabled = true;
+    apiSend('/api/messages/' + encodeURIComponent(m.id) + '/signoff-decision', 'POST', { decision: decision }).then(function(res){
+      var msgs = STATE.data[m.from];
+      if(msgs){
+        var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+        if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+      }
+      if(STATE.active === m.from) renderThread();
+      showToast(decision === "approved" ? "Approved" : "Declined");
+      pollMissed();
+    }).catch(function(){
+      showToast("Couldn't record that decision");
+      btn.disabled = false;
+    });
+  }
+  card.querySelector(".missed-approval-approve").addEventListener("click", function(e){ e.stopPropagation(); decide("approved", e.target); });
+  card.querySelector(".missed-approval-decline").addEventListener("click", function(e){ e.stopPropagation(); decide("declined", e.target); });
+  return card;
+}
+
 function renderMissedFeed(items){
+  var approvals = items.filter(function(i){ return i.kind === "approval"; });
+  missedApprovalsBox.hidden = approvals.length === 0;
+  missedApprovalsCount.textContent = String(approvals.length);
+  missedApprovalsList.innerHTML = "";
+  approvals.forEach(function(item){ missedApprovalsList.appendChild(buildMissedApprovalCard(item)); });
+
   var messages = items.filter(function(i){ return i.kind === "message"; });
   var tickets = items.filter(function(i){ return i.kind === "ticket"; });
   var guests = items.filter(function(i){ return i.kind === "guestRequest"; });

@@ -1023,10 +1023,17 @@ const server = http.createServer(async (req, res) => {
       const items = [];
 
       const msgRows = db.prepare(
-        "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL ORDER BY created_at ASC"
+        "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL AND (signoff_status IS NULL OR signoff_status != 'pending') ORDER BY created_at ASC"
       ).all(dept);
       for (const m of msgRows) {
         items.push({ kind: 'message', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+      }
+
+      const pendingSignoffRows = db.prepare(
+        "SELECT * FROM messages WHERE to_dept = ? AND signoff_status = 'pending' AND deleted_at IS NULL ORDER BY created_at ASC"
+      ).all(dept);
+      for (const m of pendingSignoffRows) {
+        items.push({ kind: 'approval', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
       }
 
       if (dept === 'maintenance') {
