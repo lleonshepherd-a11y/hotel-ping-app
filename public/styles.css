@@ -294,7 +294,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .thread-scroll::-webkit-scrollbar{display:none}
 .day-div{text-align:center;font-size:11px;font-weight:700;color:var(--text-faint);margin:14px 0 10px;text-transform:uppercase;letter-spacing:.04em}
 
-.msg-row{display:flex;margin:1.5px 0;position:relative;animation:bubbleIn .3s cubic-bezier(.2,.8,.3,1) both}
+.msg-row{display:flex;align-items:flex-end;gap:2px;margin:1.5px 0;position:relative;animation:bubbleIn .3s cubic-bezier(.2,.8,.3,1) both}
+.msg-pin-btn{flex:none;width:22px;height:22px;border:none;background:none;color:var(--text-faint);opacity:.32;display:flex;align-items:center;justify-content:center;margin-bottom:3px;transition:opacity .15s ease,color .15s ease,transform .1s ease}
+.msg-pin-btn svg{width:14px;height:14px}
+.msg-pin-btn:active{transform:scale(.82)}
+.msg-pin-btn.pinned{opacity:1;color:var(--accent)}
 .msg-row.group-end{margin-bottom:9px}
 @keyframes bubbleIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .msg-row.out{justify-content:flex-end}

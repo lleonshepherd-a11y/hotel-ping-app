@@ -1806,7 +1806,14 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   }
   if(canInlineMeta) bubble.appendChild(meta); else wrap.appendChild(meta);
 
-  row.appendChild(wrap);
+  var pinBtn = document.createElement("button");
+  pinBtn.type = "button";
+  pinBtn.className = "msg-pin-btn" + (m.pinned ? " pinned" : "");
+  pinBtn.setAttribute("aria-label", m.pinned ? "Unpin message" : "Pin message");
+  pinBtn.title = m.pinned ? "Unpin" : "Pin";
+  pinBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>';
+  pinBtn.addEventListener("click", function(e){ e.stopPropagation(); togglePinMessage(m); });
+  if(out){ row.appendChild(pinBtn); row.appendChild(wrap); } else { row.appendChild(wrap); row.appendChild(pinBtn); }
   return row;
 }
 
