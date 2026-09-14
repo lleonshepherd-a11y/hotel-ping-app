@@ -1325,28 +1325,6 @@ function cycleTaskStatus(m){
   }).catch(function(){ showToast("Couldn't update that"); });
 }
 
-var composeFab = document.getElementById("composeFab");
-var composeOverlay = document.getElementById("composeOverlay");
-var composeClose = document.getElementById("composeClose");
-var composeDeptList = document.getElementById("composeDeptList");
-composeFab.addEventListener("click", function(){
-  var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
-  composeDeptList.innerHTML = targets.map(function(id){
-    return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
-      '<span class="fwd-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
-      DEPTS[id].name+'</button>';
-  }).join("");
-  composeDeptList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      composeOverlay.hidden = true;
-      openThread(btn.getAttribute("data-dept"));
-    });
-  });
-  composeOverlay.hidden = false;
-});
-composeClose.addEventListener("click", function(){ composeOverlay.hidden = true; });
-composeOverlay.addEventListener("click", function(e){ if(e.target === composeOverlay) composeOverlay.hidden = true; });
-
 var forwardOverlay = document.getElementById("forwardOverlay");
 var forwardClose = document.getElementById("forwardClose");
 var forwardDeptList = document.getElementById("forwardDeptList");
@@ -4058,7 +4036,6 @@ function showTab(tab){
   maintenancePage.hidden = tab !== "maintenance";
   guestsPage.hidden = tab !== "guests";
   assetsPage.hidden = tab !== "assets";
-  composeFab.hidden = tab !== "chat";
   tabProfileBtn.classList.toggle("active", tab === "profile");
   tabChatBtn.classList.toggle("active", tab === "chat");
   tabEventsBtn.classList.toggle("active", tab === "events");
