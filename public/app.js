@@ -178,7 +178,9 @@ function mapServerMessage(row, self){
     edited: !!row.editedAt,
     mentions: row.mentions || undefined,
     signoff: row.signoff || undefined,
-    poll: row.poll || undefined
+    poll: row.poll || undefined,
+    escalationLevel: row.escalationLevel || 0,
+    affectsGuest: !!row.affectsGuest
   };
 }
 
@@ -1632,6 +1634,13 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     wrap.appendChild(tag);
   }
 
+  if(m.affectsGuest){
+    var guestTag = document.createElement("div");
+    guestTag.className = "guest-tag";
+    guestTag.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/></svg> Affects a guest';
+    wrap.appendChild(guestTag);
+  }
+
   if(m.taskStatus){
     var canActionTask = m.to === AUTH.staff.departmentId;
     var taskTag = document.createElement(canActionTask ? "button" : "div");
@@ -1967,6 +1976,7 @@ var optPhoto = document.getElementById("optPhoto");
 var optCamera = document.getElementById("optCamera");
 var micQuickBtn = document.getElementById("micQuickBtn");
 var optUrgent = document.getElementById("optUrgent");
+var optAffectsGuest = document.getElementById("optAffectsGuest");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
 var optSignoff = document.getElementById("optSignoff");
@@ -1986,6 +1996,7 @@ var vpTrash = document.getElementById("vpTrash");
 var vpSend = document.getElementById("vpSend");
 var vpAudio = document.getElementById("vpAudio");
 var urgentActive = false;
+var affectsGuestActive = false;
 var taskActive = false;
 
 for(var i=0;i<22;i++){
@@ -2214,6 +2225,11 @@ optUrgent.addEventListener("click", function(){
   optUrgent.classList.toggle("active", urgentActive);
   composer.classList.toggle("urgent-mode", urgentActive);
   refreshSendState();
+  closePlusMenu();
+});
+optAffectsGuest.addEventListener("click", function(){
+  affectsGuestActive = !affectsGuestActive;
+  optAffectsGuest.classList.toggle("active", affectsGuestActive);
   closePlusMenu();
 });
 optRoom.addEventListener("click", function(){
@@ -2455,6 +2471,7 @@ function doSend(){
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
+  var wasAffectsGuest = affectsGuestActive;
   var wasTask = taskActive;
   var wasSignoff = signoffActive;
   var signoffPayload = signoffData;
@@ -2466,9 +2483,11 @@ function doSend(){
   urgentActive = false;
   optUrgent.classList.remove("active");
   composer.classList.remove("urgent-mode");
+  affectsGuestActive = false;
+  optAffectsGuest.classList.remove("active");
   refreshSendState();
 
-  var payload = { from: STATE.self, urgent: wasUrgent };
+  var payload = { from: STATE.self, urgent: wasUrgent, affectsGuest: wasAffectsGuest };
   if(groupId){ payload.groupId = groupId; payload.mentions = extractMentions(text, groupId); } else payload.to = deptId;
   if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
   clearReplyBar();
@@ -2901,6 +2920,7 @@ function enterApp(staff){
   broadcastBtn.hidden = !staff.isAdmin;
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
+  opsOverviewBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "concierge";
   msgInput.placeholder = "Message as " + staff.name + "…";
@@ -4262,6 +4282,161 @@ responseBtn.addEventListener("click", function(){
 });
 responseClose.addEventListener("click", function(){ responseOverlay.hidden = true; });
 responseOverlay.addEventListener("click", function(e){ if(e.target === responseOverlay) responseOverlay.hidden = true; });
+
+/* ---------------- Ops overview (admin): escalations, ownership, blocker chains, exceptions ---------------- */
+var opsOverviewBtn = document.getElementById("opsOverviewBtn");
+var opsOverviewOverlay = document.getElementById("opsOverviewOverlay");
+var opsOverviewClose = document.getElementById("opsOverviewClose");
+var opsOverviewBody = document.getElementById("opsOverviewBody");
+
+function opsItemPreview(m){
+  if(m.type === "text") return m.body || "";
+  if(m.type === "image") return "a photo";
+  if(m.type === "file") return m.fileName || "a file";
+  return "a voice message";
+}
+
+function renderOpsOverview(data){
+  var html = "";
+
+  html += '<div class="ops-section-label">Exceptions</div>';
+  html += '<div class="ops-exceptions-row">'+
+    '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.exceptions.openTickets+'</span><span class="ops-exception-label">Rooms/jobs still open</span></div>'+
+    '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.exceptions.openGuestRequests+'</span><span class="ops-exception-label">Guest requests unresolved</span></div>'+
+    '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.blockerChains.length+'</span><span class="ops-exception-label">Blocked chains right now</span></div>'+
+  '</div>';
+
+  var needsAttention = data.escalatedMessages.filter(function(m){ return m.escalationLevel >= 2; })
+    .concat(data.escalatedTickets.filter(function(t){ return t.escalationLevel >= 2; }));
+  var atRisk = data.escalatedMessages.filter(function(m){ return m.escalationLevel === 1; })
+    .concat(data.escalatedTickets.filter(function(t){ return t.escalationLevel === 1; }));
+
+  function opsRow(item, isTicket){
+    var name = isTicket ? item.description : opsItemPreview(item);
+    var sub = isTicket ? "Maintenance ticket · unclaimed" : (DEPTS[item.from] ? DEPTS[item.from].name : item.from) + " → " + (DEPTS[item.to] ? DEPTS[item.to].name : item.to);
+    return '<div class="ops-row'+(item.escalationLevel >= 2 ? ' breach' : ' risk')+'">'+
+      '<span class="ops-row-dot"></span>'+
+      '<span class="ops-row-body"><span class="ops-row-name">'+esc(name)+'</span><span class="ops-row-sub">'+esc(sub)+'</span></span>'+
+      (item.affectsGuest ? '<span class="ops-guest-tag">Guest</span>' : '')+
+    '</div>';
+  }
+
+  html += '<div class="ops-section-label">Needs attention now</div>';
+  html += needsAttention.length
+    ? '<div class="ops-list">'+needsAttention.map(function(i){ return opsRow(i, !!i.description); }).join("")+'</div>'
+    : '<div class="ops-empty-line">Nothing has gone silent this long. Good.</div>';
+
+  html += '<div class="ops-section-label">At risk</div>';
+  html += atRisk.length
+    ? '<div class="ops-list">'+atRisk.map(function(i){ return opsRow(i, !!i.description); }).join("")+'</div>'
+    : '<div class="ops-empty-line">Nothing approaching its window right now.</div>';
+
+  html += '<div class="ops-section-label">Blocked chains</div>';
+  html += data.blockerChains.length
+    ? '<div class="ops-list">'+data.blockerChains.map(function(chain){
+        var path = chain.map(function(b){ return DEPTS[b.departmentId] ? DEPTS[b.departmentId].name : b.departmentId; });
+        var last = chain[chain.length - 1];
+        var finalTarget = DEPTS[last.waitingOn] ? DEPTS[last.waitingOn].name : last.waitingOn;
+        return '<div class="ops-row risk"><span class="ops-row-dot"></span><span class="ops-row-body"><span class="ops-row-name">'+esc(path.join(" → "))+' → '+esc(finalTarget)+'</span><span class="ops-row-sub">'+chain.length+' department'+(chain.length===1?"":"s")+' blocked in a row</span></span></div>';
+      }).join("")+'</div>'
+    : '<div class="ops-empty-line">No chains of blocked departments right now.</div>';
+
+  html += '<div class="ops-section-label">No owner assigned</div>';
+  html += data.unownedTickets.length
+    ? '<div class="ops-list">'+data.unownedTickets.map(function(t){
+        return '<div class="ops-row"><span class="ops-row-dot none"></span><span class="ops-row-body"><span class="ops-row-name">'+esc(t.description)+'</span><span class="ops-row-sub">'+MAINT_STATUS_LABEL[t.status]+' · nobody\'s claimed this</span></span></div>';
+      }).join("")+'</div>'
+    : '<div class="ops-empty-line">Every open job has someone on it.</div>';
+
+  opsOverviewBody.innerHTML = html;
+}
+
+opsOverviewBtn.addEventListener("click", function(){
+  opsOverviewBody.innerHTML = '<div class="handover-empty">Loading…</div>';
+  opsOverviewOverlay.hidden = false;
+  apiGet('/api/ops-overview').then(function(res){
+    renderOpsOverview(res);
+  }).catch(function(){
+    opsOverviewBody.innerHTML = '<div class="handover-empty">Couldn\'t load the overview.</div>';
+  });
+});
+opsOverviewClose.addEventListener("click", function(){ opsOverviewOverlay.hidden = true; });
+opsOverviewOverlay.addEventListener("click", function(e){ if(e.target === opsOverviewOverlay) opsOverviewOverlay.hidden = true; });
+
+/* ---------------- Blockers ("waiting on" chains) ---------------- */
+var blockersBtn = document.getElementById("blockersBtn");
+var blockersOverlay = document.getElementById("blockersOverlay");
+var blockersClose = document.getElementById("blockersClose");
+var blockerList = document.getElementById("blockerList");
+var blockerAddForm = document.getElementById("blockerAddForm");
+var blockerWaitingOn = document.getElementById("blockerWaitingOn");
+var blockerReason = document.getElementById("blockerReason");
+var blockerError = document.getElementById("blockerError");
+
+function renderBlockerList(blockers){
+  if(!blockers.length){
+    blockerList.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.clock, "Nothing's blocked right now", "When a department is waiting on someone else, it'll show up here.");
+    return;
+  }
+  blockerList.innerHTML = "";
+  blockers.forEach(function(b){
+    var row = document.createElement("div");
+    row.className = "blocker-row";
+    var waitingOnLabel = DEPTS[b.waitingOn] ? DEPTS[b.waitingOn].name : b.waitingOn;
+    var canResolve = b.departmentId === AUTH.staff.departmentId || AUTH.staff.isAdmin;
+    row.innerHTML =
+      '<div class="blocker-row-body">'+
+        '<span class="blocker-row-name">'+esc(DEPTS[b.departmentId] ? DEPTS[b.departmentId].name : b.departmentId)+' is waiting on '+esc(waitingOnLabel)+'</span>'+
+        (b.reason ? '<span class="blocker-row-reason">'+esc(b.reason)+'</span>' : '')+
+      '</div>'+
+      (canResolve ? '<button type="button" class="blocker-resolve-btn">Clear</button>' : '');
+    if(canResolve){
+      row.querySelector(".blocker-resolve-btn").addEventListener("click", function(){
+        apiSend('/api/blockers/' + encodeURIComponent(b.id) + '/resolve', 'POST', {}).then(function(){
+          loadBlockers();
+          showToast("Cleared");
+        }).catch(function(){ showToast("Couldn't clear that"); });
+      });
+    }
+    blockerList.appendChild(row);
+  });
+}
+
+function loadBlockers(){
+  apiGet('/api/blockers').then(function(res){
+    renderBlockerList(res.blockers);
+  }).catch(function(){
+    blockerList.innerHTML = '<div class="handover-empty">Couldn\'t load blockers.</div>';
+  });
+}
+
+blockersBtn.addEventListener("click", function(){
+  blockerWaitingOn.innerHTML = DEPT_ORDER.filter(function(id){ return id !== STATE.self; }).map(function(id){
+    return '<option value="'+id+'">'+esc(DEPTS[id].name)+'</option>';
+  }).join("") + '<option value="">Something else (describe below)</option>';
+  blockerError.textContent = "";
+  blockerList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  blockersOverlay.hidden = false;
+  loadBlockers();
+});
+blockersClose.addEventListener("click", function(){ blockersOverlay.hidden = true; });
+blockersOverlay.addEventListener("click", function(e){ if(e.target === blockersOverlay) blockersOverlay.hidden = true; });
+
+blockerAddForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  blockerError.textContent = "";
+  var deptChoice = blockerWaitingOn.value;
+  var reasonText = blockerReason.value.trim();
+  var waitingOn = deptChoice || reasonText;
+  if(!waitingOn){ blockerError.textContent = "Say what you're waiting on"; return; }
+  apiSend('/api/blockers', 'POST', { waitingOn: waitingOn, reason: deptChoice ? reasonText : null }).then(function(){
+    blockerReason.value = "";
+    loadBlockers();
+    showToast("Marked as blocked");
+  }).catch(function(err){
+    blockerError.textContent = err.message || "Couldn't save that";
+  });
+});
 
 /* ---------------- Events (ad-hoc group chats) ---------------- */
 var eventPalette = document.getElementById("eventPalette");

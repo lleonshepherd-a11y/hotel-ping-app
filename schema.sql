@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS messages (
   signoff_decided_at TEXT,
   poll_question TEXT,
   poll_options TEXT,
-  poll_votes TEXT
+  poll_votes TEXT,
+  escalation_level INTEGER NOT NULL DEFAULT 0,
+  affects_guest INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
@@ -177,9 +179,23 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   resolved_at TEXT,
-  pinned_at TEXT
+  pinned_at TEXT,
+  escalation_level INTEGER NOT NULL DEFAULT 0,
+  escalated_at TEXT,
+  owner_staff_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
+
+CREATE TABLE IF NOT EXISTS blockers (
+  id TEXT PRIMARY KEY,
+  department_id TEXT NOT NULL,
+  waiting_on TEXT NOT NULL,
+  reason TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_blockers_open ON blockers(department_id, resolved_at);
 
 CREATE TABLE IF NOT EXISTS external_notifications (
   idempotency_key TEXT PRIMARY KEY,

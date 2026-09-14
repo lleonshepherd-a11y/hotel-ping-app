@@ -202,28 +202,62 @@ async function notifyAdmins(env, payloadObj) {
 
 const URGENT_ESCALATION_MINUTES = 10;
 const NORMAL_ESCALATION_MINUTES = 25;
+const URGENT_ESCALATION_L2_MINUTES = 20;
+const NORMAL_ESCALATION_L2_MINUTES = 50;
+const TICKET_AT_RISK_MINUTES = 15;
+const TICKET_BREACH_MINUTES = 35;
 
 async function checkEscalations(env) {
   const now = Date.now();
-  const urgentCutoff = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
-  const normalCutoff = new Date(now - NORMAL_ESCALATION_MINUTES * 60 * 1000).toISOString();
-  const rows = await env.DB.prepare(
+  const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const normalCutoffL1 = new Date(now - NORMAL_ESCALATION_MINUTES * 60 * 1000).toISOString();
+  const urgentCutoffL2 = new Date(now - URGENT_ESCALATION_L2_MINUTES * 60 * 1000).toISOString();
+  const normalCutoffL2 = new Date(now - NORMAL_ESCALATION_L2_MINUTES * 60 * 1000).toISOString();
+  let escalatedCount = 0;
+
+  const msgRows = await env.DB.prepare(
     `SELECT * FROM messages
-     WHERE deleted_at IS NULL AND escalated_at IS NULL AND status != 'read'
+     WHERE deleted_at IS NULL AND status != 'read' AND escalation_level < 2
        AND ((urgent = 1 AND created_at < ?) OR (urgent = 0 AND created_at < ?))
        AND (to_dept IS NULL OR (SELECT on_duty FROM departments WHERE id = to_dept) = 1)`
-  ).bind(urgentCutoff, normalCutoff).all();
-  for (const row of rows.results) {
+  ).bind(urgentCutoffL1, normalCutoffL1).all();
+  for (const row of msgRows.results) {
+    const l2Cutoff = row.urgent ? urgentCutoffL2 : normalCutoffL2;
+    const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.created_at < l2Cutoff ? 2 : (row.escalation_level || 0));
+    if (nextLevel <= (row.escalation_level || 0)) continue;
     const preview = row.type === "text" ? row.body : (row.type === "image" ? "a photo" : row.type === "file" ? "a file" : "a voice message");
+    const stillLabel = nextLevel === 2 ? "Still unread — " : "";
     await notifyAdmins(env, {
-      title: row.urgent ? "⚠️ Unread urgent message" : "Unread message",
+      title: (row.urgent ? "⚠️ " : "") + stillLabel + (row.urgent ? "Unread urgent message" : "Unread message"),
       body: (DEPT_NAMES[row.from_dept] || row.from_dept) + " → " + (DEPT_NAMES[row.to_dept] || row.to_dept) + ": " + preview,
       url: "/",
-      tag: "hotel-ping-escalation-" + row.id,
+      tag: "hotel-ping-escalation-" + row.id + "-" + nextLevel,
     });
-    await env.DB.prepare("UPDATE messages SET escalated_at = ? WHERE id = ?").bind(new Date().toISOString(), row.id).run();
+    await env.DB.prepare("UPDATE messages SET escalated_at = ?, escalation_level = ? WHERE id = ?")
+      .bind(new Date().toISOString(), nextLevel, row.id).run();
+    escalatedCount++;
   }
-  return rows.results.length;
+
+  const ticketAtRiskCutoff = new Date(now - TICKET_AT_RISK_MINUTES * 60 * 1000).toISOString();
+  const ticketBreachCutoff = new Date(now - TICKET_BREACH_MINUTES * 60 * 1000).toISOString();
+  const ticketRows = await env.DB.prepare(
+    `SELECT * FROM maintenance_tickets WHERE status = 'reported' AND escalation_level < 2 AND created_at < ?`
+  ).bind(ticketAtRiskCutoff).all();
+  for (const row of ticketRows.results) {
+    const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : (row.escalation_level || 0));
+    if (nextLevel <= (row.escalation_level || 0)) continue;
+    await notifyAdmins(env, {
+      title: nextLevel === 2 ? "🔴 Maintenance ticket still unclaimed" : "🟡 Maintenance ticket needs claiming",
+      body: row.description,
+      url: "/",
+      tag: "hotel-ping-ticket-escalation-" + row.id + "-" + nextLevel,
+    });
+    await env.DB.prepare("UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?")
+      .bind(new Date().toISOString(), nextLevel, row.id).run();
+    escalatedCount++;
+  }
+
+  return escalatedCount;
 }
 
 async function insertMessage(env, ctx, opts) {
@@ -232,8 +266,8 @@ async function insertMessage(env, ctx, opts) {
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes, affects_guest)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -246,7 +280,8 @@ async function insertMessage(env, ctx, opts) {
     opts.signoff ? "pending" : null,
     opts.poll ? opts.poll.question : null,
     pollOptionsJson,
-    opts.poll ? "{}" : null
+    opts.poll ? "{}" : null,
+    opts.affectsGuest ? 1 : 0
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -301,6 +336,20 @@ function rowToTicket(row) {
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at || undefined,
     pinned: !!row.pinned_at,
+    escalationLevel: row.escalation_level || 0,
+    escalatedAt: row.escalated_at || undefined,
+    ownerStaffId: row.owner_staff_id || undefined,
+  };
+}
+function rowToBlocker(row) {
+  return {
+    id: row.id,
+    departmentId: row.department_id,
+    waitingOn: row.waiting_on,
+    reason: row.reason || undefined,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    resolvedAt: row.resolved_at || undefined,
   };
 }
 function rowToTicketReply(row) {
@@ -416,6 +465,8 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       options: JSON.parse(row.poll_options || "[]"),
       votes: JSON.parse(row.poll_votes || "{}"),
     } : undefined,
+    escalationLevel: row.escalation_level || 0,
+    affectsGuest: !!row.affects_guest,
   };
 }
 function rowToStaff(row) {
@@ -1238,9 +1289,98 @@ export default {
         return json({ items });
       }
 
+      // ---- Blockers (cross-department "waiting on") ----
+      if (method === "GET" && p === "/api/blockers") {
+        const rows = await env.DB.prepare(
+          "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC"
+        ).all();
+        return json({ blockers: rows.results.map(rowToBlocker) });
+      }
+
+      if (method === "POST" && p === "/api/blockers") {
+        const body = await readJsonBody(request);
+        const waitingOn = String(body.waitingOn || "").trim();
+        if (!waitingOn) return json({ error: "Say what you're waiting on" }, 400);
+        const reason = body.reason ? String(body.reason).trim().slice(0, 200) : null;
+        const requester = request._staff;
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO blockers (id, department_id, waiting_on, reason, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(id, requester.department_id, waitingOn, reason, requester.department_id, now).run();
+        const row = await env.DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
+        return json({ blocker: rowToBlocker(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/blockers/") && p.endsWith("/resolve")) {
+        const id = decodeURIComponent(p.slice("/api/blockers/".length, -"/resolve".length));
+        const existing = await env.DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Blocker not found" }, 404);
+        const requester = request._staff;
+        if (existing.department_id !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Only the department that reported this can clear it" }, 403);
+        }
+        await env.DB.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
+      }
+
+      // ---- Ops overview (admin): escalations, blocker chains, ownership, exceptions ----
+      if (method === "GET" && p === "/api/ops-overview") {
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+
+        const escalatedMsgRows = await env.DB.prepare(
+          "SELECT * FROM messages WHERE escalation_level > 0 AND status != 'read' AND deleted_at IS NULL ORDER BY escalation_level DESC, created_at ASC"
+        ).all();
+        const escalatedTicketRows = await env.DB.prepare(
+          "SELECT * FROM maintenance_tickets WHERE escalation_level > 0 AND status = 'reported' ORDER BY escalation_level DESC, created_at ASC"
+        ).all();
+
+        const unownedTicketRows = await env.DB.prepare(
+          "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND owner_staff_id IS NULL ORDER BY created_at ASC"
+        ).all();
+
+        const blockerRows = await env.DB.prepare(
+          "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC"
+        ).all();
+        const blockers = blockerRows.results.map(rowToBlocker);
+        // Chain detection: follow department_id -> waitingOn links as far as they go.
+        const byDept = {};
+        blockers.forEach((b) => { byDept[b.departmentId] = b; });
+        const visited = new Set();
+        const chains = [];
+        blockers.forEach((b) => {
+          if (visited.has(b.id)) return;
+          const chain = [b];
+          visited.add(b.id);
+          let cursor = byDept[b.waitingOn];
+          while (cursor && !visited.has(cursor.id) && chain.length < 10) {
+            chain.push(cursor);
+            visited.add(cursor.id);
+            cursor = byDept[cursor.waitingOn];
+          }
+          if (chain.length > 1) chains.push(chain);
+        });
+
+        const openTicketCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM maintenance_tickets WHERE status != 'fixed'").first();
+        const openGuestCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM guest_requests WHERE status != 'completed'").first();
+
+        return json({
+          escalatedMessages: escalatedMsgRows.results.map((r) => rowToMessage(r, r.to_dept, true)),
+          escalatedTickets: escalatedTicketRows.results.map(rowToTicket),
+          unownedTickets: unownedTicketRows.results.map(rowToTicket),
+          blockerChains: chains,
+          allBlockers: blockers,
+          exceptions: {
+            openTickets: openTicketCount.n,
+            openGuestRequests: openGuestCount.n,
+          },
+        });
+      }
+
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
+        const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
         if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         if (from !== request._staff.department_id) return json({ error: "You can only send messages as your own department" }, 403);
         let validMembers = null;
@@ -1309,6 +1449,7 @@ export default {
           fileName: fileName || null, filePath: filePathOnDisk, fileSize,
           duration: duration || null, transcript: transcript && transcript.trim() ? transcript.trim() : null,
           urgent: !!urgent,
+          affectsGuest: !!affectsGuest,
           replyToId: replyToId || null,
           roomNumber: roomNumber ? String(roomNumber).trim() : null,
           taskStatus: taskStatus || null,
@@ -1359,6 +1500,20 @@ export default {
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextPinned = !existing.pinned_at;
         await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
+        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/affects-guest")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/affects-guest".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const nextValue = existing.affects_guest ? 0 : 1;
+        await env.DB.prepare("UPDATE messages SET affects_guest = ? WHERE id = ?").bind(nextValue, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
@@ -1822,9 +1977,10 @@ export default {
           return json({ error: "Only Maintenance can update a ticket's status" }, 403);
         }
         const now = new Date().toISOString();
+        const newOwner = !existing.owner_staff_id && status !== "reported" ? request._staff.id : existing.owner_staff_id;
         await env.DB.prepare(
-          "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ? WHERE id = ?"
-        ).bind(status, now, status === "fixed" ? now : null, id).run();
+          "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ? WHERE id = ?"
+        ).bind(status, now, status === "fixed" ? now : null, newOwner, id).run();
         const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
 
         const statusNotice = { in_progress: "Started work on: ", fixed: "Fixed: " };
@@ -1835,6 +1991,24 @@ export default {
           });
         }
 
+        return json({ ticket: rowToTicket(row) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/owner")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/owner".length));
+        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
+          return json({ error: "Only Maintenance can assign a ticket's owner" }, 403);
+        }
+        const body = await readJsonBody(request);
+        const staffId = body.staffId || null;
+        if (staffId) {
+          const staffRow = await env.DB.prepare("SELECT id FROM staff WHERE id = ? AND department_id = 'maintenance'").bind(staffId).first();
+          if (!staffRow) return json({ error: "Not a Maintenance staff member" }, 400);
+        }
+        await env.DB.prepare("UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?").bind(staffId, id).run();
+        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
         return json({ ticket: rowToTicket(row) });
       }
 

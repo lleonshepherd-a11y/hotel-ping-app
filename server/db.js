@@ -137,6 +137,12 @@ if (!messageColumns.includes('poll_options')) {
 if (!messageColumns.includes('poll_votes')) {
   db.exec('ALTER TABLE messages ADD COLUMN poll_votes TEXT');
 }
+if (!messageColumns.includes('escalation_level')) {
+  db.exec('ALTER TABLE messages ADD COLUMN escalation_level INTEGER NOT NULL DEFAULT 0');
+}
+if (!messageColumns.includes('affects_guest')) {
+  db.exec('ALTER TABLE messages ADD COLUMN affects_guest INTEGER NOT NULL DEFAULT 0');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -178,9 +184,11 @@ if (toDeptCol && toDeptCol.notnull) {
       signoff_decided_at TEXT,
       poll_question TEXT,
       poll_options TEXT,
-      poll_votes TEXT
+      poll_votes TEXT,
+      escalation_level INTEGER NOT NULL DEFAULT 0,
+      affects_guest INTEGER NOT NULL DEFAULT 0
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, poll_question, poll_options, poll_votes FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, poll_question, poll_options, poll_votes, escalation_level, affects_guest FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
@@ -251,7 +259,10 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     resolved_at TEXT,
-    pinned_at TEXT
+    pinned_at TEXT,
+    escalation_level INTEGER NOT NULL DEFAULT 0,
+    escalated_at TEXT,
+    owner_staff_id TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 
@@ -337,6 +348,28 @@ if (!maintenanceColumns.includes('guest_present')) {
 if (!maintenanceColumns.includes('deadline')) {
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN deadline TEXT');
 }
+if (!maintenanceColumns.includes('escalation_level')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN escalation_level INTEGER NOT NULL DEFAULT 0');
+}
+if (!maintenanceColumns.includes('escalated_at')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN escalated_at TEXT');
+}
+if (!maintenanceColumns.includes('owner_staff_id')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN owner_staff_id TEXT');
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS blockers (
+    id TEXT PRIMARY KEY,
+    department_id TEXT NOT NULL,
+    waiting_on TEXT NOT NULL,
+    reason TEXT,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    resolved_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_blockers_open ON blockers(department_id, resolved_at);
+`);
 
 const groupColumns = db.prepare("PRAGMA table_info(groups)").all().map((c) => c.name);
 if (!groupColumns.includes('deleted_at')) {
