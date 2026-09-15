@@ -3980,7 +3980,7 @@ function buildMissedMessageCard(item){
   var card = document.createElement("div");
   card.className = "missed-msg-card";
   card.innerHTML =
-    '<span class="missed-msg-avatar" style="background:' + dept.color + '">' + esc(dept.initials) + '</span>' +
+    '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
     '<div class="missed-msg-body">' +
       '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span>' + (m.urgent ? '<span class="missed-msg-urgent">Urgent</span>' : '') + '</div>' +
       '<div class="missed-msg-preview">' + esc(preview) + '</div>' +
@@ -4000,7 +4000,7 @@ function buildMissedApprovalCard(item){
   var card = document.createElement("div");
   card.className = "missed-msg-card missed-approval-card";
   card.innerHTML =
-    '<span class="missed-msg-avatar" style="background:' + dept.color + '">' + esc(dept.initials) + '</span>' +
+    '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
     '<div class="missed-msg-body">' +
       '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span></div>' +
       '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
