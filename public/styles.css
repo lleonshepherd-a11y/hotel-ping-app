@@ -13,35 +13,35 @@
   src:url(/fonts/inter-variable.woff2) format('woff2');
 }
 :root{
-  --bg:#0d0d0d;
-  --surface:#161616;
-  --surface-2:#1e1e1e;
-  --surface-3:#262626;
-  --border:#2c2c2c;
-  --text:#f3f3f1;
-  --text-dim:#9c9c97;
-  --text-faint:#6d6d68;
+  --bg:#efefec;
+  --surface:#ffffff;
+  --surface-2:#f6f6f3;
+  --surface-3:#ececea;
+  --border:#e2e2dd;
+  --text:#18181a;
+  --text-dim:#6b6b66;
+  --text-faint:#9a9a93;
   --accent:#2fae6a;
   --accent-2:#1f8f55;
   --urgent:#e0554a;
   --urgent-2:#c23f33;
-  --urgent-tint:rgba(224,85,74,.16);
-  --bubble-in:#202020;
-  --bubble-in-text:#f3f3f1;
-  --sidebar-bg:#111111;
-  --active-tint:rgba(47,174,106,.13);
-  --active-tint-strong:rgba(47,174,106,.22);
-  --shadow-soft:0 1px 2px rgba(0,0,0,.45), 0 8px 22px rgba(0,0,0,.35);
-  --shadow-pop:0 26px 60px rgba(0,0,0,.6), 0 6px 16px rgba(0,0,0,.45);
-  --wallpaper-dot:rgba(255,255,255,.045);
-  --outline-soft:rgba(148,222,184,.18);
+  --urgent-tint:rgba(224,85,74,.12);
+  --bubble-in:#f0f0ec;
+  --bubble-in-text:#18181a;
+  --sidebar-bg:#f7f7f4;
+  --active-tint:rgba(47,174,106,.10);
+  --active-tint-strong:rgba(47,174,106,.18);
+  --shadow-soft:0 1px 2px rgba(20,20,15,.06), 0 8px 22px rgba(20,20,15,.05);
+  --shadow-pop:0 26px 60px rgba(20,20,15,.16), 0 6px 16px rgba(20,20,15,.08);
+  --wallpaper-dot:rgba(20,20,15,.05);
+  --outline-soft:rgba(47,174,106,.22);
 }
-/* Hotel Ping: premium black + emerald identity, a fixed dark design that does not switch to a light palette. */
+/* Hotel Ping: premium white + emerald identity, a fixed light design that does not switch to a dark palette. */
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{
-  background:radial-gradient(ellipse 1100px 700px at 22% -8%, #1c1c1a 0%, var(--bg) 55%);
+  background:radial-gradient(ellipse 1100px 700px at 22% -8%, #ffffff 0%, var(--bg) 55%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",Roboto,"Manrope",sans-serif;
   position:fixed;
