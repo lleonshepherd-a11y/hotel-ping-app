@@ -1757,7 +1757,8 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     bubble = buildAudioNode(m);
   }
   var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
-  if(!isEmptyPollBubble){
+  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text");
+  if(!hideTextBubble){
     if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(bubble);
   }
@@ -1791,7 +1792,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   if(m.signoff) wrap.appendChild(buildSignoffCard(m));
   if(m.poll) wrap.appendChild(buildPollCard(m));
 
-  var canInlineMeta = m.type === "text" && !isEmptyPollBubble;
+  var canInlineMeta = m.type === "text" && !hideTextBubble;
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (canInlineMeta ? " bubble-meta-inline" : "") + (m.status === "read" ? " read" : "");
