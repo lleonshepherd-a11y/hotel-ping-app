@@ -21,6 +21,19 @@ const NOIR_SESSION_MINUTES = 60 * 24 * 30;
 // from a row out of the dashboard's own staff table. status_line/phone have
 // no home in that table, so they're always absent here rather than silently
 // pointed at the wrong record.
+function toNoirDept(deptSlug) {
+  return NOIR_DEPT_ID_MAP[deptSlug] || deptSlug;
+}
+function fromNoirDept(deptUuid) {
+  return NOIR_DEPT_ID_REVERSE[deptUuid] || deptUuid;
+}
+// Shallow-clones a NOIR_DB row and swaps its department_id UUID back to
+// Hotel Ping's own slug, for rows whose other columns are otherwise a
+// direct match for the local row shape the existing rowTo* fns expect.
+function noirDeptRow(r) {
+  return Object.assign({}, r, { department_id: fromNoirDept(r.department_id) });
+}
+
 function noirIdentity(staffRow) {
   return {
     id: staffRow.id,
@@ -387,6 +400,17 @@ function rowToBlocker(row) {
     resolvedAt: row.resolved_at || undefined,
   };
 }
+function noirBlockerRow(r) {
+  return {
+    id: r.id,
+    department_id: fromNoirDept(r.department_id),
+    waiting_on: fromNoirDept(r.waiting_on),
+    reason: r.reason,
+    created_by: r.created_by_staff_id,
+    created_at: r.created_at,
+    resolved_at: r.resolved_at,
+  };
+}
 function rowToTicketReply(row) {
   return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
 }
@@ -413,6 +437,22 @@ function rowToAssetRequest(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     returnedAt: row.returned_at || undefined,
+  };
+}
+// asset_requests has no department column on the dashboard side, only a
+// staff FK - department-level ownership is resolved via a join (see the
+// /api/assets handlers), and this maps that joined row back to the local
+// shape rowToAssetRequest expects.
+function noirAssetRow(r) {
+  return {
+    id: r.id,
+    item_name: r.item_name,
+    notes: r.notes,
+    status: r.status,
+    requested_by: fromNoirDept(r.requester_dept),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    returned_at: r.returned_at,
   };
 }
 function rowToStory(row, viewed) {
@@ -1295,11 +1335,15 @@ export default {
       }
 
       // ---- Blockers (cross-department "waiting on") ----
+      // Lives in the dashboard's blockers table now. department_id/waiting_on
+      // are UUIDs there, so translate at the boundary; created_by_staff_id is
+      // a real staff FK (the old local table stored a department id in that
+      // column instead, but nothing on the client reads it back).
       if (method === "GET" && p === "/api/blockers") {
-        const rows = await env.DB.prepare(
+        const rows = await env.NOIR_DB.prepare(
           "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC"
         ).all();
-        return json({ blockers: rows.results.map(rowToBlocker) });
+        return json({ blockers: rows.results.map((r) => rowToBlocker(noirBlockerRow(r))) });
       }
 
       if (method === "POST" && p === "/api/blockers") {
@@ -1310,22 +1354,22 @@ export default {
         const requester = request._staff;
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.DB.prepare(
-          "INSERT INTO blockers (id, department_id, waiting_on, reason, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-        ).bind(id, requester.department_id, waitingOn, reason, requester.department_id, now).run();
-        const row = await env.DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
-        return json({ blocker: rowToBlocker(row) });
+        await env.NOIR_DB.prepare(
+          "INSERT INTO blockers (id, department_id, waiting_on, reason, created_by_staff_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(id, toNoirDept(requester.department_id), toNoirDept(waitingOn), reason, requester.id, now).run();
+        const row = await env.NOIR_DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
+        return json({ blocker: rowToBlocker(noirBlockerRow(row)) });
       }
 
       if (method === "POST" && p.startsWith("/api/blockers/") && p.endsWith("/resolve")) {
         const id = decodeURIComponent(p.slice("/api/blockers/".length, -"/resolve".length));
-        const existing = await env.DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare("SELECT * FROM blockers WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Blocker not found" }, 404);
         const requester = request._staff;
-        if (existing.department_id !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(existing.department_id) !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that reported this can clear it" }, 403);
         }
-        await env.DB.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        await env.NOIR_DB.prepare("UPDATE blockers SET resolved_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         return json({ ok: true });
       }
 
@@ -1345,10 +1389,10 @@ export default {
           "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND owner_staff_id IS NULL ORDER BY created_at ASC"
         ).all();
 
-        const blockerRows = await env.DB.prepare(
+        const blockerRows = await env.NOIR_DB.prepare(
           "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC"
         ).all();
-        const blockers = blockerRows.results.map(rowToBlocker);
+        const blockers = blockerRows.results.map((r) => rowToBlocker(noirBlockerRow(r)));
         // Chain detection: follow department_id -> waitingOn links as far as they go.
         const byDept = {};
         blockers.forEach((b) => { byDept[b.departmentId] = b; });
@@ -1715,28 +1759,28 @@ export default {
       }
 
       if (method === "GET" && p === "/api/quick-replies") {
-        const dept = request._staff.department_id;
-        let rows = await env.DB.prepare("SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC").bind(dept).all();
+        const dept = toNoirDept(request._staff.department_id);
+        let rows = await env.NOIR_DB.prepare("SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC").bind(dept).all();
         if (rows.results.length === 0) {
           const now = new Date().toISOString();
           for (let i = 0; i < DEFAULT_QUICK_REPLIES.length; i++) {
-            await env.DB.prepare(
+            await env.NOIR_DB.prepare(
               "INSERT INTO quick_replies (id, department_id, text, position, created_at) VALUES (?, ?, ?, ?, ?)"
             ).bind(crypto.randomUUID(), dept, DEFAULT_QUICK_REPLIES[i], i, now).run();
           }
-          rows = await env.DB.prepare("SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC").bind(dept).all();
+          rows = await env.NOIR_DB.prepare("SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC").bind(dept).all();
         }
         return json({ replies: rows.results.map((r) => ({ id: r.id, text: r.text })) });
       }
 
       if (method === "POST" && p === "/api/quick-replies") {
-        const dept = request._staff.department_id;
+        const dept = toNoirDept(request._staff.department_id);
         const body = await readJsonBody(request);
         const text = String(body.text || "").trim().slice(0, 24);
         if (!text) return json({ error: "Text is required" }, 400);
-        const maxPos = await env.DB.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM quick_replies WHERE department_id = ?").bind(dept).first();
+        const maxPos = await env.NOIR_DB.prepare("SELECT COALESCE(MAX(position), -1) AS m FROM quick_replies WHERE department_id = ?").bind(dept).first();
         const id = crypto.randomUUID();
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "INSERT INTO quick_replies (id, department_id, text, position, created_at) VALUES (?, ?, ?, ?, ?)"
         ).bind(id, dept, text, maxPos.m + 1, new Date().toISOString()).run();
         return json({ reply: { id, text } }, 201);
@@ -1744,31 +1788,31 @@ export default {
 
       if (method === "PATCH" && p.startsWith("/api/quick-replies/")) {
         const id = decodeURIComponent(p.slice("/api/quick-replies/".length));
-        const dept = request._staff.department_id;
-        const existing = await env.DB.prepare("SELECT 1 FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).first();
+        const dept = toNoirDept(request._staff.department_id);
+        const existing = await env.NOIR_DB.prepare("SELECT 1 FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).first();
         if (!existing) return json({ error: "Not found" }, 404);
         const body = await readJsonBody(request);
         const text = String(body.text || "").trim().slice(0, 24);
         if (!text) return json({ error: "Text is required" }, 400);
-        await env.DB.prepare("UPDATE quick_replies SET text = ? WHERE id = ?").bind(text, id).run();
+        await env.NOIR_DB.prepare("UPDATE quick_replies SET text = ? WHERE id = ?").bind(text, id).run();
         return json({ reply: { id, text } });
       }
 
       if (method === "DELETE" && p.startsWith("/api/quick-replies/")) {
         const id = decodeURIComponent(p.slice("/api/quick-replies/".length));
-        const dept = request._staff.department_id;
-        await env.DB.prepare("DELETE FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).run();
+        const dept = toNoirDept(request._staff.department_id);
+        await env.NOIR_DB.prepare("DELETE FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).run();
         return json({ ok: true });
       }
 
       if (method === "GET" && p === "/api/stories") {
         const now = new Date().toISOString();
-        await env.DB.prepare("DELETE FROM stories WHERE expires_at < ?").bind(now).run();
-        const rows = await env.DB.prepare("SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC").bind(now).all();
+        await env.NOIR_DB.prepare("DELETE FROM stories WHERE expires_at < ?").bind(now).run();
+        const rows = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC").bind(now).all();
         const viewerDept = request._staff.department_id;
-        const viewedRows = await env.DB.prepare("SELECT story_id FROM story_views WHERE department_id = ?").bind(viewerDept).all();
+        const viewedRows = await env.NOIR_DB.prepare("SELECT story_id FROM story_views WHERE department_id = ?").bind(toNoirDept(viewerDept)).all();
         const viewedIds = new Set(viewedRows.results.map((r) => r.story_id));
-        return json({ stories: rows.results.map((r) => rowToStory(r, r.department_id === viewerDept || viewedIds.has(r.id))) });
+        return json({ stories: rows.results.map((r) => rowToStory(noirDeptRow(r), fromNoirDept(r.department_id) === viewerDept || viewedIds.has(r.id))) });
       }
 
       if (method === "POST" && p === "/api/stories") {
@@ -1786,34 +1830,34 @@ export default {
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
         const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
-        await env.DB.prepare(
-          "INSERT INTO stories (id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, requester.department_id, requester.name, safeName, caption, now.toISOString(), expiresAt).run();
-        const row = await env.DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
-        return json({ story: rowToStory(row, true) }, 201);
+        await env.NOIR_DB.prepare(
+          "INSERT INTO stories (id, hotel_id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(id, NOIR_HOTEL_ID, toNoirDept(requester.department_id), requester.name, safeName, caption, now.toISOString(), expiresAt).run();
+        const row = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        return json({ story: rowToStory(noirDeptRow(row), true) }, 201);
       }
 
       if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/view")) {
         const id = decodeURIComponent(p.slice("/api/stories/".length, -"/view".length));
-        const story = await env.DB.prepare("SELECT 1 FROM stories WHERE id = ?").bind(id).first();
+        const story = await env.NOIR_DB.prepare("SELECT 1 FROM stories WHERE id = ?").bind(id).first();
         if (!story) return json({ error: "Story not found" }, 404);
         const viewerDept = request._staff.department_id;
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "INSERT INTO story_views (story_id, department_id, viewed_at) VALUES (?, ?, ?) ON CONFLICT(story_id, department_id) DO NOTHING"
-        ).bind(id, viewerDept, new Date().toISOString()).run();
+        ).bind(id, toNoirDept(viewerDept), new Date().toISOString()).run();
         return json({ ok: true });
       }
 
       if (method === "DELETE" && p.startsWith("/api/stories/")) {
         const id = decodeURIComponent(p.slice("/api/stories/".length));
-        const existing = await env.DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Story not found" }, 404);
         const requester = request._staff;
-        if (existing.department_id !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(existing.department_id) !== requester.department_id && !requester.is_admin) {
           return json({ error: "You can only delete your own department's stories" }, 403);
         }
-        await env.DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
-        await env.DB.prepare("DELETE FROM story_views WHERE story_id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM story_views WHERE story_id = ?").bind(id).run();
         return json({ ok: true });
       }
 
@@ -2095,9 +2139,16 @@ export default {
         return json({ request: rowToGuestRequest(row) });
       }
 
+      // Dashboard's asset_requests has no department column, only a staff FK
+      // (requested_by_staff_id) - so department-level ownership is resolved
+      // by joining staff to look up which department the requester belongs to,
+      // matching this table's original "your department's requests" behavior.
       if (method === "GET" && p === "/api/assets") {
-        const rows = await env.DB.prepare("SELECT * FROM asset_requests ORDER BY created_at DESC").all();
-        return json({ requests: rows.results.map(rowToAssetRequest) });
+        const rows = await env.NOIR_DB.prepare(
+          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
+           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id ORDER BY ar.created_at DESC`
+        ).all();
+        return json({ requests: rows.results.map((r) => rowToAssetRequest(noirAssetRow(r))) });
       }
 
       if (method === "POST" && p === "/api/assets") {
@@ -2109,10 +2160,10 @@ export default {
         const notes = body.notes ? String(body.notes).trim().slice(0, 200) : null;
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.DB.prepare(
-          "INSERT INTO asset_requests (id, item_name, notes, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, 'requested', ?, ?, ?)"
-        ).bind(id, itemName, notes, requester.department_id, now, now).run();
-        const row = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        await env.NOIR_DB.prepare(
+          "INSERT INTO asset_requests (id, hotel_id, item_name, notes, status, requested_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)"
+        ).bind(id, NOIR_HOTEL_ID, itemName, notes, requester.id, now, now).run();
+        const row = { id, item_name: itemName, notes, status: "requested", requester_dept: toNoirDept(requester.department_id), created_at: now, updated_at: now, returned_at: null };
 
         const notifyPromise = Promise.all([...DEPT_IDS].filter((d) => d !== requester.department_id).map((deptId) =>
           notifyDepartment(env, deptId, {
@@ -2124,7 +2175,7 @@ export default {
         ));
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
-        return json({ request: rowToAssetRequest(row) }, 201);
+        return json({ request: rowToAssetRequest(noirAssetRow(row)) }, 201);
       }
 
       if (method === "POST" && p.startsWith("/api/assets/") && p.endsWith("/status")) {
@@ -2132,28 +2183,34 @@ export default {
         const body = await readJsonBody(request);
         const status = body.status;
         if (!ASSET_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
-        const existing = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
+           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id WHERE ar.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Request not found" }, 404);
-        if (existing.requested_by !== request._staff.department_id && !request._staff.is_admin) {
+        if (fromNoirDept(existing.requester_dept) !== request._staff.department_id && !request._staff.is_admin) {
           return json({ error: "You can only update your own department's requests" }, 403);
         }
         const now = new Date().toISOString();
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?"
         ).bind(status, now, status === "returned" ? now : null, id).run();
-        const row = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
-        return json({ request: rowToAssetRequest(row) });
+        existing.status = status; existing.updated_at = now; existing.returned_at = status === "returned" ? now : null;
+        return json({ request: rowToAssetRequest(noirAssetRow(existing)) });
       }
 
       if (method === "DELETE" && p.startsWith("/api/assets/")) {
         const id = decodeURIComponent(p.slice("/api/assets/".length));
-        const existing = await env.DB.prepare("SELECT * FROM asset_requests WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
+           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id WHERE ar.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Request not found" }, 404);
         const requester = request._staff;
-        if (existing.requested_by !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(existing.requester_dept) !== requester.department_id && !requester.is_admin) {
           return json({ error: "You can only remove your own department's requests" }, 403);
         }
-        await env.DB.prepare("DELETE FROM asset_requests WHERE id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM asset_requests WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 
