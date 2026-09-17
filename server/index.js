@@ -1017,6 +1017,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { departments });
     }
 
+    if (req.method === 'GET' && p === '/api/signoffs') {
+      const requester = staffFromToken(req);
+      const dept = requester.department_id;
+      const rows = db.prepare(
+        "SELECT * FROM messages WHERE signoff_status IS NOT NULL AND (from_dept = ? OR to_dept = ?) AND deleted_at IS NULL ORDER BY created_at DESC"
+      ).all(dept, dept);
+      const items = rows.map((m) => rowToMessage(m, dept, requester.is_admin)).filter(Boolean);
+      return send(res, 200, { items });
+    }
+
     if (req.method === 'GET' && p === '/api/missed') {
       const requester = staffFromToken(req);
       const dept = requester.department_id;

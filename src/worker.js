@@ -1256,6 +1256,15 @@ export default {
         return json({ departments: rows.results.map((r) => ({ deptId: r.to_dept, avgSeconds: r.avg_seconds, count: r.n })) });
       }
 
+      if (method === "GET" && p === "/api/signoffs") {
+        const dept = request._staff.department_id;
+        const rows = await env.DB.prepare(
+          "SELECT * FROM messages WHERE signoff_status IS NOT NULL AND (from_dept = ? OR to_dept = ?) AND deleted_at IS NULL ORDER BY created_at DESC"
+        ).bind(dept, dept).all();
+        const items = rows.results.map((m) => rowToMessage(m, dept, request._staff.is_admin)).filter(Boolean);
+        return json({ items });
+      }
+
       if (method === "GET" && p === "/api/missed") {
         const dept = request._staff.department_id;
         const items = [];

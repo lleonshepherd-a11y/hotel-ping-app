@@ -179,6 +179,11 @@
         <span class="sb-menu-chevron" id="moreOptionsChevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <div id="moreOptionsSub" hidden>
+        <button class="sb-menu-row sb-menu-row-sub" id="assetsBtn" type="button">
+          <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+          <span class="sb-menu-label">Asset exchange</span>
+          <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+        </button>
         <button class="sb-menu-row sb-menu-row-sub" id="changePinBtn" type="button">
           <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg></span>
           <span class="sb-menu-label">Change your PIN</span>
@@ -381,60 +386,52 @@
       <div class="guests-feed" id="guestsFeed"></div>
     </div>
 
-    <div class="sb-page" id="assetsPage" hidden>
+    <div class="sb-page" id="requestsPage" hidden>
       <div class="guests-header assets-header">
         <div class="guests-header-icon assets-header-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </div>
         <div>
-          <div class="sb-title">Asset exchange</div>
-          <div class="sb-sub">Swap stock and items between departments</div>
+          <div class="sb-title">Requests</div>
+          <div class="sb-sub">Ask a manager to approve something, like a repair or a spend</div>
         </div>
       </div>
-      <form class="maint-new-form" id="newAssetForm">
-        <input type="text" id="newAssetItem" placeholder="Item, e.g. Wine for the kitchen, champagne chillers" required maxlength="80">
-        <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
-        <button type="submit" class="admin-add-btn">Request item</button>
+      <form class="maint-new-form" id="newRequestForm">
+        <input type="text" id="newRequestTitle" placeholder="What needs approving? e.g. Replace broken ice machine" required maxlength="120">
+        <div class="request-form-row">
+          <input type="number" id="newRequestAmount" placeholder="Amount £ (optional)" min="0" step="0.01">
+          <select id="newRequestTo"></select>
+        </div>
+        <button type="submit" class="admin-add-btn">Send request</button>
       </form>
-      <div class="admin-add-error" id="assetError"></div>
-      <div class="sb-search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="assetSearchInput" placeholder="Search asset requests">
-        <button id="assetSearchClear" hidden aria-label="Clear search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
-      <div class="maint-feed" id="assetFeed"></div>
+      <div class="admin-add-error" id="requestError"></div>
+      <div class="maint-feed" id="requestsFeed"></div>
     </div>
 
     <div class="bottom-tabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button" aria-label="Profile" title="Profile">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Profile</span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+        <span class="bottom-tab-label">Profile</span>
       </button>
       <button class="bottom-tab active" id="tabChatBtn" type="button" aria-label="Chat" title="Chat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span>Chat</span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="bottom-tab-label">Chat</span>
       </button>
       <button class="bottom-tab" id="tabEventsBtn" type="button" aria-label="Events" title="Events">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/><circle cx="12" cy="15" r="2.2"/></svg>
-        <span>Events</span>
-        <span class="tab-badge" id="tabEventsBadge" hidden></span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><rect x="6.5" y="13" width="2.4" height="2.4"/><rect x="10.8" y="13" width="2.4" height="2.4"/><path d="M15 14.5l1.4 1.4 2.6-2.6"/></svg><span class="tab-badge" id="tabEventsBadge" hidden></span></span>
+        <span class="bottom-tab-label">Events</span>
       </button>
       <button class="bottom-tab" id="tabMaintBtn" type="button" aria-label="Maintenance repairs" title="Maintenance repairs">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
-        <span>Maintenance repairs</span>
-        <span class="tab-badge" id="tabMaintBadge" hidden></span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg><span class="tab-badge" id="tabMaintBadge" hidden></span></span>
+        <span class="bottom-tab-label">Repairs</span>
       </button>
-      <button class="bottom-tab" id="tabAssetsBtn" type="button" aria-label="Asset exchange" title="Asset exchange">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        <span>Asset exchange</span>
-        <span class="tab-badge" id="tabAssetsBadge" hidden></span>
+      <button class="bottom-tab" id="tabRequestsBtn" type="button" aria-label="Requests" title="Requests">
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="tab-badge" id="tabRequestsBadge" hidden></span></span>
+        <span class="bottom-tab-label">Requests</span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg>
-        <span>Guests</span>
-        <span class="tab-badge" id="tabGuestsBadge" hidden></span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg><span class="tab-badge" id="tabGuestsBadge" hidden></span></span>
+        <span class="bottom-tab-label">Guests</span>
       </button>
     </div>
   </aside>
@@ -455,6 +452,9 @@
       </div>
       <button class="mute-btn" id="callBtn" type="button" aria-label="Call" title="Call" style="right:92px" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
+      <button class="mute-btn urgent-header-btn" id="urgentToggleBtn" type="button" aria-label="Mark next message urgent" title="Mark urgent" style="right:130px">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
       </button>
       <button class="mute-btn" id="filesBtn" type="button" aria-label="Shared files" title="Shared files" style="right:54px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg>
@@ -550,10 +550,6 @@
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/><circle cx="12" cy="13.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
                   <span class="plus-opt-label">Camera</span>
                 </button>
-                <button class="plus-opt" id="optUrgent" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
-                  <span class="plus-opt-label">Urgent</span>
-                </button>
                 <button class="plus-opt" id="optAffectsGuest" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8" stroke-width="1.7"/><path d="M2 18h20" stroke-width="1.7"/></svg></span>
                   <span class="plus-opt-label">Guest</span>
@@ -573,6 +569,10 @@
                 <button class="plus-opt" id="optPoll" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16" stroke-width="1.7"/><rect x="6" y="12" width="3" height="6" rx="0.5" stroke-width="1.7"/><rect x="11" y="8" width="3" height="10" rx="0.5" stroke-width="1.7"/><rect x="16" y="4" width="3" height="14" rx="0.5" stroke-width="1.7"/></svg></span>
                   <span class="plus-opt-label">Poll</span>
+                </button>
+                <button class="plus-opt" id="optAssetRequest" type="button">
+                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4" stroke-width="1.7"/><path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-width="1.7"/><path d="M7 22l-4-4 4-4" stroke-width="1.7"/><path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-width="1.7"/></svg></span>
+                  <span class="plus-opt-label">Item request</span>
                 </button>
               </div>
             </div>
@@ -730,6 +730,32 @@
     </div>
     <p class="broadcast-hint">Every conversation across the hotel, most recent first. Tap one to open it.</p>
     <div class="feed-list" id="feedList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="assetsOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Asset exchange</h2>
+      <button class="admin-close" id="assetsClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Swap stock and items between departments.</p>
+    <form class="maint-new-form" id="newAssetForm">
+      <input type="text" id="newAssetItem" placeholder="Item, e.g. Wine for the kitchen, champagne chillers" required maxlength="80">
+      <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
+      <button type="submit" class="admin-add-btn">Request item</button>
+    </form>
+    <div class="admin-add-error" id="assetError"></div>
+    <div class="sb-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="assetSearchInput" placeholder="Search asset requests">
+      <button id="assetSearchClear" hidden aria-label="Clear search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="maint-feed" id="assetFeed"></div>
   </div>
 </div>
 

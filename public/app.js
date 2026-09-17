@@ -1976,7 +1976,7 @@ var plusMenu = document.getElementById("plusMenu");
 var optPhoto = document.getElementById("optPhoto");
 var optCamera = document.getElementById("optCamera");
 var micQuickBtn = document.getElementById("micQuickBtn");
-var optUrgent = document.getElementById("optUrgent");
+var urgentToggleBtn = document.getElementById("urgentToggleBtn");
 var optAffectsGuest = document.getElementById("optAffectsGuest");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
@@ -2221,12 +2221,11 @@ document.addEventListener("click", function(e){
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
 micQuickBtn.addEventListener("click", function(){ startRecording(); });
-optUrgent.addEventListener("click", function(){
+urgentToggleBtn.addEventListener("click", function(){
   urgentActive = !urgentActive;
-  optUrgent.classList.toggle("active", urgentActive);
+  urgentToggleBtn.classList.toggle("active", urgentActive);
   composer.classList.toggle("urgent-mode", urgentActive);
   refreshSendState();
-  closePlusMenu();
 });
 optAffectsGuest.addEventListener("click", function(){
   affectsGuestActive = !affectsGuestActive;
@@ -2244,6 +2243,11 @@ optTask.addEventListener("click", function(){
 optSignoff.addEventListener("click", function(){
   closePlusMenu();
   openSignoffOverlay();
+});
+var optAssetRequest = document.getElementById("optAssetRequest");
+optAssetRequest.addEventListener("click", function(){
+  closePlusMenu();
+  openAssetsOverlay(true);
 });
 
 var optPoll = document.getElementById("optPoll");
@@ -2482,7 +2486,7 @@ function doSend(){
   STATE.attachment = null;
   renderAttachPreview();
   urgentActive = false;
-  optUrgent.classList.remove("active");
+  urgentToggleBtn.classList.remove("active");
   composer.classList.remove("urgent-mode");
   affectsGuestActive = false;
   optAffectsGuest.classList.remove("active");
@@ -2852,7 +2856,7 @@ function startPolling(){
   slowPollTimer = setInterval(function(){
     if(document.hidden) return;
     refreshNow().catch(function(){});
-    refreshAssetsBadge();
+    refreshRequestsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(!tabGuestsBtn.hidden) refreshGuestsBadge();
   }, 6000);
@@ -2929,7 +2933,7 @@ function enterApp(staff){
   startPolling();
   setTimeout(function(){
     refreshMaintenanceBadge();
-    refreshAssetsBadge();
+    refreshRequestsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(staff.departmentId === "concierge") refreshGuestsBadge();
     pollMissed();
@@ -4101,30 +4105,30 @@ var chatPage = document.getElementById("chatPage");
 var eventsPage = document.getElementById("eventsPage");
 var maintenancePage = document.getElementById("maintenancePage");
 var guestsPage = document.getElementById("guestsPage");
-var assetsPage = document.getElementById("assetsPage");
+var requestsPage = document.getElementById("requestsPage");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
 var tabEventsBtn = document.getElementById("tabEventsBtn");
 var tabMaintBtn = document.getElementById("tabMaintBtn");
 var tabGuestsBtn = document.getElementById("tabGuestsBtn");
-var tabAssetsBtn = document.getElementById("tabAssetsBtn");
+var tabRequestsBtn = document.getElementById("tabRequestsBtn");
 function showTab(tab){
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
   eventsPage.hidden = tab !== "events";
   maintenancePage.hidden = tab !== "maintenance";
   guestsPage.hidden = tab !== "guests";
-  assetsPage.hidden = tab !== "assets";
+  requestsPage.hidden = tab !== "requests";
   tabProfileBtn.classList.toggle("active", tab === "profile");
   tabChatBtn.classList.toggle("active", tab === "chat");
   tabEventsBtn.classList.toggle("active", tab === "events");
   tabMaintBtn.classList.toggle("active", tab === "maintenance");
   tabGuestsBtn.classList.toggle("active", tab === "guests");
-  tabAssetsBtn.classList.toggle("active", tab === "assets");
+  tabRequestsBtn.classList.toggle("active", tab === "requests");
   if(tab === "events") openEventsTab();
   if(tab === "maintenance") openMaintenanceTab();
   if(tab === "guests") openGuestsTab();
-  if(tab === "assets") openAssetsTab();
+  if(tab === "requests") openRequestsTab();
   if(tab === "profile") pollMissed();
 }
 tabProfileBtn.addEventListener("click", function(){ showTab("profile"); });
@@ -4132,7 +4136,7 @@ tabChatBtn.addEventListener("click", function(){ showTab("chat"); });
 tabEventsBtn.addEventListener("click", function(){ showTab("events"); });
 tabMaintBtn.addEventListener("click", function(){ showTab("maintenance"); });
 tabGuestsBtn.addEventListener("click", function(){ showTab("guests"); });
-tabAssetsBtn.addEventListener("click", function(){ showTab("assets"); });
+tabRequestsBtn.addEventListener("click", function(){ showTab("requests"); });
 showTab("chat");
 
 (function setupTabBarDrag(){
@@ -5908,7 +5912,8 @@ newMaintForm.addEventListener("submit", function(e){
   }).finally(function(){ submitBtn.disabled = false; });
 });
 
-/* ---- Hotel asset exchange ---- */
+/* ---- Hotel asset exchange (reached via the composer's "Item request"
+   option and Profile > More options > Asset exchange - not a main tab) ---- */
 var assetFeed = document.getElementById("assetFeed");
 var newAssetForm = document.getElementById("newAssetForm");
 var newAssetItem = document.getElementById("newAssetItem");
@@ -5920,21 +5925,24 @@ var ASSET_STATUS_ORDER = { requested: 0, borrowed: 1, returned: 2 };
 var ASSET_NEXT_STATUS = { requested: "borrowed", borrowed: "returned" };
 var ASSET_NEXT_LABEL = { requested: "Mark borrowed", borrowed: "Mark returned" };
 
-var tabAssetsBadge = document.getElementById("tabAssetsBadge");
-function refreshAssetsBadge(){
+var assetsOverlay = document.getElementById("assetsOverlay");
+var assetsClose = document.getElementById("assetsClose");
+var assetsBtn = document.getElementById("assetsBtn");
+function refreshAssetsList(){
   apiGet('/api/assets').then(function(res){
     STATE.assetRequests = res.requests;
-    var n = res.requests.filter(function(r){ return r.status === "requested"; }).length;
-    tabAssetsBadge.hidden = n === 0;
-    tabAssetsBadge.textContent = n > 99 ? "99+" : String(n);
-    if(!assetsPage.hidden) renderAssetsBoard();
+    if(!assetsOverlay.hidden) renderAssetsBoard();
   }).catch(function(){});
 }
-
-function openAssetsTab(){
+function openAssetsOverlay(focusForm){
+  assetsOverlay.hidden = false;
   assetFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
-  refreshAssetsBadge();
+  refreshAssetsList();
+  if(focusForm) setTimeout(function(){ newAssetItem.focus(); }, 30);
 }
+assetsClose.addEventListener("click", function(){ assetsOverlay.hidden = true; });
+assetsOverlay.addEventListener("click", function(e){ if(e.target === assetsOverlay) assetsOverlay.hidden = true; });
+assetsBtn.addEventListener("click", function(){ openAssetsOverlay(false); });
 
 var assetSearchInput = document.getElementById("assetSearchInput");
 var assetSearchClear = document.getElementById("assetSearchClear");
@@ -6064,6 +6072,134 @@ newAssetForm.addEventListener("submit", function(e){
     showToast("Requested");
   }).catch(function(err){
     assetError.textContent = err.message || "Couldn't send that request.";
+  }).finally(function(){ submitBtn.disabled = false; });
+});
+
+/* ---- Requests (HOD sign-off) main-menu tab ---- */
+var requestsFeed = document.getElementById("requestsFeed");
+var newRequestForm = document.getElementById("newRequestForm");
+var newRequestTitle = document.getElementById("newRequestTitle");
+var newRequestAmount = document.getElementById("newRequestAmount");
+var newRequestTo = document.getElementById("newRequestTo");
+var requestError = document.getElementById("requestError");
+var tabRequestsBadge = document.getElementById("tabRequestsBadge");
+STATE.signoffs = STATE.signoffs || [];
+
+function populateRequestToOptions(){
+  var prev = newRequestTo.value;
+  newRequestTo.innerHTML = "";
+  DEPT_ORDER.forEach(function(id){
+    if(id === STATE.self) return;
+    var opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = DEPTS[id] ? DEPTS[id].name : id;
+    newRequestTo.appendChild(opt);
+  });
+  if(prev && DEPT_ORDER.indexOf(prev) !== -1 && prev !== STATE.self) newRequestTo.value = prev;
+  else if(STATE.self !== "gm" && DEPT_ORDER.indexOf("gm") !== -1) newRequestTo.value = "gm";
+}
+
+function refreshRequestsBadge(){
+  apiGet('/api/signoffs').then(function(res){
+    STATE.signoffs = res.items;
+    var n = res.items.filter(function(m){ return m.signoff && m.signoff.status === "pending" && m.to === STATE.self; }).length;
+    tabRequestsBadge.hidden = n === 0;
+    tabRequestsBadge.textContent = n > 99 ? "99+" : String(n);
+    if(!requestsPage.hidden) renderRequestsBoard();
+  }).catch(function(){});
+}
+
+function openRequestsTab(){
+  populateRequestToOptions();
+  requestsFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
+  refreshRequestsBadge();
+}
+
+function renderRequestsBoard(){
+  requestsFeed.innerHTML = "";
+  var items = STATE.signoffs || [];
+  if(!items.length){
+    requestsFeed.innerHTML = '<div class="maint-col-empty">No requests yet</div>';
+    return;
+  }
+  items.forEach(function(m){ requestsFeed.appendChild(buildRequestCard(m)); });
+}
+
+function decideRequestCard(m, decision, btn){
+  btn.disabled = true;
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/signoff-decision', 'POST', { decision: decision }).then(function(res){
+    var idx = STATE.signoffs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) STATE.signoffs[idx] = res.message;
+    renderRequestsBoard();
+    showToast(decision === "approved" ? "Approved" : "Declined");
+    pollMissed();
+  }).catch(function(){
+    showToast("Couldn't record that decision");
+    btn.disabled = false;
+  });
+}
+
+function buildRequestCard(m){
+  var s = m.signoff;
+  var mine = m.from === STATE.self;
+  var otherDept = mine ? m.to : m.from;
+  var otherName = DEPTS[otherDept] ? DEPTS[otherDept].name : otherDept;
+  var card = document.createElement("div");
+  card.className = "missed-msg-card request-card";
+  var statusHtml;
+  if(s.status === "pending" && !mine){
+    statusHtml = '<div class="missed-approval-actions">' +
+      '<button type="button" class="missed-approval-decline">Decline</button>' +
+      '<button type="button" class="missed-approval-approve">Approve</button>' +
+    '</div>';
+  } else if(s.status === "pending"){
+    statusHtml = '<div class="missed-msg-time">Awaiting sign-off from ' + esc(otherName) + '</div>';
+  } else {
+    var byName = s.decidedBy || "";
+    statusHtml = '<div class="missed-msg-time">' + (s.status === "approved" ? "Approved" : "Declined") + (byName ? " by " + esc(byName) : "") + (s.decidedAt ? " · " + fmtNoteTime(s.decidedAt) : "") + '</div>';
+  }
+  card.innerHTML =
+    '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
+    '<div class="missed-msg-body">' +
+      '<div class="missed-msg-top"><span class="missed-msg-from">' + (mine ? "To " + esc(otherName) : "From " + esc(otherName)) + '</span></div>' +
+      '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
+      statusHtml +
+    '</div>';
+  if(s.status === "pending" && !mine){
+    card.querySelector(".missed-approval-approve").addEventListener("click", function(e){ decideRequestCard(m, "approved", e.target); });
+    card.querySelector(".missed-approval-decline").addEventListener("click", function(e){ decideRequestCard(m, "declined", e.target); });
+  }
+  card.querySelector(".missed-msg-body").addEventListener("click", function(e){
+    if(e.target.closest(".missed-approval-actions")) return;
+    showTab("chat");
+    openThread(otherDept);
+  });
+  return card;
+}
+
+newRequestForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  requestError.textContent = "";
+  var title = newRequestTitle.value.trim();
+  if(!title) return;
+  var to = newRequestTo.value;
+  if(!to){ requestError.textContent = "Choose who to send this to."; return; }
+  var amountRaw = newRequestAmount.value.trim();
+  var payload = {
+    from: STATE.self, to: to, type: "text",
+    text: "Requesting approval: " + title,
+    signoff: { title: title, amount: amountRaw ? Number(amountRaw) : undefined }
+  };
+  var submitBtn = newRequestForm.querySelector(".admin-add-btn");
+  submitBtn.disabled = true;
+  apiSend('/api/messages', 'POST', payload).then(function(res){
+    STATE.signoffs.unshift(res.message);
+    renderRequestsBoard();
+    newRequestTitle.value = "";
+    newRequestAmount.value = "";
+    showToast("Sent to " + (DEPTS[to] ? DEPTS[to].name : to));
+  }).catch(function(err){
+    requestError.textContent = err.message || "Couldn't send that request.";
   }).finally(function(){ submitBtn.disabled = false; });
 });
 
