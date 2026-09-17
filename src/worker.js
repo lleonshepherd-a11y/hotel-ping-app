@@ -278,6 +278,41 @@ const NORMAL_ESCALATION_L2_MINUTES = 50;
 const TICKET_AT_RISK_MINUTES = 15;
 const TICKET_BREACH_MINUTES = 35;
 
+// Hotel Ping's 8 departments are hardcoded (DEPT_IDS/NOIR_DEPT_ID_MAP) rather
+// than read live from the dashboard, since that roster is deeply baked into
+// this Worker and the client (PIN logins, on-duty toggles, station
+// assignment, etc.) - a live/dynamic department list would be a much larger
+// change. This is the lighter-weight middle ground: every cron tick, check
+// the dashboard's own department list against what's hardcoded here and log
+// (not alert - Workers logs are visible via `wrangler tail` or the
+// dashboard) if they've drifted apart, so a future department add/rename on
+// their side doesn't silently go unnoticed here.
+async function checkDashboardDepartmentDrift(env) {
+  if (!env.DASHBOARD_DEPARTMENTS_URL || !env.DASHBOARD_DEPARTMENTS_KEY) return;
+  try {
+    const res = await fetch(env.DASHBOARD_DEPARTMENTS_URL, {
+      headers: { "x-api-key": env.DASHBOARD_DEPARTMENTS_KEY },
+    });
+    if (!res.ok) {
+      console.error("Dashboard department check: request failed with status " + res.status);
+      return;
+    }
+    const data = await res.json();
+    const remoteIds = new Set((data.departments || []).map((d) => d.departmentId));
+    const missingLocally = [...remoteIds].filter((id) => !DEPT_IDS.has(id));
+    const missingRemotely = [...DEPT_IDS].filter((id) => !remoteIds.has(id));
+    if (missingLocally.length || missingRemotely.length) {
+      console.error(
+        "Dashboard department drift detected - dashboard has departments Hotel Ping doesn't know about: [" +
+        missingLocally.join(", ") + "]; Hotel Ping has departments the dashboard doesn't list: [" +
+        missingRemotely.join(", ") + "]"
+      );
+    }
+  } catch (e) {
+    console.error("Dashboard department check error:", e && e.stack || e);
+  }
+}
+
 async function checkEscalations(env) {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -2430,5 +2465,6 @@ export default {
 
   async scheduled(event, env, ctx) {
     ctx.waitUntil(checkEscalations(env));
+    ctx.waitUntil(checkDashboardDepartmentDrift(env));
   },
 };
