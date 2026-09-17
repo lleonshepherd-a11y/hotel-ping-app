@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS messages (
   signoff_status TEXT,
   signoff_decided_by TEXT,
   signoff_decided_at TEXT,
+  signoff_code TEXT,
   poll_question TEXT,
   poll_options TEXT,
   poll_votes TEXT,

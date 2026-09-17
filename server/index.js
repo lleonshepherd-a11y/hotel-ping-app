@@ -150,6 +150,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
     signoff: row.signoff_title ? {
       title: row.signoff_title,
+      code: row.signoff_code || undefined,
       amount: row.signoff_amount != null ? row.signoff_amount : undefined,
       target: row.signoff_target || undefined,
       category: row.signoff_category || undefined,
@@ -249,14 +250,20 @@ function checkEscalations() {
   return escalatedCount;
 }
 
+function nextSignoffCode() {
+  const row = db.prepare("SELECT COUNT(*) AS n FROM messages WHERE signoff_title IS NOT NULL").get();
+  return 'RQ-' + String((row ? row.n : 0) + 1).padStart(4, '0');
+}
+
 function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
+  const signoffCode = opts.signoff ? nextSignoffCode() : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes, affects_guest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -267,6 +274,7 @@ function insertMessage(opts) {
     opts.signoff && opts.signoff.category ? opts.signoff.category : null,
     opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
     opts.signoff ? 'pending' : null,
+    signoffCode,
     opts.poll ? opts.poll.question : null,
     pollOptionsJson,
     opts.poll ? '{}' : null,

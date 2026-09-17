@@ -128,6 +128,9 @@ if (!messageColumns.includes('signoff_decided_by')) {
 if (!messageColumns.includes('signoff_decided_at')) {
   db.exec('ALTER TABLE messages ADD COLUMN signoff_decided_at TEXT');
 }
+if (!messageColumns.includes('signoff_code')) {
+  db.exec('ALTER TABLE messages ADD COLUMN signoff_code TEXT');
+}
 if (!messageColumns.includes('poll_question')) {
   db.exec('ALTER TABLE messages ADD COLUMN poll_question TEXT');
 }

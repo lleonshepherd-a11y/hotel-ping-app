@@ -1460,7 +1460,8 @@ function buildSignoffCard(m){
   card.className = "signoff-card " + s.status;
   var head = document.createElement("div");
   head.className = "signoff-head";
-  head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> HOD SIGN-OFF REQUEST</span>' +
+  head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> HOD SIGN-OFF REQUEST' +
+    (s.code ? ' <span class="signoff-code">'+esc(s.code)+'</span>' : '') + '</span>' +
     (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '');
   card.appendChild(head);
 
@@ -4006,7 +4007,10 @@ function buildMissedApprovalCard(item){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
     '<div class="missed-msg-body">' +
-      '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span></div>' +
+      '<div class="missed-msg-top">' +
+        (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
+        '<span class="missed-msg-from">' + esc(dept.name) + '</span>' +
+      '</div>' +
       '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
       '<div class="missed-approval-actions">' +
         '<button type="button" class="missed-approval-decline">Decline</button>' +
@@ -6081,6 +6085,9 @@ var newRequestForm = document.getElementById("newRequestForm");
 var newRequestTitle = document.getElementById("newRequestTitle");
 var newRequestAmount = document.getElementById("newRequestAmount");
 var newRequestTo = document.getElementById("newRequestTo");
+var newRequestCategory = document.getElementById("newRequestCategory");
+var newRequestTarget = document.getElementById("newRequestTarget");
+var newRequestGuest = document.getElementById("newRequestGuest");
 var requestError = document.getElementById("requestError");
 var tabRequestsBadge = document.getElementById("tabRequestsBadge");
 STATE.signoffs = STATE.signoffs || [];
@@ -6158,11 +6165,19 @@ function buildRequestCard(m){
     var byName = s.decidedBy || "";
     statusHtml = '<div class="missed-msg-time">' + (s.status === "approved" ? "Approved" : "Declined") + (byName ? " by " + esc(byName) : "") + (s.decidedAt ? " · " + fmtNoteTime(s.decidedAt) : "") + '</div>';
   }
+  var metaBits = [];
+  if(s.category) metaBits.push(esc(s.category));
+  if(s.target) metaBits.push(esc(s.target));
+  if(s.guestInfo) metaBits.push(esc(s.guestInfo));
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
     '<div class="missed-msg-body">' +
-      '<div class="missed-msg-top"><span class="missed-msg-from">' + (mine ? "To " + esc(otherName) : "From " + esc(otherName)) + '</span></div>' +
+      '<div class="missed-msg-top">' +
+        (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
+        '<span class="missed-msg-from">' + (mine ? "To " + esc(otherName) : "From " + esc(otherName)) + '</span>' +
+      '</div>' +
       '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
+      (metaBits.length ? '<div class="request-card-meta">' + metaBits.join(' · ') + '</div>' : '') +
       statusHtml +
     '</div>';
   if(s.status === "pending" && !mine){
@@ -6188,16 +6203,23 @@ newRequestForm.addEventListener("submit", function(e){
   var payload = {
     from: STATE.self, to: to, type: "text",
     text: "Requesting approval: " + title,
-    signoff: { title: title, amount: amountRaw ? Number(amountRaw) : undefined }
+    signoff: {
+      title: title,
+      amount: amountRaw ? Number(amountRaw) : undefined,
+      category: newRequestCategory.value || undefined,
+      target: newRequestTarget.value.trim() || undefined,
+      guestInfo: newRequestGuest.value.trim() || undefined,
+    }
   };
   var submitBtn = newRequestForm.querySelector(".admin-add-btn");
   submitBtn.disabled = true;
   apiSend('/api/messages', 'POST', payload).then(function(res){
     STATE.signoffs.unshift(res.message);
     renderRequestsBoard();
-    newRequestTitle.value = "";
-    newRequestAmount.value = "";
-    showToast("Sent to " + (DEPTS[to] ? DEPTS[to].name : to));
+    newRequestForm.reset();
+    populateRequestToOptions();
+    var code = res.message.signoff && res.message.signoff.code;
+    showToast((code ? code + " sent to " : "Sent to ") + (DEPTS[to] ? DEPTS[to].name : to));
   }).catch(function(err){
     requestError.textContent = err.message || "Couldn't send that request.";
   }).finally(function(){ submitBtn.disabled = false; });

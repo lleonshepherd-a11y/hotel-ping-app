@@ -315,14 +315,20 @@ async function checkEscalations(env) {
   return escalatedCount;
 }
 
+async function nextSignoffCode(env) {
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM messages WHERE signoff_title IS NOT NULL").first();
+  return "RQ-" + String((row ? row.n : 0) + 1).padStart(4, "0");
+}
+
 async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
+  const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, poll_question, poll_options, poll_votes, affects_guest)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -333,6 +339,7 @@ async function insertMessage(env, ctx, opts) {
     opts.signoff && opts.signoff.category ? opts.signoff.category : null,
     opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
     opts.signoff ? "pending" : null,
+    signoffCode,
     opts.poll ? opts.poll.question : null,
     pollOptionsJson,
     opts.poll ? "{}" : null,
@@ -520,12 +527,48 @@ function rowToGroup(row, members) {
     location: row.location || undefined,
   };
 }
+// Groups live in the dashboard's noir-house-db now. Its groups table has no
+// shared_at column (a feature Hotel Ping added later), so that stays in a
+// small local companion table keyed by the group's (dashboard) id; created_by
+// is a staff FK there rather than a department, so the creating department
+// is resolved via a join to staff, same pattern as maintenance tickets.
+async function groupMetaMap(env, groupIds) {
+  const ids = [...new Set(groupIds)];
+  if (!ids.length) return {};
+  const rows = await env.DB.prepare(
+    `SELECT * FROM group_meta WHERE group_id IN (${ids.map(() => "?").join(",")})`
+  ).bind(...ids).all();
+  const byGroup = {};
+  rows.results.forEach((m) => { byGroup[m.group_id] = m; });
+  return byGroup;
+}
+function mergeGroupRow(core, meta) {
+  return {
+    id: core.id,
+    name: core.name,
+    created_by: fromNoirDept(core.creator_dept),
+    created_at: core.created_at,
+    archived_at: core.archived_at,
+    shared_at: meta ? meta.shared_at : null,
+    description: core.description,
+    event_date: core.event_date,
+    guest_count: core.guest_count,
+    location: core.location,
+  };
+}
 function rowToStation(row) {
   return {
     id: row.id, groupId: row.group_id, title: row.title, category: row.category || undefined,
     description: row.description || undefined, icon: row.icon || undefined,
     assignedDeptId: row.assigned_dept_id || undefined, confirmedAt: row.confirmed_at || undefined,
     position: row.position,
+  };
+}
+function noirStationRow(r) {
+  return {
+    id: r.id, group_id: r.group_id, title: r.title, category: r.category, description: r.description, icon: r.icon,
+    assigned_dept_id: r.assigned_department_id ? fromNoirDept(r.assigned_department_id) : null,
+    confirmed_at: r.confirmed_at, position: r.position,
   };
 }
 function rowToRunsheetItem(row) {
@@ -571,6 +614,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
     signoff: row.signoff_title ? {
       title: row.signoff_title,
+      code: row.signoff_code || undefined,
       amount: row.signoff_amount != null ? row.signoff_amount : undefined,
       target: row.signoff_target || undefined,
       category: row.signoff_category || undefined,

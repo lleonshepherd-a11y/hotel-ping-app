@@ -396,15 +396,45 @@
           <div class="sb-sub">Ask a manager to approve something, like a repair or a spend</div>
         </div>
       </div>
-      <form class="maint-new-form" id="newRequestForm">
-        <input type="text" id="newRequestTitle" placeholder="What needs approving? e.g. Replace broken ice machine" required maxlength="120">
-        <div class="request-form-row">
-          <input type="number" id="newRequestAmount" placeholder="Amount £ (optional)" min="0" step="0.01">
-          <select id="newRequestTo"></select>
+      <form class="request-full-form" id="newRequestForm">
+        <div class="request-form-section">
+          <label class="request-form-label" for="newRequestTitle">What needs approving?</label>
+          <input type="text" id="newRequestTitle" placeholder="e.g. Replace broken ice machine" required maxlength="120">
         </div>
-        <button type="submit" class="admin-add-btn">Send request</button>
+        <div class="request-form-grid">
+          <div class="request-form-section">
+            <label class="request-form-label" for="newRequestTo">Send to</label>
+            <select id="newRequestTo"></select>
+          </div>
+          <div class="request-form-section">
+            <label class="request-form-label" for="newRequestAmount">Amount</label>
+            <input type="number" id="newRequestAmount" placeholder="£ (optional)" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="request-form-grid">
+          <div class="request-form-section">
+            <label class="request-form-label" for="newRequestCategory">Category</label>
+            <select id="newRequestCategory">
+              <option value="">Optional</option>
+              <option>Guest Service Recovery &amp; Comp</option>
+              <option>Maintenance &amp; Engineering</option>
+              <option>Security &amp; Safety</option>
+              <option>Facilities &amp; Events</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="request-form-section">
+            <label class="request-form-label" for="newRequestTarget">Room / area</label>
+            <input type="text" id="newRequestTarget" placeholder="Optional" maxlength="120">
+          </div>
+        </div>
+        <div class="request-form-section">
+          <label class="request-form-label" for="newRequestGuest">Guest name &amp; VIP level</label>
+          <input type="text" id="newRequestGuest" placeholder="Optional" maxlength="120">
+        </div>
+        <button type="submit" class="admin-add-btn request-form-submit">Send request</button>
+        <div class="admin-add-error" id="requestError"></div>
       </form>
-      <div class="admin-add-error" id="requestError"></div>
       <div class="maint-feed" id="requestsFeed"></div>
     </div>
 
