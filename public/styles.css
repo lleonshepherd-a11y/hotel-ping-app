@@ -13,9 +13,9 @@
   src:url(/fonts/inter-variable.woff2) format('woff2');
 }
 :root{
-  --bg:#f6f6f4;
-  --surface:#ffffff;
-  --surface-2:#f6f6f3;
+  --bg:#f2f2f0;
+  --surface:#f9f9f7;
+  --surface-2:#f4f4f1;
   --surface-3:#ececea;
   --border:#e2e2dd;
   --text:#18181a;
@@ -28,7 +28,7 @@
   --urgent-tint:rgba(193,104,95,.12);
   --bubble-in:#f0f0ec;
   --bubble-in-text:#18181a;
-  --sidebar-bg:#ffffff;
+  --sidebar-bg:#f9f9f7;
   --active-tint:rgba(20,20,22,.08);
   --active-tint-strong:rgba(20,20,22,.16);
   --shadow-soft:0 1px 2px rgba(20,20,15,.06), 0 8px 22px rgba(20,20,15,.05);
@@ -41,7 +41,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
 body{
-  background:radial-gradient(ellipse 1100px 700px at 22% -8%, #ffffff 0%, var(--bg) 55%);
+  background:radial-gradient(ellipse 1100px 700px at 22% -8%, #f9f9f7 0%, var(--bg) 55%);
   color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",Roboto,"Manrope",sans-serif;
   position:fixed;
@@ -88,14 +88,14 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;
   z-index:1;
 }
-.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 .sb-page::-webkit-scrollbar{display:none}
 .bottom-tabs{
-  position:absolute;left:8px;right:8px;bottom:0;z-index:5;
+  position:absolute;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:5;
   display:flex;justify-content:space-around;touch-action:none;
-  margin:0;padding:5px 3px calc(4px + env(safe-area-inset-bottom));
-  background:#ffffff;border-radius:0;
-  box-shadow:0 -8px 20px -12px rgba(20,20,15,.3), 0 0 0 1.5px rgba(20,20,15,.45);
+  margin:0;padding:6px 3px;
+  background:#f9f9f7;border-radius:22px;
+  box-shadow:0 12px 26px -10px rgba(20,20,15,.32), 0 4px 10px -2px rgba(20,20,15,.14), 0 0 0 1.5px rgba(20,20,15,.45);
 }
 .bottom-tab{
   flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
@@ -173,7 +173,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-search button svg{width:13px;height:13px}
 .sb-empty{padding:24px 20px;text-align:center;font-size:12.5px;color:var(--text-faint);line-height:1.5}
 .chat-filter-row{display:flex;gap:6px;padding:12px 16px 0}
-.chat-filter-chip{display:flex;align-items:center;gap:5px;border:1.5px solid #4d84f5;background:#ffffff;color:#3a63b8;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700}
+.chat-filter-chip{display:flex;align-items:center;gap:5px;border:1.5px solid #4d84f5;background:#f9f9f7;color:#3a63b8;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700}
 .chat-filter-chip svg{width:13px;height:13px;flex:none}
 .chat-filter-dot{width:8px;height:8px;border-radius:50%;background:var(--urgent);flex:none}
 .chat-filter-count{font-variant-numeric:tabular-nums;opacity:.85}
@@ -458,7 +458,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .photo-crop-zoom-row{display:flex;align-items:center;gap:10px;padding:16px 24px calc(20px + env(safe-area-inset-bottom));flex-shrink:0}
 .photo-crop-zoom-row svg{width:16px;height:16px;color:rgba(255,255,255,.6);flex:none}
 .photo-crop-zoom-row input[type=range]{flex:1;accent-color:var(--accent)}
-.sb-profile-card{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:12px 14px;background:#ffffff;border-radius:16px;border:none;width:calc(100% - 40px);text-align:left;box-shadow:0 8px 20px -10px rgba(20,20,15,.3), 0 2px 6px -1px rgba(20,20,15,.12), 0 0 0 1px var(--border)}
+.sb-profile-card{display:flex;align-items:center;gap:12px;margin:14px 20px 0;padding:12px 14px;background:#f9f9f7;border-radius:16px;border:none;width:calc(100% - 40px);text-align:left;box-shadow:0 8px 20px -10px rgba(20,20,15,.3), 0 2px 6px -1px rgba(20,20,15,.12), 0 0 0 1px var(--border)}
 .sb-profile-avatar{width:48px;height:48px;border-radius:50%;flex:none;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 .sb-profile-avatar svg{width:20px;height:20px}
 .sb-profile-info{flex:1;min-width:0}
@@ -685,7 +685,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* ---------- Admin panel ---------- */
 .sb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 20px 18px}
 
-.sb-menu-list{margin:14px 20px 4px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 20px -10px rgba(20,20,15,.3), 0 2px 6px -1px rgba(20,20,15,.12), 0 0 0 1px var(--border);flex-shrink:0}
+.sb-menu-list{margin:14px 20px 4px;background:#f9f9f7;border-radius:16px;overflow:hidden;box-shadow:0 8px 20px -10px rgba(20,20,15,.3), 0 2px 6px -1px rgba(20,20,15,.12), 0 0 0 1px var(--border);flex-shrink:0}
 .sb-menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border)}
 .sb-menu-row:last-child{border-bottom:none}
 .sb-menu-row:hover{background:var(--surface-3)}
@@ -792,7 +792,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}
-.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 .events-page-scroll::-webkit-scrollbar{display:none}
 .events-hint{padding:0 20px;margin:0 0 14px}
 .event-palette{display:flex;gap:14px;overflow-x:auto;padding:4px 20px 16px;scrollbar-width:none}
