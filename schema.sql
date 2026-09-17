@@ -82,9 +82,12 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   endpoint TEXT NOT NULL UNIQUE,
   p256dh TEXT NOT NULL,
   auth TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  department_id TEXT,
+  is_admin INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_push_staff ON push_subscriptions(staff_id);
+CREATE INDEX IF NOT EXISTS idx_push_dept ON push_subscriptions(department_id);
 
 CREATE TABLE IF NOT EXISTS typing_status (
   from_dept TEXT NOT NULL,

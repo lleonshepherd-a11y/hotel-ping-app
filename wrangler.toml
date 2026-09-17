@@ -12,6 +12,11 @@ binding = "DB"
 database_name = "hotel-ping-db"
 database_id = "018a4539-a04b-4ada-841d-1962bcde934d"
 
+[[d1_databases]]
+binding = "NOIR_DB"
+database_name = "noir-house-db"
+database_id = "e20a018c-4228-4343-856f-9c80bf3cc8dd"
+
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "hotel-ping-uploads"

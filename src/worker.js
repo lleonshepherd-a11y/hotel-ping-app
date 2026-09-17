@@ -1,3 +1,39 @@
+// Auth now lives in the shared dashboard database (noir-house-db, binding
+// NOIR_DB) rather than this Worker's own D1 - see the NOIR_DB migration.
+// Every other table below still reads/writes the original DB binding until
+// its own phase of the migration happens; only login/session/profile-PIN
+// have moved so far.
+const NOIR_HOTEL_ID = "5ca39253-5d0d-4526-a1e9-ed9a39e91707";
+const NOIR_DEPT_ID_MAP = {
+  gm: "53b8a53e-cc3e-4732-8e9a-417c91e1e9b8",
+  foh: "04dccc8b-3da8-448f-9be1-8fa68935da92",
+  concierge: "32cd4290-036e-4b11-8f8d-ab94dce3427e",
+  restaurant: "5dd88a56-62af-4aec-9a9b-337ee7da4ffe",
+  kitchen: "dde80a18-f50a-4d6e-9cfe-c122f429425e",
+  bar: "28c6a2ea-1db8-4a37-b9cf-6a911dd30c91",
+  housekeeping: "591efca2-1058-4f27-9602-03731bcd5811",
+  maintenance: "de37b6a6-ad48-422d-9c5b-950411e40f07",
+};
+const NOIR_DEPT_ID_REVERSE = Object.fromEntries(Object.entries(NOIR_DEPT_ID_MAP).map(([k, v]) => [v, k]));
+const NOIR_SESSION_MINUTES = 60 * 24 * 30;
+
+// Builds the shape the rest of this Worker expects a "staff" object to have,
+// from a row out of the dashboard's own staff table. status_line/phone have
+// no home in that table, so they're always absent here rather than silently
+// pointed at the wrong record.
+function noirIdentity(staffRow) {
+  return {
+    id: staffRow.id,
+    name: staffRow.display_name,
+    department_id: NOIR_DEPT_ID_REVERSE[staffRow.department_id] || staffRow.department_id,
+    is_admin: (staffRow.role === "general_manager" || staffRow.role === "admin") ? 1 : 0,
+    created_at: new Date().toISOString(),
+    profile_complete: 1,
+    status_line: null,
+    phone: null,
+  };
+}
+
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
 const DEPT_NAMES = {
   gm: "General Manager", foh: "Head Receptionist", concierge: "Head Concierge", restaurant: "Restaurant Manager",
@@ -45,6 +81,11 @@ function randomSaltHex() {
 }
 function newToken() {
   return crypto.randomUUID() + crypto.randomUUID();
+}
+async function sha256Hex(text) {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(text));
+  return bytesToHex(new Uint8Array(digest));
 }
 
 /* ---------------- base64url helpers ---------------- */
@@ -167,35 +208,29 @@ async function notifyDepartment(env, deptId, payloadObj, fromDeptId) {
     ).bind(deptId, fromDeptId).first();
     if (muted) return;
   }
-  const staffRows = await env.DB.prepare("SELECT id FROM staff WHERE department_id = ?").bind(deptId).all();
-  for (const s of staffRows.results) {
-    const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(s.id).all();
-    for (const sub of subs.results) {
-      try {
-        const res = await sendWebPush(env, sub, payloadObj);
-        if (res.status === 404 || res.status === 410) {
-          await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
-        }
-      } catch (e) {
-        // best-effort - don't fail the message send if a push fails
+  const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE department_id = ?").bind(deptId).all();
+  for (const sub of subs.results) {
+    try {
+      const res = await sendWebPush(env, sub, payloadObj);
+      if (res.status === 404 || res.status === 410) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
       }
+    } catch (e) {
+      // best-effort - don't fail the message send if a push fails
     }
   }
 }
 
 async function notifyAdmins(env, payloadObj) {
-  const staffRows = await env.DB.prepare("SELECT id FROM staff WHERE is_admin = 1").all();
-  for (const s of staffRows.results) {
-    const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(s.id).all();
-    for (const sub of subs.results) {
-      try {
-        const res = await sendWebPush(env, sub, payloadObj);
-        if (res.status === 404 || res.status === 410) {
-          await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
-        }
-      } catch (e) {
-        // best-effort
+  const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE is_admin = 1").all();
+  for (const sub of subs.results) {
+    try {
+      const res = await sendWebPush(env, sub, payloadObj);
+      if (res.status === 404 || res.status === 410) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
       }
+    } catch (e) {
+      // best-effort - don't fail the message send if a push fails
     }
   }
 }
@@ -487,10 +522,18 @@ async function staffFromToken(env, request) {
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
   if (!token) return null;
-  const session = await env.DB.prepare("SELECT * FROM sessions WHERE token = ?").bind(token).first();
-  if (!session) return null;
-  const staff = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(session.staff_id).first();
-  return staff || null;
+  const tokenHash = await sha256Hex(token);
+  const row = await env.NOIR_DB.prepare(
+    `SELECT ss.id AS session_id, s.id AS staff_id, s.display_name, s.role, s.department_id, s.active
+     FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
+     WHERE ss.token_hash = ? AND ss.ended_at IS NULL AND ss.expires_at > ? AND s.active = 1`
+  ).bind(tokenHash, new Date().toISOString()).first();
+  if (!row) return null;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + NOIR_SESSION_MINUTES * 60000).toISOString();
+  await env.NOIR_DB.prepare("UPDATE staff_sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?")
+    .bind(now.toISOString(), expiresAt, row.session_id).run();
+  return noirIdentity({ id: row.staff_id, display_name: row.display_name, role: row.role, department_id: row.department_id });
 }
 
 // Admins can VIEW another department's conversations ("Viewing as"), but nobody -
@@ -498,23 +541,6 @@ async function staffFromToken(env, request) {
 // this explicitly allows it. Never trust a "self"/"from" field on its own.
 function canViewAsSelf(requester, self) {
   return self === requester.department_id || !!requester.is_admin;
-}
-
-async function ensureSeeded(env) {
-  const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM staff").first();
-  if (count && count.n > 0) return;
-  const salt = randomSaltHex();
-  // Never seed a hardcoded/guessable PIN - anyone who has read this source file would
-  // know it. Generate a random one and log it so whoever triggered this bootstrap
-  // (staff table was completely empty) can retrieve it from the Worker logs.
-  const pinBytes = new Uint32Array(1);
-  crypto.getRandomValues(pinBytes);
-  const pin = String(100000 + (pinBytes[0] % 900000));
-  const hash = await hashPin(pin, salt);
-  await env.DB.prepare(
-    `INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, created_at) VALUES (?, 'Dave', 'gm', ?, ?, 1, ?)`
-  ).bind(crypto.randomUUID(), hash, salt, new Date().toISOString()).run();
-  console.log("First-run admin account seeded: name 'Dave', PIN " + pin + " - sign in and change this PIN immediately.");
 }
 
 export default {
@@ -540,8 +566,6 @@ export default {
       if (!p.startsWith("/api/")) {
         return env.ASSETS.fetch(request);
       }
-
-      await ensureSeeded(env);
 
       // ---- External integration (own API-key auth, not a staff session) ----
       if (method === "POST" && p === "/api/external/notify") {
@@ -620,35 +644,47 @@ export default {
         const pin = String(body.pin || "");
         if (!name || !pin) return json({ error: "Name and PIN are required" }, 400);
 
-        const LOCKOUT_WINDOW_MS = 5 * 60 * 1000;
-        const attemptKey = name.toLowerCase();
-        const attempt = await env.DB.prepare("SELECT * FROM login_attempts WHERE key = ?").bind(attemptKey).first();
-        const windowExpired = attempt && (Date.now() - Date.parse(attempt.first_at) >= LOCKOUT_WINDOW_MS);
-        if (attempt && !windowExpired && attempt.count >= 5) {
+        const identifier = "hotelping:" + name.toLowerCase();
+        const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        await env.NOIR_DB.prepare("DELETE FROM login_failures WHERE created_at <= ?").bind(since).run();
+        const failCount = await env.NOIR_DB.prepare("SELECT COUNT(*) AS n FROM login_failures WHERE identifier = ? AND created_at > ?").bind(identifier, since).first();
+        if (failCount && failCount.n >= 8) {
           return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
         }
 
-        const staff = await env.DB.prepare("SELECT * FROM staff WHERE LOWER(name) = LOWER(?)").bind(name).first();
-        const ok = staff && (await hashPin(pin, staff.pin_salt)) === staff.pin_hash;
-        if (!ok) {
-          if (attempt && !windowExpired) {
-            await env.DB.prepare("UPDATE login_attempts SET count = ? WHERE key = ?").bind(attempt.count + 1, attemptKey).run();
-          } else {
-            await env.DB.prepare("INSERT OR REPLACE INTO login_attempts (key, count, first_at) VALUES (?, 1, ?)").bind(attemptKey, new Date().toISOString()).run();
-          }
+        const candidates = await env.NOIR_DB.prepare(
+          "SELECT id, display_name, role, department_id, pin_hash, pin_salt FROM staff WHERE hotel_id = ? AND active = 1"
+        ).bind(NOIR_HOTEL_ID).all();
+
+        let matched = null;
+        for (const candidate of candidates.results) {
+          if ((await hashPin(pin, candidate.pin_salt)) === candidate.pin_hash) { matched = candidate; break; }
+        }
+        if (!matched) {
+          await env.NOIR_DB.prepare("INSERT INTO login_failures (id, identifier, created_at) VALUES (?, ?, ?)").bind(crypto.randomUUID(), identifier, new Date().toISOString()).run();
           return json({ error: "Incorrect name or PIN" }, 401);
         }
-        await env.DB.prepare("DELETE FROM login_attempts WHERE key = ?").bind(attemptKey).run();
 
         const token = newToken();
-        await env.DB.prepare("INSERT INTO sessions (token, staff_id, created_at) VALUES (?, ?, ?)").bind(token, staff.id, new Date().toISOString()).run();
-        return json({ token, staff: rowToStaff(staff) });
+        const tokenHash = await sha256Hex(token);
+        const sessionId = crypto.randomUUID();
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + NOIR_SESSION_MINUTES * 60000).toISOString();
+        await env.NOIR_DB.prepare(
+          `INSERT INTO staff_sessions (id, staff_id, department_id, token_hash, expires_at, last_seen_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(sessionId, matched.id, matched.department_id, tokenHash, expiresAt, now.toISOString(), now.toISOString()).run();
+
+        return json({ token, staff: rowToStaff(noirIdentity(matched)) });
       }
 
       if (method === "POST" && p === "/api/auth/logout") {
         const auth = request.headers.get("authorization") || "";
         const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-        if (token) await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
+        if (token) {
+          const tokenHash = await sha256Hex(token);
+          await env.NOIR_DB.prepare("UPDATE staff_sessions SET ended_at = ? WHERE token_hash = ? AND ended_at IS NULL").bind(new Date().toISOString(), tokenHash).run();
+        }
         return json({ ok: true });
       }
 
@@ -669,12 +705,12 @@ export default {
         }
         const existing = await env.DB.prepare("SELECT id FROM push_subscriptions WHERE endpoint = ?").bind(sub.endpoint).first();
         if (existing) {
-          await env.DB.prepare("UPDATE push_subscriptions SET staff_id = ?, p256dh = ?, auth = ? WHERE id = ?")
-            .bind(request._staff.id, sub.keys.p256dh, sub.keys.auth, existing.id).run();
+          await env.DB.prepare("UPDATE push_subscriptions SET staff_id = ?, p256dh = ?, auth = ?, department_id = ?, is_admin = ? WHERE id = ?")
+            .bind(request._staff.id, sub.keys.p256dh, sub.keys.auth, request._staff.department_id, request._staff.is_admin ? 1 : 0, existing.id).run();
         } else {
           await env.DB.prepare(
-            "INSERT INTO push_subscriptions (id, staff_id, endpoint, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-          ).bind(crypto.randomUUID(), request._staff.id, sub.endpoint, sub.keys.p256dh, sub.keys.auth, new Date().toISOString()).run();
+            "INSERT INTO push_subscriptions (id, staff_id, endpoint, p256dh, auth, created_at, department_id, is_admin) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+          ).bind(crypto.randomUUID(), request._staff.id, sub.endpoint, sub.keys.p256dh, sub.keys.auth, new Date().toISOString(), request._staff.department_id, request._staff.is_admin ? 1 : 0).run();
         }
         return json({ ok: true });
       }
@@ -687,93 +723,43 @@ export default {
         return json({ ok: true });
       }
 
-      // ---- Staff directory: any signed-in user can read names/departments ----
-      if (method === "GET" && p === "/api/staff") {
-        const rows = await env.DB.prepare("SELECT * FROM staff ORDER BY name").all();
-        return json({ staff: rows.results.map(rowToStaff) });
-      }
-
       // ---- Self-service profile setup: any signed-in user can edit their own name/PIN ----
+      // Staff records now live in the dashboard's database. status_line/phone
+      // have no column there, so those two fields are accepted (to avoid
+      // breaking older clients that still send them) but not persisted.
       if (method === "PATCH" && p === "/api/profile") {
         const id = request._staff.id;
         const body = await readJsonBody(request);
         if (typeof body.name === "string" && body.name.trim()) {
-          await env.DB.prepare("UPDATE staff SET name = ? WHERE id = ?").bind(body.name.trim(), id).run();
-        }
-        if (typeof body.statusLine === "string") {
-          const statusLine = body.statusLine.trim().slice(0, 60);
-          await env.DB.prepare("UPDATE staff SET status_line = ? WHERE id = ?").bind(statusLine || null, id).run();
-        }
-        if (typeof body.phone === "string") {
-          const phone = body.phone.trim().slice(0, 30);
-          await env.DB.prepare("UPDATE staff SET phone = ? WHERE id = ?").bind(phone || null, id).run();
+          await env.NOIR_DB.prepare("UPDATE staff SET display_name = ? WHERE id = ?").bind(body.name.trim(), id).run();
         }
         if (typeof body.pin === "string" && body.pin) {
           if (!PIN_RE.test(body.pin)) return json({ error: "PIN must be 4-6 digits" }, 400);
           const currentPin = typeof body.currentPin === "string" ? body.currentPin : "";
-          const existing = await env.DB.prepare("SELECT pin_hash, pin_salt FROM staff WHERE id = ?").bind(id).first();
+          const existing = await env.NOIR_DB.prepare("SELECT pin_hash, pin_salt FROM staff WHERE id = ?").bind(id).first();
           if (!existing || (await hashPin(currentPin, existing.pin_salt)) !== existing.pin_hash) {
             return json({ error: "Current PIN is incorrect" }, 400);
           }
           const salt = randomSaltHex();
-          await env.DB.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(await hashPin(body.pin, salt), salt, id).run();
+          await env.NOIR_DB.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(await hashPin(body.pin, salt), salt, id).run();
         }
-        await env.DB.prepare("UPDATE staff SET profile_complete = 1 WHERE id = ?").bind(id).run();
-        const row = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(id).first();
-        return json({ staff: rowToStaff(row) });
+        const row = await env.NOIR_DB.prepare("SELECT id, display_name, role, department_id FROM staff WHERE id = ?").bind(id).first();
+        return json({ staff: rowToStaff(noirIdentity(row)) });
       }
 
-      // ---- Staff management (admin only beyond this point) ----
+      // ---- Staff directory: any signed-in user can read names/departments ----
+      if (method === "GET" && p === "/api/staff") {
+        const rows = await env.NOIR_DB.prepare(
+          "SELECT id, display_name, role, department_id FROM staff WHERE hotel_id = ? AND active = 1 ORDER BY display_name"
+        ).bind(NOIR_HOTEL_ID).all();
+        return json({ staff: rows.results.map((r) => rowToStaff(noirIdentity(r))) });
+      }
+
+      // ---- Staff management now happens on the dashboard side (owner-provisioned) ----
       if (p === "/api/staff" || p.startsWith("/api/staff/")) {
-        const requester = request._staff;
-        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
-
-        if (method === "POST" && p === "/api/staff") {
-          const body = await readJsonBody(request);
-          const name = String(body.name || "").trim();
-          const pin = String(body.pin || "");
-          const departmentId = body.departmentId;
-          if (!name || !PIN_RE.test(pin)) return json({ error: "Name and a 4-6 digit PIN are required" }, 400);
-          if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
-          const salt = randomSaltHex();
-          const id = crypto.randomUUID();
-          await env.DB.prepare(
-            `INSERT INTO staff (id, name, department_id, pin_hash, pin_salt, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-          ).bind(id, name, departmentId, await hashPin(pin, salt), salt, body.isAdmin ? 1 : 0, new Date().toISOString()).run();
-          const row = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(id).first();
-          return json({ staff: rowToStaff(row) }, 201);
-        }
-
-        if (method === "PATCH" && p.startsWith("/api/staff/")) {
-          const id = decodeURIComponent(p.slice("/api/staff/".length));
-          const existing = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(id).first();
-          if (!existing) return json({ error: "Staff not found" }, 404);
-          const body = await readJsonBody(request);
-          if (typeof body.name === "string" && body.name.trim()) {
-            await env.DB.prepare("UPDATE staff SET name = ? WHERE id = ?").bind(body.name.trim(), id).run();
-          }
-          if (body.departmentId) {
-            if (!DEPT_IDS.has(body.departmentId)) return json({ error: "Unknown department" }, 400);
-            await env.DB.prepare("UPDATE staff SET department_id = ? WHERE id = ?").bind(body.departmentId, id).run();
-          }
-          if (typeof body.isAdmin === "boolean") {
-            await env.DB.prepare("UPDATE staff SET is_admin = ? WHERE id = ?").bind(body.isAdmin ? 1 : 0, id).run();
-          }
-          if (typeof body.pin === "string" && body.pin) {
-            if (!PIN_RE.test(body.pin)) return json({ error: "PIN must be 4-6 digits" }, 400);
-            const salt = randomSaltHex();
-            await env.DB.prepare("UPDATE staff SET pin_hash = ?, pin_salt = ? WHERE id = ?").bind(await hashPin(body.pin, salt), salt, id).run();
-          }
-          const row = await env.DB.prepare("SELECT * FROM staff WHERE id = ?").bind(id).first();
-          return json({ staff: rowToStaff(row) });
-        }
-
-        if (method === "DELETE" && p.startsWith("/api/staff/")) {
-          const id = decodeURIComponent(p.slice("/api/staff/".length));
-          if (id === requester.id) return json({ error: "You can't delete your own account" }, 400);
-          await env.DB.prepare("DELETE FROM sessions WHERE staff_id = ?").bind(id).run();
-          await env.DB.prepare("DELETE FROM staff WHERE id = ?").bind(id).run();
-          return json({ ok: true });
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        if (method === "POST" || method === "PATCH" || method === "DELETE") {
+          return json({ error: "Staff accounts are now managed from the dashboard, not from Hotel Ping" }, 410);
         }
       }
 
@@ -2029,7 +2015,8 @@ export default {
         const body = await readJsonBody(request);
         const staffId = body.staffId || null;
         if (staffId) {
-          const staffRow = await env.DB.prepare("SELECT id FROM staff WHERE id = ? AND department_id = 'maintenance'").bind(staffId).first();
+          const staffRow = await env.NOIR_DB.prepare("SELECT id FROM staff WHERE id = ? AND department_id = ? AND active = 1")
+            .bind(staffId, NOIR_DEPT_ID_MAP.maintenance).first();
           if (!staffRow) return json({ error: "Not a Maintenance staff member" }, 400);
         }
         await env.DB.prepare("UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?").bind(staffId, id).run();
