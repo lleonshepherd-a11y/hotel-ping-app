@@ -1789,7 +1789,11 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     wrap.appendChild(capBubble);
   }
 
-  if(m.signoff) wrap.appendChild(buildSignoffCard(m));
+  if(m.signoff){
+    var signoffCard = buildSignoffCard(m);
+    if(!m.deleted && !m.pending) attachLongPress(signoffCard, function(x, y){ showMessageActionMenu(m, x, y); });
+    wrap.appendChild(signoffCard);
+  }
   if(m.poll) wrap.appendChild(buildPollCard(m));
 
   var canInlineMeta = m.type === "text" && !hideTextBubble;
@@ -4008,11 +4012,12 @@ function buildMissedApprovalCard(item){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
     '<div class="missed-msg-body">' +
+      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '') +
       '<div class="missed-msg-top">' +
         (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
         '<span class="missed-msg-from">' + esc(dept.name) + '</span>' +
       '</div>' +
-      '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
+      '<div class="missed-msg-preview">' + esc(s.title) + '</div>' +
       '<div class="missed-approval-actions">' +
         '<button type="button" class="missed-approval-decline">Decline</button>' +
         '<button type="button" class="missed-approval-approve">Approve</button>' +
@@ -6125,12 +6130,24 @@ function openRequestsTab(){
 
 function renderRequestsBoard(){
   requestsFeed.innerHTML = "";
-  var items = STATE.signoffs || [];
+  var items = (STATE.signoffs || []).slice().sort(function(a, b){
+    if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    return 0;
+  });
   if(!items.length){
     requestsFeed.innerHTML = '<div class="maint-col-empty">No requests yet</div>';
     return;
   }
   items.forEach(function(m){ requestsFeed.appendChild(buildRequestCard(m)); });
+}
+
+function toggleRequestPin(m){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/pin', 'POST', {}).then(function(res){
+    var idx = STATE.signoffs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) STATE.signoffs[idx] = res.message;
+    renderRequestsBoard();
+    showToast(res.message.pinned ? "Pinned to top" : "Unpinned");
+  }).catch(function(){ showToast("Couldn't update pin"); });
 }
 
 function decideRequestCard(m, decision, btn){
@@ -6153,7 +6170,7 @@ function buildRequestCard(m){
   var otherDept = mine ? m.to : m.from;
   var otherName = DEPTS[otherDept] ? DEPTS[otherDept].name : otherDept;
   var card = document.createElement("div");
-  card.className = "missed-msg-card request-card";
+  card.className = "missed-msg-card request-card" + (m.pinned ? " pinned" : "");
   var statusHtml;
   if(s.status === "pending" && !mine){
     statusHtml = '<div class="missed-approval-actions">' +
@@ -6173,11 +6190,12 @@ function buildRequestCard(m){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
     '<div class="missed-msg-body">' +
+      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '') +
       '<div class="missed-msg-top">' +
         (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
         '<span class="missed-msg-from">' + (mine ? "To " + esc(otherName) : "From " + esc(otherName)) + '</span>' +
       '</div>' +
-      '<div class="missed-msg-preview">' + esc(s.title) + (s.amount != null ? ' · ' + esc(fmtSignoffAmount(s.amount)) : '') + '</div>' +
+      '<div class="missed-msg-preview">' + esc(s.title) + '</div>' +
       (metaBits.length ? '<div class="request-card-meta">' + metaBits.join(' · ') + '</div>' : '') +
       statusHtml +
     '</div>';
@@ -6190,6 +6208,14 @@ function buildRequestCard(m){
     showTab("chat");
     openThread(otherDept);
   });
+  var pinBtn = document.createElement("button");
+  pinBtn.type = "button";
+  pinBtn.className = "request-pin-btn" + (m.pinned ? " pinned" : "");
+  pinBtn.setAttribute("aria-label", m.pinned ? "Unpin request" : "Pin request to top");
+  pinBtn.title = m.pinned ? "Unpin" : "Pin to top";
+  pinBtn.innerHTML = PIN_SVG;
+  pinBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleRequestPin(m); });
+  card.appendChild(pinBtn);
   return card;
 }
 
