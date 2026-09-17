@@ -202,7 +202,12 @@ function loadStaffMeta(){
 }
 
 function buildData(self){
-  var others = DEPT_ORDER.filter(function(id){ return id !== self; });
+  // "dashboard" isn't a real staff department (no PIN login, on-duty toggle,
+  // etc.), so it deliberately stays out of DEPT_ORDER - which drives a lot of
+  // unrelated pickers (station assignment, blocker "waiting on", and so on)
+  // where it wouldn't make sense to offer. It's added here only, so it shows
+  // up as an ordinary conversation in the main chat list.
+  var others = DEPT_ORDER.filter(function(id){ return id !== self; }).concat(["dashboard"]);
   return Promise.all(others.map(function(id){
     return apiGet('/api/messages?self=' + encodeURIComponent(self) + '&with=' + encodeURIComponent(id))
       .then(function(res){ return { id: id, messages: res.messages.map(function(row){ return mapServerMessage(row, self); }) }; });

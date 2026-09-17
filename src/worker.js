@@ -248,6 +248,29 @@ async function notifyAdmins(env, payloadObj) {
   }
 }
 
+// The reverse of /api/external/notify: when a Hotel Ping department sends a
+// message "to the dashboard", relay it there so it actually reaches whoever
+// monitors the dashboard - Hotel Ping's own push/on-duty system has no
+// concept of "dashboard" as a real staff department. Best-effort and a
+// silent no-op until the dashboard side gives us its receiving endpoint and
+// key (mirroring how they configured EXTERNAL_API_KEY for the notify-in
+// direction), so sending "to Dashboard" always succeeds locally even before
+// that's wired up on their end.
+async function notifyDashboard(env, ctx, opts) {
+  if (!env.DASHBOARD_NOTIFY_URL || !env.DASHBOARD_NOTIFY_KEY) return;
+  const promise = fetch(env.DASHBOARD_NOTIFY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": env.DASHBOARD_NOTIFY_KEY },
+    body: JSON.stringify({
+      idempotencyKey: opts.messageId,
+      departmentId: opts.departmentId,
+      staffName: opts.staffName,
+      message: opts.message,
+    }),
+  }).catch((e) => console.error("notifyDashboard error:", e && e.stack || e));
+  if (ctx && ctx.waitUntil) ctx.waitUntil(promise); else await promise;
+}
+
 const URGENT_ESCALATION_MINUTES = 10;
 const NORMAL_ESCALATION_MINUTES = 25;
 const URGENT_ESCALATION_L2_MINUTES = 20;
@@ -984,7 +1007,7 @@ export default {
       if (method === "GET" && p === "/api/messages") {
         const self = url.searchParams.get("self");
         const other = url.searchParams.get("with");
-        if (!DEPT_IDS.has(self) || !DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || other === "dashboard")) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
@@ -1570,7 +1593,7 @@ export default {
           const memberRows = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
           validMembers = new Set(memberRows.results.map((m) => fromNoirDept(m.department_id)));
           if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);
-        } else if (!DEPT_IDS.has(to)) {
+        } else if (!DEPT_IDS.has(to) && to !== "dashboard") {
           return json({ error: "Unknown department" }, 400);
         }
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
@@ -1637,6 +1660,12 @@ export default {
           signoff: signoffData,
           poll: pollData,
         });
+
+        if (to === "dashboard" && row.body) {
+          await notifyDashboard(env, ctx, {
+            messageId: row.id, departmentId: from, staffName: request._staff.name, message: row.body,
+          });
+        }
 
         return json({ message: rowToMessage(row, from, false) }, 201);
       }
