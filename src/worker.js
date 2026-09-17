@@ -288,21 +288,28 @@ async function checkEscalations(env) {
 
   const ticketAtRiskCutoff = new Date(now - TICKET_AT_RISK_MINUTES * 60 * 1000).toISOString();
   const ticketBreachCutoff = new Date(now - TICKET_BREACH_MINUTES * 60 * 1000).toISOString();
-  const ticketRows = await env.DB.prepare(
-    `SELECT * FROM maintenance_tickets WHERE status = 'reported' AND escalation_level < 2 AND created_at < ?`
+  const ticketRows = await env.NOIR_DB.prepare(
+    `SELECT id, description, created_at FROM maintenance_tickets WHERE status = 'reported' AND created_at < ?`
   ).bind(ticketAtRiskCutoff).all();
-  for (const row of ticketRows.results) {
-    const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : (row.escalation_level || 0));
-    if (nextLevel <= (row.escalation_level || 0)) continue;
-    await notifyAdmins(env, {
-      title: nextLevel === 2 ? "🔴 Maintenance ticket still unclaimed" : "🟡 Maintenance ticket needs claiming",
-      body: row.description,
-      url: "/",
-      tag: "hotel-ping-ticket-escalation-" + row.id + "-" + nextLevel,
-    });
-    await env.DB.prepare("UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?")
-      .bind(new Date().toISOString(), nextLevel, row.id).run();
-    escalatedCount++;
+  if (ticketRows.results.length) {
+    const metaByTicket = await ticketMetaMap(env, ticketRows.results.map((r) => r.id));
+    for (const row of ticketRows.results) {
+      const level = metaByTicket[row.id] ? metaByTicket[row.id].escalation_level : 0;
+      if (level >= 2) continue;
+      const nextLevel = level === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : level);
+      if (nextLevel <= level) continue;
+      await notifyAdmins(env, {
+        title: nextLevel === 2 ? "🔴 Maintenance ticket still unclaimed" : "🟡 Maintenance ticket needs claiming",
+        body: row.description,
+        url: "/",
+        tag: "hotel-ping-ticket-escalation-" + row.id + "-" + nextLevel,
+      });
+      await env.DB.prepare(
+        `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
+         ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = excluded.escalation_level, escalated_at = excluded.escalated_at`
+      ).bind(row.id, nextLevel, new Date().toISOString()).run();
+      escalatedCount++;
+    }
   }
 
   return escalatedCount;
@@ -369,6 +376,40 @@ function rowToHandoverNote(row) {
 function rowToDepartment(row) {
   return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty, photoUrl: row.photo_path ? "/uploads/" + row.photo_path : undefined };
 }
+// Maintenance tickets live in the dashboard's noir-house-db, but pinning and
+// escalation tracking have no columns there (Hotel Ping grew those features
+// after that table was created), so they stay in a small local companion
+// table keyed by the ticket's (dashboard) id.
+async function ticketMetaMap(env, ticketIds) {
+  const ids = [...new Set(ticketIds)];
+  if (!ids.length) return {};
+  const rows = await env.DB.prepare(
+    `SELECT * FROM maintenance_ticket_meta WHERE ticket_id IN (${ids.map(() => "?").join(",")})`
+  ).bind(...ids).all();
+  const byTicket = {};
+  rows.results.forEach((m) => { byTicket[m.ticket_id] = m; });
+  return byTicket;
+}
+function mergeTicketRow(core, meta) {
+  return {
+    id: core.id,
+    room_number: core.room_number,
+    description: core.description,
+    photo_path: core.photo_path,
+    status: core.status,
+    priority: core.priority,
+    guest_present: core.guest_present,
+    deadline: core.deadline,
+    created_by: fromNoirDept(core.creator_dept),
+    created_at: core.created_at,
+    updated_at: core.updated_at,
+    resolved_at: core.resolved_at,
+    pinned_at: meta ? meta.pinned_at : null,
+    escalation_level: meta ? meta.escalation_level : 0,
+    escalated_at: meta ? meta.escalated_at : null,
+    owner_staff_id: core.owner_staff_id,
+  };
+}
 function rowToTicket(row) {
   return {
     id: row.id,
@@ -413,6 +454,9 @@ function noirBlockerRow(r) {
 }
 function rowToTicketReply(row) {
   return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
+}
+function noirReplyRow(r) {
+  return { id: r.id, ticket_id: r.ticket_id, from_dept: fromNoirDept(r.from_department_id), body: r.body, created_at: r.created_at };
 }
 function rowToGuestRequest(row) {
   return {
@@ -1313,11 +1357,13 @@ export default {
         }
 
         if (dept === "maintenance") {
-          const ticketRows = await env.DB.prepare(
-            "SELECT * FROM maintenance_tickets WHERE status != 'fixed' ORDER BY created_at ASC"
+          const ticketRows = await env.NOIR_DB.prepare(
+            `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+             LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.status != 'fixed' ORDER BY mt.created_at ASC`
           ).all();
+          const ticketMeta = await ticketMetaMap(env, ticketRows.results.map((t) => t.id));
           for (const t of ticketRows.results) {
-            items.push({ kind: "ticket", id: t.id, createdAt: t.created_at, ticket: rowToTicket(t) });
+            items.push({ kind: "ticket", id: t.id, createdAt: t.created_at, ticket: rowToTicket(mergeTicketRow(t, ticketMeta[t.id])) });
           }
         }
 
@@ -1381,13 +1427,22 @@ export default {
         const escalatedMsgRows = await env.DB.prepare(
           "SELECT * FROM messages WHERE escalation_level > 0 AND status != 'read' AND deleted_at IS NULL ORDER BY escalation_level DESC, created_at ASC"
         ).all();
-        const escalatedTicketRows = await env.DB.prepare(
-          "SELECT * FROM maintenance_tickets WHERE escalation_level > 0 AND status = 'reported' ORDER BY escalation_level DESC, created_at ASC"
-        ).all();
 
-        const unownedTicketRows = await env.DB.prepare(
-          "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND owner_staff_id IS NULL ORDER BY created_at ASC"
+        const reportedTicketRows = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.status = 'reported' ORDER BY mt.created_at ASC`
         ).all();
+        const reportedTicketMeta = await ticketMetaMap(env, reportedTicketRows.results.map((t) => t.id));
+        const reportedTickets = reportedTicketRows.results.map((t) => mergeTicketRow(t, reportedTicketMeta[t.id]));
+        const escalatedTickets = reportedTickets
+          .filter((t) => t.escalation_level > 0)
+          .sort((a, b) => b.escalation_level - a.escalation_level || (a.created_at < b.created_at ? -1 : 1));
+
+        const unownedTicketRows = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.status != 'fixed' AND mt.owner_staff_id IS NULL ORDER BY mt.created_at ASC`
+        ).all();
+        const unownedTicketMeta = await ticketMetaMap(env, unownedTicketRows.results.map((t) => t.id));
 
         const blockerRows = await env.NOIR_DB.prepare(
           "SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC"
@@ -1411,13 +1466,13 @@ export default {
           if (chain.length > 1) chains.push(chain);
         });
 
-        const openTicketCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM maintenance_tickets WHERE status != 'fixed'").first();
+        const openTicketCount = await env.NOIR_DB.prepare("SELECT COUNT(*) AS n FROM maintenance_tickets WHERE status != 'fixed'").first();
         const openGuestCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM guest_requests WHERE status != 'completed'").first();
 
         return json({
           escalatedMessages: escalatedMsgRows.results.map((r) => rowToMessage(r, r.to_dept, true)),
-          escalatedTickets: escalatedTicketRows.results.map(rowToTicket),
-          unownedTickets: unownedTicketRows.results.map(rowToTicket),
+          escalatedTickets: escalatedTickets.map(rowToTicket),
+          unownedTickets: unownedTicketRows.results.map((t) => rowToTicket(mergeTicketRow(t, unownedTicketMeta[t.id]))),
           blockerChains: chains,
           allBlockers: blockers,
           exceptions: {
@@ -1902,8 +1957,12 @@ export default {
       }
 
       if (method === "GET" && p === "/api/maintenance") {
-        const rows = await env.DB.prepare("SELECT * FROM maintenance_tickets ORDER BY created_at DESC").all();
-        return json({ tickets: rows.results.map(rowToTicket) });
+        const rows = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id ORDER BY mt.created_at DESC`
+        ).all();
+        const meta = await ticketMetaMap(env, rows.results.map((r) => r.id));
+        return json({ tickets: rows.results.map((r) => rowToTicket(mergeTicketRow(r, meta[r.id]))) });
       }
 
       if (method === "POST" && p === "/api/maintenance") {
@@ -1919,28 +1978,35 @@ export default {
         if (deadline && !DEADLINE_RE.test(deadline)) deadline = null;
 
         if (roomNumber) {
-          const dup = await env.DB.prepare(
-            "SELECT * FROM maintenance_tickets WHERE status != 'fixed' AND LOWER(TRIM(room_number)) = LOWER(?) ORDER BY created_at DESC LIMIT 1"
+          const dup = await env.NOIR_DB.prepare(
+            `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+             LEFT JOIN staff s ON s.id = mt.created_by_staff_id
+             WHERE mt.status != 'fixed' AND LOWER(TRIM(mt.room_number)) = LOWER(?) ORDER BY mt.created_at DESC LIMIT 1`
           ).bind(roomNumber).first();
           if (dup) {
             const replyId = crypto.randomUUID();
             const now = new Date().toISOString();
             const noteText = "Also reported by " + (DEPT_NAMES[requester.department_id] || requester.department_id) + ": " + description;
-            await env.DB.prepare(
-              "INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)"
-            ).bind(replyId, dup.id, requester.department_id, noteText, now).run();
+            await env.NOIR_DB.prepare(
+              "INSERT INTO maintenance_replies (id, ticket_id, from_department_id, body, created_at) VALUES (?, ?, ?, ?, ?)"
+            ).bind(replyId, dup.id, toNoirDept(requester.department_id), noteText, now).run();
 
             const mergedPriority = MAINT_PRIORITY_RANK[priority] < MAINT_PRIORITY_RANK[dup.priority] ? priority : dup.priority;
             const mergedGuestPresent = guestPresent || !!dup.guest_present;
             const mergedDeadline = deadline && (!dup.deadline || deadline < dup.deadline) ? deadline : dup.deadline;
             if (mergedPriority !== dup.priority || mergedGuestPresent !== !!dup.guest_present || mergedDeadline !== dup.deadline) {
-              await env.DB.prepare(
+              await env.NOIR_DB.prepare(
                 "UPDATE maintenance_tickets SET priority = ?, guest_present = ?, deadline = ?, updated_at = ? WHERE id = ?"
               ).bind(mergedPriority, mergedGuestPresent ? 1 : 0, mergedDeadline, now, dup.id).run();
             }
-            const mergedRow = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(dup.id).first();
+            const mergedRow = await env.NOIR_DB.prepare(
+              `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+               LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+            ).bind(dup.id).first();
+            const mergedMeta = (await ticketMetaMap(env, [dup.id]))[dup.id];
 
-            if (dup.created_by !== requester.department_id) {
+            const dupCreatorDept = fromNoirDept(dup.creator_dept);
+            if (dupCreatorDept !== requester.department_id) {
               const notifyPromise = notifyDepartment(env, "maintenance", {
                 title: "🔧 Same job reported again",
                 body: noteText,
@@ -1949,7 +2015,7 @@ export default {
               }, requester.department_id).catch(function(e){ console.error("notifyDepartment (dup maintenance) error:", e && e.stack || e); });
               if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
             }
-            return json({ ticket: rowToTicket(mergedRow), merged: true }, 200);
+            return json({ ticket: rowToTicket(mergeTicketRow(mergedRow, mergedMeta)), merged: true }, 200);
           }
         }
 
@@ -1967,10 +2033,15 @@ export default {
 
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.DB.prepare(
-          "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
-        ).bind(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now).run();
-        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        await env.NOIR_DB.prepare(
+          "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
+        ).bind(id, NOIR_HOTEL_ID, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
+        await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(id).run();
+        const coreRow = {
+          id, room_number: roomNumber, description, photo_path: photoPath, status: "reported", priority,
+          guest_present: guestPresent ? 1 : 0, deadline, creator_dept: toNoirDept(requester.department_id),
+          created_at: now, updated_at: now, resolved_at: null, owner_staff_id: null,
+        };
 
         let notifyBody = (roomNumber ? "Room " + roomNumber + ": " : "") + description;
         if (guestPresent) notifyBody += " · Guest in room";
@@ -1983,18 +2054,21 @@ export default {
         }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maintenance) error:", e && e.stack || e); });
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
-        return json({ ticket: rowToTicket(row) }, 201);
+        return json({ ticket: rowToTicket(mergeTicketRow(coreRow, { pinned_at: null, escalation_level: 0, escalated_at: null })) }, 201);
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
-        const rows = await env.DB.prepare("SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC").bind(id).all();
-        return json({ replies: rows.results.map(rowToTicketReply) });
+        const rows = await env.NOIR_DB.prepare("SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC").bind(id).all();
+        return json({ replies: rows.results.map((r) => rowToTicketReply(noirReplyRow(r))) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
-        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         const body = await readJsonBody(request);
         const text = String(body.text || "").trim();
@@ -2002,12 +2076,13 @@ export default {
         const requester = request._staff;
         const replyId = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.DB.prepare(
-          "INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)"
-        ).bind(replyId, id, requester.department_id, text, now).run();
-        const row = await env.DB.prepare("SELECT * FROM maintenance_replies WHERE id = ?").bind(replyId).first();
+        await env.NOIR_DB.prepare(
+          "INSERT INTO maintenance_replies (id, ticket_id, from_department_id, body, created_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(replyId, id, toNoirDept(requester.department_id), text, now).run();
+        const row = await env.NOIR_DB.prepare("SELECT * FROM maintenance_replies WHERE id = ?").bind(replyId).first();
 
-        const notifyTarget = requester.department_id === "maintenance" ? existing.created_by : "maintenance";
+        const creatorDept = fromNoirDept(existing.creator_dept);
+        const notifyTarget = requester.department_id === "maintenance" ? creatorDept : "maintenance";
         if (notifyTarget !== requester.department_id) {
           const notifyPromise = notifyDepartment(env, notifyTarget, {
             title: (DEPT_NAMES[requester.department_id] || requester.department_id) + " · job reply",
@@ -2018,7 +2093,7 @@ export default {
           if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
         }
 
-        return json({ reply: rowToTicketReply(row) }, 201);
+        return json({ reply: rowToTicketReply(noirReplyRow(row)) }, 201);
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/status")) {
@@ -2026,32 +2101,40 @@ export default {
         const body = await readJsonBody(request);
         const status = body.status;
         if (!MAINT_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
-        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
           return json({ error: "Only Maintenance can update a ticket's status" }, 403);
         }
         const now = new Date().toISOString();
         const newOwner = !existing.owner_staff_id && status !== "reported" ? request._staff.id : existing.owner_staff_id;
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ? WHERE id = ?"
         ).bind(status, now, status === "fixed" ? now : null, newOwner, id).run();
-        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
+        const meta = (await ticketMetaMap(env, [id]))[id];
 
+        const creatorDept = fromNoirDept(existing.creator_dept);
         const statusNotice = { in_progress: "Started work on: ", fixed: "Fixed: " };
-        if (statusNotice[status] && existing.created_by !== "maintenance") {
+        if (statusNotice[status] && creatorDept !== "maintenance") {
           await insertMessage(env, ctx, {
-            from: "maintenance", to: existing.created_by, type: "text",
+            from: "maintenance", to: creatorDept, type: "text",
             body: statusNotice[status] + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
           });
         }
 
-        return json({ ticket: rowToTicket(row) });
+        return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/owner")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/owner".length));
-        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare("SELECT id FROM maintenance_tickets WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
           return json({ error: "Only Maintenance can assign a ticket's owner" }, 403);
@@ -2063,35 +2146,49 @@ export default {
             .bind(staffId, NOIR_DEPT_ID_MAP.maintenance).first();
           if (!staffRow) return json({ error: "Not a Maintenance staff member" }, 400);
         }
-        await env.DB.prepare("UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?").bind(staffId, id).run();
-        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
-        return json({ ticket: rowToTicket(row) });
+        await env.NOIR_DB.prepare("UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?").bind(staffId, id).run();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
+        const meta = (await ticketMetaMap(env, [id]))[id];
+        return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/pin")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/pin".length));
-        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
-        const nextPinned = !existing.pinned_at;
+        const existingMeta = (await ticketMetaMap(env, [id]))[id];
+        const nextPinned = !(existingMeta && existingMeta.pinned_at);
         await env.DB.prepare(
-          "UPDATE maintenance_tickets SET pinned_at = ? WHERE id = ?"
-        ).bind(nextPinned ? new Date().toISOString() : null, id).run();
-        const row = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
-        return json({ ticket: rowToTicket(row) });
+          `INSERT INTO maintenance_ticket_meta (ticket_id, pinned_at) VALUES (?, ?)
+           ON CONFLICT(ticket_id) DO UPDATE SET pinned_at = excluded.pinned_at`
+        ).bind(id, nextPinned ? new Date().toISOString() : null).run();
+        const meta = (await ticketMetaMap(env, [id]))[id];
+        return json({ ticket: rowToTicket(mergeTicketRow(existing, meta)) });
       }
 
       if (method === "DELETE" && p.startsWith("/api/maintenance/")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length));
-        const existing = await env.DB.prepare("SELECT * FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         const requester = request._staff;
-        if (existing.created_by !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(existing.creator_dept) !== requester.department_id && !requester.is_admin) {
           return json({ error: "You can only remove your own department's tickets" }, 403);
         }
         if (existing.status !== "reported" && !requester.is_admin) {
           return json({ error: "This job has already been picked up and can't be deleted" }, 400);
         }
-        await env.DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM maintenance_replies WHERE ticket_id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
+        await env.DB.prepare("DELETE FROM maintenance_ticket_meta WHERE ticket_id = ?").bind(id).run();
         return json({ ok: true });
       }
 

@@ -189,6 +189,17 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 
+-- Maintenance tickets themselves now live in the dashboard's noir-house-db.
+-- Its maintenance_tickets table has no columns for pinning or escalation
+-- tracking (features Hotel Ping grew after that table was created), so
+-- those stay here, keyed to the ticket's id on the dashboard side.
+CREATE TABLE IF NOT EXISTS maintenance_ticket_meta (
+  ticket_id TEXT PRIMARY KEY,
+  pinned_at TEXT,
+  escalation_level INTEGER NOT NULL DEFAULT 0,
+  escalated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS blockers (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,
