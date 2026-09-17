@@ -353,8 +353,8 @@ async function insertMessage(env, ctx, opts) {
   const notifyBody = opts.urgent ? "🔴 Urgent: " + (previewMap[opts.type] || "New message") : (previewMap[opts.type] || "New message");
   let notifyPromise;
   if (opts.groupId) {
-    const members = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(opts.groupId).all();
-    const others = members.results.map((m) => m.department_id).filter((d) => d !== opts.from);
+    const members = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(opts.groupId).all();
+    const others = members.results.map((m) => fromNoirDept(m.department_id)).filter((d) => d !== opts.from);
     const mentioned = new Set(opts.mentions || []);
     notifyPromise = Promise.all(others.map((deptId) => notifyDepartment(env, deptId, {
       title: DEPT_NAMES[opts.from] || opts.from,
@@ -532,6 +532,15 @@ function rowToGroup(row, members) {
 // small local companion table keyed by the group's (dashboard) id; created_by
 // is a staff FK there rather than a department, so the creating department
 // is resolved via a join to staff, same pattern as maintenance tickets.
+// Returns the department slug that created a group, or null if the group
+// doesn't exist - used by the many "only the creating department can..."
+// checks on stations/runsheet/archive/delete without repeating the join.
+async function groupCreatorDept(env, groupId) {
+  const row = await env.NOIR_DB.prepare(
+    `SELECT s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+  ).bind(groupId).first();
+  return row ? fromNoirDept(row.creator_dept) : null;
+}
 async function groupMetaMap(env, groupIds) {
   const ids = [...new Set(groupIds)];
   if (!ids.length) return {};
@@ -987,25 +996,30 @@ export default {
       if (method === "GET" && p === "/api/groups") {
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        const groupRows = await env.DB.prepare("SELECT * FROM groups WHERE deleted_at IS NULL ORDER BY created_at DESC").all();
+        const groupRows = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g
+           LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.deleted_at IS NULL ORDER BY g.created_at DESC`
+        ).all();
+        const groupMeta = await groupMetaMap(env, groupRows.results.map((g) => g.id));
         const groups = [];
         for (const g of groupRows.results) {
-          const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
-          const members = memberRows.results.map((m) => m.department_id);
+          const merged = mergeGroupRow(g, groupMeta[g.id]);
+          const memberRows = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(g.id).all();
+          const members = memberRows.results.map((m) => fromNoirDept(m.department_id));
           const isMember = members.includes(self);
-          if (g.archived_at && !request._staff.is_admin && !g.shared_at) continue;
+          if (merged.archived_at && !request._staff.is_admin && !merged.shared_at) continue;
           const last = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at DESC LIMIT 1").bind(g.id).first();
-          const readRow = await env.DB.prepare("SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?").bind(g.id, self).first();
+          const readRow = await env.NOIR_DB.prepare("SELECT last_read_at FROM group_reads WHERE group_id = ? AND department_id = ?").bind(g.id, toNoirDept(self)).first();
           const since = readRow ? readRow.last_read_at : "1970-01-01T00:00:00.000Z";
           const unread = await env.DB.prepare(
             "SELECT COUNT(*) AS n FROM messages WHERE group_id = ? AND from_dept != ? AND created_at > ? AND deleted_at IS NULL"
           ).bind(g.id, self, since).first();
           groups.push({
-            id: g.id, name: g.name, createdBy: g.created_by, createdAt: g.created_at,
-            archivedAt: g.archived_at || undefined, sharedAt: g.shared_at || undefined,
-            description: g.description || undefined, eventDate: g.event_date || undefined,
-            guestCount: g.guest_count === null || g.guest_count === undefined ? undefined : g.guest_count,
-            location: g.location || undefined,
+            id: merged.id, name: merged.name, createdBy: merged.created_by, createdAt: merged.created_at,
+            archivedAt: merged.archived_at || undefined, sharedAt: merged.shared_at || undefined,
+            description: merged.description || undefined, eventDate: merged.event_date || undefined,
+            guestCount: merged.guest_count === null || merged.guest_count === undefined ? undefined : merged.guest_count,
+            location: merged.location || undefined,
             members, isMember,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: isMember ? unread.n : 0,
@@ -1024,54 +1038,60 @@ export default {
         const allMembers = Array.from(new Set([self, ...memberIds]));
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.DB.prepare("INSERT INTO groups (id, name, created_by, created_at) VALUES (?, ?, ?, ?)").bind(id, name, self, now).run();
+        await env.NOIR_DB.prepare("INSERT INTO groups (id, hotel_id, name, created_by_staff_id, created_at) VALUES (?, ?, ?, ?, ?)")
+          .bind(id, NOIR_HOTEL_ID, name, request._staff.id, now).run();
         for (const deptId of allMembers) {
-          await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, deptId, now).run();
+          await env.NOIR_DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, toNoirDept(deptId), now).run();
         }
-        const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        return json({ group: rowToGroup(row, allMembers) }, 201);
+        const row = { id, name, creator_dept: toNoirDept(self), created_at: now, archived_at: null, description: null, event_date: null, guest_count: null, location: null };
+        return json({ group: rowToGroup(mergeGroupRow(row, null), allMembers) }, 201);
       }
 
       if (method === "PATCH" && p.startsWith("/api/groups/") && p.split("/").length === 4) {
         const id = decodeURIComponent(p.slice("/api/groups/".length));
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        const group = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+        ).bind(id).first();
         if (!group) return json({ error: "Event not found" }, 404);
         const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(group.creator_dept) !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can edit its details" }, 403);
         }
         const body = await readJsonBody(request);
         if (typeof body.description === "string") {
-          await env.DB.prepare("UPDATE groups SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 400) || null, id).run();
+          await env.NOIR_DB.prepare("UPDATE groups SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 400) || null, id).run();
         }
         if (typeof body.eventDate === "string" || body.eventDate === null) {
-          await env.DB.prepare("UPDATE groups SET event_date = ? WHERE id = ?").bind(body.eventDate ? String(body.eventDate).trim().slice(0, 60) : null, id).run();
+          await env.NOIR_DB.prepare("UPDATE groups SET event_date = ? WHERE id = ?").bind(body.eventDate ? String(body.eventDate).trim().slice(0, 60) : null, id).run();
         }
         if (typeof body.guestCount === "number" || body.guestCount === null) {
           const gc = body.guestCount === null ? null : Math.max(0, Math.round(body.guestCount));
-          await env.DB.prepare("UPDATE groups SET guest_count = ? WHERE id = ?").bind(gc, id).run();
+          await env.NOIR_DB.prepare("UPDATE groups SET guest_count = ? WHERE id = ?").bind(gc, id).run();
         }
         if (typeof body.location === "string" || body.location === null) {
-          await env.DB.prepare("UPDATE groups SET location = ? WHERE id = ?").bind(body.location ? String(body.location).trim().slice(0, 120) : null, id).run();
+          await env.NOIR_DB.prepare("UPDATE groups SET location = ? WHERE id = ?").bind(body.location ? String(body.location).trim().slice(0, 120) : null, id).run();
         }
-        const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(id).all();
-        const row2 = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        return json({ group: rowToGroup(row2, memberRows.results.map((m) => m.department_id)) });
+        const memberRows = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(id).all();
+        const row2 = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+        ).bind(id).first();
+        const meta2 = (await groupMetaMap(env, [id]))[id];
+        return json({ group: rowToGroup(mergeGroupRow(row2, meta2), memberRows.results.map((m) => fromNoirDept(m.department_id))) });
       }
 
       // ---- Event stations (drag-a-department-icon-in role assignments) ----
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/stations")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/stations".length));
-        const rows = await env.DB.prepare("SELECT * FROM event_stations WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
-        return json({ stations: rows.results.map(rowToStation) });
+        const rows = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        return json({ stations: rows.results.map((r) => rowToStation(noirStationRow(r))) });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/stations")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/stations".length));
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(id).first();
-        if (!group) return json({ error: "Event not found" }, 404);
+        const creatorDept = await groupCreatorDept(env, id);
+        if (creatorDept === null) return json({ error: "Event not found" }, 404);
         const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
+        if (creatorDept !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can add stations" }, 403);
         }
         const body = await readJsonBody(request);
@@ -1081,79 +1101,80 @@ export default {
         const category = body.category ? String(body.category).trim().slice(0, 60) : null;
         const description = body.description ? String(body.description).trim().slice(0, 200) : null;
         const icon = body.icon ? String(body.icon).trim().slice(0, 30) : null;
-        const posRow = await env.DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_stations WHERE group_id = ?").bind(id).first();
+        const posRow = await env.NOIR_DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_stations WHERE group_id = ?").bind(id).first();
         const stationId = crypto.randomUUID();
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "INSERT INTO event_stations (id, group_id, title, category, description, icon, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(stationId, id, title, category, description, icon, posRow.maxPos + 1, new Date().toISOString()).run();
-        const row = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(stationId).first();
-        return json({ station: rowToStation(row) }, 201);
+        const row = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(stationId).first();
+        return json({ station: rowToStation(noirStationRow(row)) }, 201);
       }
 
       if (method === "PATCH" && p.startsWith("/api/stations/")) {
         const id = decodeURIComponent(p.slice("/api/stations/".length));
-        const station = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
+        const station = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
         if (!station) return json({ error: "Station not found" }, 404);
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(station.group_id).first();
+        const creatorDept = await groupCreatorDept(env, station.group_id);
         const requester = request._staff;
-        const canManage = group && (group.created_by === requester.department_id || requester.is_admin);
+        const canManage = creatorDept !== null && (creatorDept === requester.department_id || requester.is_admin);
         const body = await readJsonBody(request);
 
         if (typeof body.assignedDeptId !== "undefined") {
           if (!canManage) return json({ error: "Only the department that created this event can assign stations" }, 403);
           if (body.assignedDeptId !== null && !DEPT_IDS.has(body.assignedDeptId)) return json({ error: "Unknown department" }, 400);
-          await env.DB.prepare("UPDATE event_stations SET assigned_dept_id = ?, confirmed_at = NULL WHERE id = ?").bind(body.assignedDeptId || null, id).run();
+          await env.NOIR_DB.prepare("UPDATE event_stations SET assigned_department_id = ?, confirmed_at = NULL WHERE id = ?")
+            .bind(body.assignedDeptId ? toNoirDept(body.assignedDeptId) : null, id).run();
         }
         if (body.confirm === true) {
-          if (station.assigned_dept_id !== requester.department_id && !requester.is_admin) {
+          if (fromNoirDept(station.assigned_department_id) !== requester.department_id && !requester.is_admin) {
             return json({ error: "Only the assigned department can confirm this station" }, 403);
           }
-          await env.DB.prepare("UPDATE event_stations SET confirmed_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+          await env.NOIR_DB.prepare("UPDATE event_stations SET confirmed_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         }
         if (typeof body.title === "string" || typeof body.category === "string" || typeof body.description === "string") {
           if (!canManage) return json({ error: "Only the department that created this event can edit stations" }, 403);
           if (typeof body.title === "string") {
             const title = body.title.trim();
             if (!title) return json({ error: "Station title is required" }, 400);
-            await env.DB.prepare("UPDATE event_stations SET title = ? WHERE id = ?").bind(title.slice(0, 80), id).run();
+            await env.NOIR_DB.prepare("UPDATE event_stations SET title = ? WHERE id = ?").bind(title.slice(0, 80), id).run();
           }
           if (typeof body.category === "string") {
-            await env.DB.prepare("UPDATE event_stations SET category = ? WHERE id = ?").bind(body.category.trim().slice(0, 60) || null, id).run();
+            await env.NOIR_DB.prepare("UPDATE event_stations SET category = ? WHERE id = ?").bind(body.category.trim().slice(0, 60) || null, id).run();
           }
           if (typeof body.description === "string") {
-            await env.DB.prepare("UPDATE event_stations SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 200) || null, id).run();
+            await env.NOIR_DB.prepare("UPDATE event_stations SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 200) || null, id).run();
           }
         }
-        const row = await env.DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
-        return json({ station: rowToStation(row) });
+        const row = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
+        return json({ station: rowToStation(noirStationRow(row)) });
       }
 
       if (method === "DELETE" && p.startsWith("/api/stations/")) {
         const id = decodeURIComponent(p.slice("/api/stations/".length));
-        const station = await env.DB.prepare("SELECT group_id FROM event_stations WHERE id = ?").bind(id).first();
+        const station = await env.NOIR_DB.prepare("SELECT group_id FROM event_stations WHERE id = ?").bind(id).first();
         if (!station) return json({ error: "Station not found" }, 404);
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(station.group_id).first();
+        const creatorDept = await groupCreatorDept(env, station.group_id);
         const requester = request._staff;
-        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        if (creatorDept === null || (creatorDept !== requester.department_id && !requester.is_admin)) {
           return json({ error: "Only the department that created this event can remove stations" }, 403);
         }
-        await env.DB.prepare("DELETE FROM event_stations WHERE id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM event_stations WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 
       // ---- Event run sheet ----
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/runsheet")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/runsheet".length));
-        const rows = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        const rows = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
         return json({ items: rows.results.map(rowToRunsheetItem) });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/runsheet")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/runsheet".length));
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(id).first();
-        if (!group) return json({ error: "Event not found" }, 404);
+        const creatorDept = await groupCreatorDept(env, id);
+        if (creatorDept === null) return json({ error: "Event not found" }, 404);
         const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
+        if (creatorDept !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
         }
         const body = await readJsonBody(request);
@@ -1165,51 +1186,51 @@ export default {
         if (title.length > 100) return json({ error: "Title is too long" }, 400);
         const description = body.description ? String(body.description).trim().slice(0, 300) : null;
         const teamLabel = body.teamLabel ? String(body.teamLabel).trim().slice(0, 60) : null;
-        const posRow = await env.DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_runsheet_items WHERE group_id = ?").bind(id).first();
+        const posRow = await env.NOIR_DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_runsheet_items WHERE group_id = ?").bind(id).first();
         const itemId = crypto.randomUUID();
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "INSERT INTO event_runsheet_items (id, group_id, time_label, title, description, team_label, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(itemId, id, timeLabel, title, description, teamLabel, posRow.maxPos + 1, new Date().toISOString()).run();
-        const row = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(itemId).first();
+        const row = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(itemId).first();
         return json({ item: rowToRunsheetItem(row) }, 201);
       }
 
       if (method === "PATCH" && p.startsWith("/api/runsheet/")) {
         const id = decodeURIComponent(p.slice("/api/runsheet/".length));
-        const item = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        const item = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
         if (!item) return json({ error: "Run sheet item not found" }, 404);
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(item.group_id).first();
+        const creatorDept = await groupCreatorDept(env, item.group_id);
         const requester = request._staff;
-        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        if (creatorDept === null || (creatorDept !== requester.department_id && !requester.is_admin)) {
           return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
         }
         const body = await readJsonBody(request);
         if (typeof body.timeLabel === "string" && body.timeLabel.trim()) {
-          await env.DB.prepare("UPDATE event_runsheet_items SET time_label = ? WHERE id = ?").bind(body.timeLabel.trim().slice(0, 20), id).run();
+          await env.NOIR_DB.prepare("UPDATE event_runsheet_items SET time_label = ? WHERE id = ?").bind(body.timeLabel.trim().slice(0, 20), id).run();
         }
         if (typeof body.title === "string" && body.title.trim()) {
-          await env.DB.prepare("UPDATE event_runsheet_items SET title = ? WHERE id = ?").bind(body.title.trim().slice(0, 100), id).run();
+          await env.NOIR_DB.prepare("UPDATE event_runsheet_items SET title = ? WHERE id = ?").bind(body.title.trim().slice(0, 100), id).run();
         }
         if (typeof body.description === "string") {
-          await env.DB.prepare("UPDATE event_runsheet_items SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 300) || null, id).run();
+          await env.NOIR_DB.prepare("UPDATE event_runsheet_items SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 300) || null, id).run();
         }
         if (typeof body.teamLabel === "string") {
-          await env.DB.prepare("UPDATE event_runsheet_items SET team_label = ? WHERE id = ?").bind(body.teamLabel.trim().slice(0, 60) || null, id).run();
+          await env.NOIR_DB.prepare("UPDATE event_runsheet_items SET team_label = ? WHERE id = ?").bind(body.teamLabel.trim().slice(0, 60) || null, id).run();
         }
-        const row = await env.DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        const row = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
         return json({ item: rowToRunsheetItem(row) });
       }
 
       if (method === "DELETE" && p.startsWith("/api/runsheet/")) {
         const id = decodeURIComponent(p.slice("/api/runsheet/".length));
-        const item = await env.DB.prepare("SELECT group_id FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        const item = await env.NOIR_DB.prepare("SELECT group_id FROM event_runsheet_items WHERE id = ?").bind(id).first();
         if (!item) return json({ error: "Run sheet item not found" }, 404);
-        const group = await env.DB.prepare("SELECT created_by FROM groups WHERE id = ?").bind(item.group_id).first();
+        const creatorDept = await groupCreatorDept(env, item.group_id);
         const requester = request._staff;
-        if (!group || (group.created_by !== requester.department_id && !requester.is_admin)) {
+        if (creatorDept === null || (creatorDept !== requester.department_id && !requester.is_admin)) {
           return json({ error: "Only the department that created this event can edit the run sheet" }, 403);
         }
-        await env.DB.prepare("DELETE FROM event_runsheet_items WHERE id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM event_runsheet_items WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 
@@ -1218,10 +1239,10 @@ export default {
         const body = await readJsonBody(request);
         const self = body.self;
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        const group = await env.NOIR_DB.prepare("SELECT id FROM groups WHERE id = ?").bind(id).first();
         if (!group) return json({ error: "Group not found" }, 404);
-        const existingMember = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
-        await env.DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, self, new Date().toISOString()).run();
+        const existingMember = await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, toNoirDept(self)).first();
+        await env.NOIR_DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, toNoirDept(self), new Date().toISOString()).run();
         if (!existingMember) {
           const requester = request._staff;
           const actorId = requester.department_id;
@@ -1238,56 +1259,63 @@ export default {
         const body = await readJsonBody(request);
         const self = body.self;
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
-        await env.DB.prepare("DELETE FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).run();
+        await env.NOIR_DB.prepare("DELETE FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, toNoirDept(self)).run();
         return json({ ok: true });
       }
 
       if (method === "DELETE" && p.startsWith("/api/groups/")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length));
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        if (!group) return json({ error: "Event not found" }, 404);
+        const creatorDept = await groupCreatorDept(env, id);
+        if (creatorDept === null) return json({ error: "Event not found" }, 404);
         const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
+        if (creatorDept !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can delete it" }, 403);
         }
         const msgCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM messages WHERE group_id = ?").bind(id).first();
         if (msgCount.n > 0) {
           return json({ error: "This event already has messages in it and can't be deleted. End it instead." }, 400);
         }
-        await env.DB.prepare("UPDATE groups SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        await env.NOIR_DB.prepare("UPDATE groups SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
         return json({ ok: true });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/archive")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/archive".length));
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        const group = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+        ).bind(id).first();
         if (!group) return json({ error: "Event not found" }, 404);
         if (group.archived_at) return json({ error: "This event has already ended" }, 400);
         const requester = request._staff;
-        if (group.created_by !== requester.department_id && !requester.is_admin) {
+        if (fromNoirDept(group.creator_dept) !== requester.department_id && !requester.is_admin) {
           return json({ error: "Only the department that created this event can end it" }, 403);
         }
         const now = new Date().toISOString();
-        await env.DB.prepare("UPDATE groups SET archived_at = ? WHERE id = ?").bind(now, id).run();
+        await env.NOIR_DB.prepare("UPDATE groups SET archived_at = ? WHERE id = ?").bind(now, id).run();
         const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
         await insertMessage(env, ctx, {
           from: requester.department_id, groupId: id, type: "text",
           body: actorName + " ended this event. It's kept here for training.",
           silent: true,
         });
-        const row = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        return json({ group: rowToGroup(row) });
+        const row = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+        ).bind(id).first();
+        const meta = (await groupMetaMap(env, [id]))[id];
+        return json({ group: rowToGroup(mergeGroupRow(row, meta)) });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/share")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/share".length));
-        const group = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
+        const group = await env.NOIR_DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
         if (!group) return json({ error: "Event not found" }, 404);
         const requester = request._staff;
         if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
         if (!group.archived_at) return json({ error: "End the event before sharing it" }, 400);
         const now = new Date().toISOString();
-        await env.DB.prepare("UPDATE groups SET shared_at = ? WHERE id = ?").bind(now, id).run();
+        await env.DB.prepare(
+          `INSERT INTO group_meta (group_id, shared_at) VALUES (?, ?) ON CONFLICT(group_id) DO UPDATE SET shared_at = excluded.shared_at`
+        ).bind(id, now).run();
         const actorName = DEPT_NAMES[requester.department_id] || requester.department_id;
         await insertMessage(env, ctx, {
           from: requester.department_id, groupId: id, type: "text",
@@ -1303,8 +1331,11 @@ export default {
           }, requester.department_id))
         ).catch((e) => console.error("notifyDepartment (share) top-level error:", e && e.stack || e));
         if (ctx && ctx.waitUntil) ctx.waitUntil(shareNotify); else await shareNotify;
-        const row2 = await env.DB.prepare("SELECT * FROM groups WHERE id = ?").bind(id).first();
-        return json({ group: rowToGroup(row2) });
+        const row2 = await env.NOIR_DB.prepare(
+          `SELECT g.*, s.department_id AS creator_dept FROM groups g LEFT JOIN staff s ON s.id = g.created_by_staff_id WHERE g.id = ?`
+        ).bind(id).first();
+        const meta2 = (await groupMetaMap(env, [id]))[id];
+        return json({ group: rowToGroup(mergeGroupRow(row2, meta2)) });
       }
 
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/messages")) {
@@ -1312,12 +1343,13 @@ export default {
         const self = url.searchParams.get("self");
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
-        const group = await env.DB.prepare("SELECT archived_at, shared_at FROM groups WHERE id = ?").bind(id).first();
+        const group = await env.NOIR_DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(id).first();
+        const meta = (await groupMetaMap(env, [id]))[id];
         if (!request._staff.is_admin) {
           if (group && group.archived_at) {
-            if (!group.shared_at) return json({ error: "This event has ended and is only visible to the General Manager" }, 403);
+            if (!(meta && meta.shared_at)) return json({ error: "This event has ended and is only visible to the General Manager" }, 403);
           } else {
-            const member = await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, self).first();
+            const member = await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(id, toNoirDept(self)).first();
             if (!member) return json({ error: "Not a member of this group" }, 403);
           }
         }
@@ -1331,9 +1363,9 @@ export default {
         const self = body.self;
         if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         const now = new Date().toISOString();
-        await env.DB.prepare(
+        await env.NOIR_DB.prepare(
           "INSERT INTO group_reads (group_id, department_id, last_read_at) VALUES (?, ?, ?) ON CONFLICT(group_id, department_id) DO UPDATE SET last_read_at = excluded.last_read_at"
-        ).bind(id, self, now).run();
+        ).bind(id, toNoirDept(self), now).run();
         return json({ ok: true });
       }
 
@@ -1533,10 +1565,10 @@ export default {
         if (from !== request._staff.department_id) return json({ error: "You can only send messages as your own department" }, 403);
         let validMembers = null;
         if (groupId) {
-          const group = await env.DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(groupId).first();
+          const group = await env.NOIR_DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(groupId).first();
           if (group && group.archived_at) return json({ error: "This event has ended and is now read only" }, 400);
-          const memberRows = await env.DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
-          validMembers = new Set(memberRows.results.map((m) => m.department_id));
+          const memberRows = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
+          validMembers = new Set(memberRows.results.map((m) => fromNoirDept(m.department_id)));
           if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);
         } else if (!DEPT_IDS.has(to)) {
           return json({ error: "Unknown department" }, 400);
@@ -1644,7 +1676,7 @@ export default {
         if (!existing) return json({ error: "Message not found" }, 404);
         const requester = request._staff;
         const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextPinned = !existing.pinned_at;
         await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
@@ -1658,7 +1690,7 @@ export default {
         if (!existing) return json({ error: "Message not found" }, 404);
         const requester = request._staff;
         const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextValue = existing.affects_guest ? 0 : 1;
         await env.DB.prepare("UPDATE messages SET affects_guest = ? WHERE id = ?").bind(nextValue, id).run();
@@ -1672,7 +1704,7 @@ export default {
         if (!existing) return json({ error: "Message not found" }, 404);
         const requester = request._staff;
         const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const nextCompleted = !existing.completed_at;
         await env.DB.prepare("UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?")
@@ -1744,7 +1776,7 @@ export default {
         if (!existing.poll_question) return json({ error: "This message isn't a poll" }, 400);
         const requester = request._staff;
         const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const bodyIn = await readJsonBody(request);
         const options = JSON.parse(existing.poll_options || "[]");
@@ -1769,7 +1801,7 @@ export default {
         if (existing.deleted_at) return json({ error: "Can't forward a deleted message" }, 400);
         const requester = request._staff;
         const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, requester.department_id).first());
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const body = await readJsonBody(request);
         const to = body.to;

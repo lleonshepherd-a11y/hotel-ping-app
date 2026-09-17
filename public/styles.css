@@ -407,7 +407,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .signoff-head-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.05em;color:#5d94f6}
 .signoff-head-label svg{width:12px;height:12px}
 .signoff-amount{font-size:14px;font-weight:800;color:#7dabf8;font-variant-numeric:tabular-nums}
-.signoff-code{opacity:.7;font-weight:700;margin-left:2px}
+.signoff-code{font-weight:800;margin-left:2px;color:#3a63b8;background:rgba(77,132,245,.16);border-radius:6px;padding:2px 6px;letter-spacing:.02em}
 .signoff-category{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#5d94f6;background:rgba(77,132,245,.16);padding:2px 8px;border-radius:8px;margin-bottom:5px}
 .signoff-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
 .signoff-target{font-size:12px;color:var(--text-dim);margin-bottom:8px}
