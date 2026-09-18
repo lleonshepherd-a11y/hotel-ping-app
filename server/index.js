@@ -401,7 +401,7 @@ const server = http.createServer(async (req, res) => {
 
       const validOrigin = fromDepartmentId && DEPT_IDS.has(fromDepartmentId) && fromDepartmentId !== departmentId;
       const row = insertMessage({
-        from: validOrigin ? fromDepartmentId : 'dashboard', to: departmentId, type: 'text',
+        from: validOrigin ? fromDepartmentId : 'dashboard', to: validOrigin ? departmentId : 'gm', type: 'text',
         body: validOrigin ? message : (senderName ? senderName + ': ' + message : message),
         dashboardConversationId: conversationId,
       });
@@ -670,7 +670,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/messages') {
       const self = url.searchParams.get('self');
       const other = url.searchParams.get('with');
-      if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || other === 'dashboard')) return send(res, 400, { error: 'Unknown department' });
+      if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || (other === 'dashboard' && self === 'gm'))) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
       if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
       const rows = db.prepare(`
@@ -1216,6 +1216,8 @@ const server = http.createServer(async (req, res) => {
         if (!validMembers.has(from)) return send(res, 403, { error: 'Not a member of this group' });
       } else if (!DEPT_IDS.has(to) && to !== 'dashboard') {
         return send(res, 400, { error: 'Unknown department' });
+      } else if (to === 'dashboard' && from !== 'gm') {
+        return send(res, 403, { error: 'Only the GM can message Head Office directly' });
       }
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
       if (type === 'text' && !text?.trim() && !poll) return send(res, 400, { error: 'Message text is required' });

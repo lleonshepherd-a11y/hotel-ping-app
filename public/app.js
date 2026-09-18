@@ -207,7 +207,10 @@ function buildData(self){
   // unrelated pickers (station assignment, blocker "waiting on", and so on)
   // where it wouldn't make sense to offer. It's added here only, so it shows
   // up as an ordinary conversation in the main chat list.
-  var others = DEPT_ORDER.filter(function(id){ return id !== self; }).concat(["dashboard"]);
+  var others = DEPT_ORDER.filter(function(id){ return id !== self; });
+  // Only the GM bridges both systems (app + dashboard) - every other
+  // department reaches head office by messaging the GM directly instead.
+  if(self === "gm") others = others.concat(["dashboard"]);
   return Promise.all(others.map(function(id){
     return apiGet('/api/messages?self=' + encodeURIComponent(self) + '&with=' + encodeURIComponent(id))
       .then(function(res){ return { id: id, messages: res.messages.map(function(row){ return mapServerMessage(row, self); }) }; });

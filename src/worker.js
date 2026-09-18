@@ -901,9 +901,12 @@ export default {
         }
 
         const validOrigin = fromDepartmentId && DEPT_IDS.has(fromDepartmentId) && fromDepartmentId !== departmentId;
+        // Unattributed head-office messages (no real department behind them)
+        // always land with the GM - he's the only one with a Head Office
+        // contact - regardless of which department the caller named.
         const row = await insertMessage(env, ctx, {
           from: validOrigin ? fromDepartmentId : "dashboard",
-          to: departmentId, type: "text",
+          to: validOrigin ? departmentId : "gm", type: "text",
           body: validOrigin ? message : (senderName ? senderName + ": " + message : message),
           dashboardConversationId: conversationId,
         });
@@ -1211,7 +1214,7 @@ export default {
       if (method === "GET" && p === "/api/messages") {
         const self = url.searchParams.get("self");
         const other = url.searchParams.get("with");
-        if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || other === "dashboard")) return json({ error: "Unknown department" }, 400);
+        if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || (other === "dashboard" && self === "gm"))) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
@@ -1799,6 +1802,8 @@ export default {
           if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);
         } else if (!DEPT_IDS.has(to) && to !== "dashboard") {
           return json({ error: "Unknown department" }, 400);
+        } else if (to === "dashboard" && from !== "gm") {
+          return json({ error: "Only the GM can message Head Office directly" }, 403);
         }
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
         if (type === "text" && !(text && text.trim()) && !poll) return json({ error: "Message text is required" }, 400);
