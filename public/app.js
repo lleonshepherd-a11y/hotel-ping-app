@@ -2933,7 +2933,7 @@ function enterApp(staff){
   loginScreen.hidden = true;
   setupScreen.hidden = true;
   appRoot.hidden = false;
-  sbSub.textContent = "Noir House · " + (DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "Department heads");
+  sbSub.textContent = DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "Department heads";
   switcherWrap.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
