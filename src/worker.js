@@ -883,6 +883,12 @@ export default {
         // general inbox.
         const conversationId = body.conversationId ? String(body.conversationId).trim() : null;
         const senderName = body.senderName ? String(body.senderName).trim().slice(0, 80) : null;
+        // Optional: when the message genuinely comes from one of our own 8
+        // departments (a ticket, a report from a real team), pass their
+        // slug here so it's delivered as if they messaged directly - no
+        // "Head Office" wrapper. Leave it out for a real head-office/system
+        // message that has no department behind it.
+        const fromDepartmentId = body.fromDepartmentId ? String(body.fromDepartmentId).trim() : null;
         if (!idempotencyKey) return json({ error: "idempotencyKey is required" }, 400);
         if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
         if (!message) return json({ error: "message is required" }, 400);
@@ -894,9 +900,11 @@ export default {
           return json({ ok: true, duplicate: true, messageId: existing.message_id });
         }
 
+        const validOrigin = fromDepartmentId && DEPT_IDS.has(fromDepartmentId) && fromDepartmentId !== departmentId;
         const row = await insertMessage(env, ctx, {
-          from: "dashboard", to: departmentId, type: "text",
-          body: senderName ? senderName + ": " + message : message,
+          from: validOrigin ? fromDepartmentId : "dashboard",
+          to: departmentId, type: "text",
+          body: validOrigin ? message : (senderName ? senderName + ": " + message : message),
           dashboardConversationId: conversationId,
         });
         await env.DB.prepare(

@@ -391,6 +391,7 @@ const server = http.createServer(async (req, res) => {
       const message = String(body.message || '').trim();
       const conversationId = body.conversationId ? String(body.conversationId).trim() : null;
       const senderName = body.senderName ? String(body.senderName).trim().slice(0, 80) : null;
+      const fromDepartmentId = body.fromDepartmentId ? String(body.fromDepartmentId).trim() : null;
       if (!idempotencyKey) return send(res, 400, { error: 'idempotencyKey is required' });
       if (!DEPT_IDS.has(departmentId)) return send(res, 400, { error: 'Unknown department' });
       if (!message) return send(res, 400, { error: 'message is required' });
@@ -398,9 +399,10 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT message_id FROM external_notifications WHERE idempotency_key = ?').get(idempotencyKey);
       if (existing) return send(res, 200, { ok: true, duplicate: true, messageId: existing.message_id });
 
+      const validOrigin = fromDepartmentId && DEPT_IDS.has(fromDepartmentId) && fromDepartmentId !== departmentId;
       const row = insertMessage({
-        from: 'dashboard', to: departmentId, type: 'text',
-        body: senderName ? senderName + ': ' + message : message,
+        from: validOrigin ? fromDepartmentId : 'dashboard', to: departmentId, type: 'text',
+        body: validOrigin ? message : (senderName ? senderName + ': ' + message : message),
         dashboardConversationId: conversationId,
       });
       db.prepare('INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)')
