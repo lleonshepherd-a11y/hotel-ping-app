@@ -1927,31 +1927,28 @@ function setOnDuty(id, on){
 
 var dutyTrack = document.getElementById("dutyTrack");
 var dutyKnob = document.getElementById("dutyKnob");
-var dutyStatusPill = document.getElementById("dutyStatusPill");
 
-function dutyMaxLeft(){ return dutyTrack.clientWidth - 26 - 6; }
+function dutyMaxLeft(){ return dutyTrack.clientWidth - 27 - 4; }
 
 function renderDuty(){
   var on = isOnDuty(STATE.self);
   dutyTrack.classList.toggle("off", !on);
-  dutyKnob.style.left = (on ? 3 : dutyMaxLeft() + 3) + "px";
+  dutyKnob.style.left = (on ? 2 : dutyMaxLeft() + 2) + "px";
   dutyKnob.setAttribute("aria-checked", on ? "true" : "false");
   dutyKnob.setAttribute("aria-label", on ? "On duty. Slide or press Enter to turn the board off" : "Board off. Slide or press Enter to turn it back on");
-  dutyStatusPill.textContent = on ? "On duty" : "Off duty";
-  dutyStatusPill.classList.toggle("off", !on);
 }
 
 (function(){
-  var dragging = false, startX = 0, startLeft = 3, moved = false;
+  var dragging = false, startX = 0, startLeft = 2, moved = false;
 
-  function clamp(v){ return Math.min(dutyMaxLeft() + 3, Math.max(3, v)); }
+  function clamp(v){ return Math.min(dutyMaxLeft() + 2, Math.max(2, v)); }
 
   function onDown(e){
     dragging = true; moved = false;
     dutyKnob.setPointerCapture(e.pointerId);
     dutyTrack.classList.add("dragging");
     startX = e.clientX;
-    startLeft = parseFloat(dutyKnob.style.left) || 3;
+    startLeft = parseFloat(dutyKnob.style.left) || 2;
   }
   function onMove(e){
     if(!dragging) return;
@@ -1963,8 +1960,8 @@ function renderDuty(){
     if(!dragging) return;
     dragging = false;
     dutyTrack.classList.remove("dragging");
-    var left = parseFloat(dutyKnob.style.left) || 3;
-    var pct = (left - 3) / dutyMaxLeft();
+    var left = parseFloat(dutyKnob.style.left) || 2;
+    var pct = (left - 2) / dutyMaxLeft();
     var wasOn = isOnDuty(STATE.self);
     var flip = wasOn ? pct > 0.55 : pct < 0.45;
     if(flip && moved) setOnDuty(STATE.self, !wasOn);
