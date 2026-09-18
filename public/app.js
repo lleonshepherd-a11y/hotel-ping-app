@@ -33,9 +33,7 @@ function shadeColor(hex, pct){
   return "#" + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
 }
 function avatarGradient(deptId){
-  var d = DEPTS[deptId];
-  if(!d || !d.color) return "linear-gradient(155deg, #2c2c30, #131315)";
-  return "linear-gradient(155deg, "+shadeColor(d.color, 16)+", "+shadeColor(d.color, -26)+")";
+  return "linear-gradient(155deg, #2c2c30, #131315)";
 }
 function avatarStyleAttr(deptId){
   return "position:relative;background:"+avatarGradient(deptId);
