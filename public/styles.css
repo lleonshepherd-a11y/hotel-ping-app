@@ -1244,5 +1244,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   .main{position:fixed;inset:0;height:100vh;height:100dvh;z-index:4;transform:translateX(100%);transition:transform .28s cubic-bezier(.3,1,.4,1)}
   .main.show-mobile{transform:translateX(0)}
   .back-btn{display:flex;position:absolute;left:16px;top:50%;transform:translateY(-50%)}
+  .thread-head{padding-left:64px}
   .bubble-wrap{max-width:84%}
 }
