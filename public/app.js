@@ -64,7 +64,7 @@ var DEPTS = {
   dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
-var HELP_ALERT_RESPONDER_DEPT = "gm";
+var HELP_ALERT_RESPONDER_DEPTS = ["gm"];
 
 // Real per-department state (contact name, on-duty flag) - loaded from the
 // server on boot and kept in sync with it, not held only in memory.
@@ -3018,19 +3018,65 @@ logoutBtn.addEventListener("click", function(){
 var adminOverlay = document.getElementById("adminOverlay");
 var adminClose = document.getElementById("adminClose");
 var staffListEl = document.getElementById("staffList");
-var addStaffForm = document.getElementById("addStaffForm");
-var addStaffDept = document.getElementById("addStaffDept");
-var addStaffError = document.getElementById("addStaffError");
+var setupChecklistEl = document.getElementById("setupChecklist");
+var setupTabsEl = document.getElementById("setupTabs");
+var setupPanelTeam = document.getElementById("setupPanelTeam");
+var setupPanelDepartments = document.getElementById("setupPanelDepartments");
+var setupPanelAreas = document.getElementById("setupPanelAreas");
+var deptSetupListEl = document.getElementById("deptSetupList");
+var floorListEl = document.getElementById("floorList");
+var addFloorForm = document.getElementById("addFloorForm");
+var zoneStubListEl = document.getElementById("zoneStubList");
+var SETUP_CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex:none"><path d="M20 6L9 17l-5-5"/></svg>';
 
 function openAdmin(){
-  addStaffDept.innerHTML = "";
-  DEPT_ORDER.forEach(function(id){
-    var opt = document.createElement("option");
-    opt.value = id; opt.textContent = DEPTS[id] ? DEPTS[id].name : id;
-    addStaffDept.appendChild(opt);
-  });
   adminOverlay.hidden = false;
+  setSetupTab("team");
   loadStaffList();
+  loadSetupChecklist();
+}
+
+function setSetupTab(tab){
+  Array.prototype.forEach.call(setupTabsEl.children, function(btn){
+    btn.classList.toggle("active", btn.getAttribute("data-tab") === tab);
+  });
+  setupPanelTeam.hidden = tab !== "team";
+  setupPanelDepartments.hidden = tab !== "departments";
+  setupPanelAreas.hidden = tab !== "areas";
+  if(tab === "departments") loadDeptSetupList();
+  if(tab === "areas") loadFloorList();
+}
+Array.prototype.forEach.call(setupTabsEl.children, function(btn){
+  btn.addEventListener("click", function(){ setSetupTab(btn.getAttribute("data-tab")); });
+});
+
+function loadSetupChecklist(){
+  setupChecklistEl.innerHTML = '<div class="handover-empty">Loading…</div>';
+  Promise.all([apiGet('/api/staff'), apiGet('/api/departments'), apiGet('/api/floors')]).then(function(results){
+    var staff = results[0].staff, departments = results[1].departments, floors = results[2].floors;
+    var hasAreas = floors.some(function(f){ return f.zones.length > 0; });
+    var items = [
+      { label: "Team members added", done: staff.length > 1, tab: "team" },
+      { label: "Departments configured", done: departments.length > 0 && departments.every(function(d){ return !!d.contactName; }), tab: "departments" },
+      { label: "Hotel areas mapped for SOS", done: hasAreas, tab: "areas" },
+    ];
+    setupChecklistEl.innerHTML = "";
+    var heading = document.createElement("div");
+    heading.className = "setup-checklist-heading";
+    heading.textContent = "Setup checklist – complete before going live";
+    setupChecklistEl.appendChild(heading);
+    var row = document.createElement("div");
+    row.className = "setup-checklist-row";
+    items.forEach(function(it){
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "setup-checklist-item" + (it.done ? " done" : "");
+      btn.innerHTML = (it.done ? SETUP_CHECK_SVG : '<span class="setup-checklist-dot"></span>') + '<span>' + esc(it.label) + '</span>';
+      btn.addEventListener("click", function(){ setSetupTab(it.tab); });
+      row.appendChild(btn);
+    });
+    setupChecklistEl.appendChild(row);
+  }).catch(function(){ setupChecklistEl.innerHTML = ""; });
 }
 
 function loadStaffList(){
@@ -3089,7 +3135,7 @@ function buildStaffRow(s){
   }
 
   var sub = document.createElement("span");
-  sub.textContent = "Added " + new Date(s.createdAt).toLocaleDateString();
+  sub.textContent = s.role ? s.role.replace(/_/g, " ") : ("Added " + new Date(s.createdAt).toLocaleDateString());
   name.appendChild(sub);
 
   var select = document.createElement("select");
@@ -3102,65 +3148,244 @@ function buildStaffRow(s){
   select.addEventListener("change", function(){
     apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { departmentId: select.value }).catch(function(){
       select.value = s.departmentId;
+      showToast("Couldn't change that department");
     });
   });
-
-  var resetPin = document.createElement("button");
-  resetPin.className = "staff-row-del";
-  resetPin.type = "button";
-  resetPin.setAttribute("aria-label", "Reset PIN for " + s.name);
-  resetPin.title = "Reset PIN";
-  resetPin.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>';
-  resetPin.addEventListener("click", function(){
-    showPrompt({ title: "Reset PIN for " + s.name, placeholder: "New 4-6 digit PIN", maxLength: 6, confirmLabel: "Reset" }).then(function(newPin){
-      if(newPin === null) return;
-      if(!/^\d{4,6}$/.test(newPin)){ showToast("PIN must be 4-6 digits"); return; }
-      apiSend('/api/staff/' + encodeURIComponent(s.id), 'PATCH', { pin: newPin }).then(function(){
-        showToast("PIN reset for " + s.name);
-      }).catch(function(){ showToast("Couldn't reset that PIN"); });
-    });
-  });
-
-  var del = document.createElement("button");
-  del.className = "staff-row-del";
-  del.type = "button";
-  del.setAttribute("aria-label", "Remove " + s.name);
-  del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
-  del.addEventListener("click", function(){
-    if(s.id === AUTH.staff.id) return;
-    showConfirm({ title: "Remove " + s.name + "?", confirmLabel: "Remove" }).then(function(ok){
-      if(!ok) return;
-      apiDelete('/api/staff/' + encodeURIComponent(s.id)).then(loadStaffList).catch(function(){});
-    });
-  });
-  if(s.id === AUTH.staff.id) del.disabled = true;
 
   row.appendChild(name);
   row.appendChild(select);
-  row.appendChild(resetPin);
-  row.appendChild(del);
+  return row;
+}
+
+/* ---------------- Hotel setup: Departments panel ---------------- */
+function loadDeptSetupList(){
+  deptSetupListEl.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/departments').then(function(res){
+    deptSetupListEl.innerHTML = "";
+    DEPT_ORDER.forEach(function(id){
+      var d = res.departments.find(function(x){ return x.id === id; }) || { id: id, name: DEPTS[id].name, contactName: "", onDuty: true };
+      deptSetupListEl.appendChild(buildDeptSetupRow(d));
+    });
+  }).catch(function(){ deptSetupListEl.innerHTML = '<div class="handover-empty">Couldn\'t load departments.</div>'; });
+}
+function buildDeptSetupRow(d){
+  var row = document.createElement("div");
+  row.className = "staff-row";
+  var name = document.createElement("div");
+  name.className = "staff-row-name";
+  var nameText = document.createElement("span");
+  nameText.className = "staff-row-name-text";
+  nameText.textContent = DEPTS[d.id] ? DEPTS[d.id].name : d.name;
+  name.appendChild(nameText);
+  var sub = document.createElement("span");
+  sub.textContent = d.onDuty ? "On duty" : "Off duty";
+  name.appendChild(sub);
+
+  var input = document.createElement("input");
+  input.type = "text";
+  input.className = "staff-row-name-input";
+  input.placeholder = "Contact name";
+  input.maxLength = 40;
+  input.value = d.contactName || "";
+  input.addEventListener("blur", function(){
+    var val = input.value.trim();
+    if(val === (d.contactName || "")) return;
+    apiSend('/api/departments/' + encodeURIComponent(d.id), 'PATCH', { contactName: val }).then(function(res2){
+      DEPT_META[d.id] = res2.department;
+      loadSetupChecklist();
+    }).catch(function(){
+      input.value = d.contactName || "";
+      showToast("Couldn't update that contact name");
+    });
+  });
+
+  row.appendChild(name);
+  row.appendChild(input);
+  return row;
+}
+
+/* ---------------- Hotel setup: Hotel areas (floor/zone mapper) ---------------- */
+var CURRENT_FLOORS = [];
+function loadFloorList(){
+  floorListEl.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/floors').then(function(res){
+    CURRENT_FLOORS = res.floors;
+    renderFloorList();
+    loadZoneStubList();
+    loadSetupChecklist();
+  }).catch(function(){ floorListEl.innerHTML = '<div class="handover-empty">Couldn\'t load hotel areas.</div>'; });
+}
+function renderFloorList(){
+  floorListEl.innerHTML = "";
+  if(!CURRENT_FLOORS.length){
+    floorListEl.innerHTML = '<div class="handover-empty">No floors yet. Add one below.</div>';
+    return;
+  }
+  CURRENT_FLOORS.forEach(function(f){ floorListEl.appendChild(buildFloorCard(f)); });
+}
+function buildRemoveBtn(label, onConfirm){
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "zone-chip-del";
+  btn.setAttribute("aria-label", "Remove " + label);
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+  btn.addEventListener("click", function(){
+    showConfirm({ title: "Remove " + label + "?", confirmLabel: "Remove" }).then(function(ok){ if(ok) onConfirm(); });
+  });
+  return btn;
+}
+function buildFloorCard(f){
+  var card = document.createElement("div");
+  card.className = "floor-card";
+
+  var head = document.createElement("div");
+  head.className = "floor-card-head";
+  var title = document.createElement("span");
+  title.className = "floor-card-title";
+  title.textContent = f.name;
+  head.appendChild(title);
+  head.appendChild(buildRemoveBtn(f.name, function(){
+    apiDelete('/api/floors/' + encodeURIComponent(f.id)).then(loadFloorList).catch(function(){});
+  }));
+  card.appendChild(head);
+
+  var zoneWrap = document.createElement("div");
+  zoneWrap.className = "zone-chip-list";
+  f.zones.forEach(function(z){ zoneWrap.appendChild(buildZoneGroup(z, f)); });
+  card.appendChild(zoneWrap);
+
+  var addAreaForm = document.createElement("form");
+  addAreaForm.className = "admin-add-form area-add-form";
+  addAreaForm.innerHTML = '<input type="text" placeholder="Add area, e.g. Main bar" maxlength="60" required><button type="submit" class="admin-add-btn">Add area</button>';
+  addAreaForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var input = addAreaForm.querySelector("input");
+    var val = input.value.trim();
+    if(!val) return;
+    apiSend('/api/zones', 'POST', { floorId: f.id, name: val }).then(function(){ loadFloorList(); }).catch(function(){ showToast("Couldn't add that area"); });
+  });
+  card.appendChild(addAreaForm);
+  return card;
+}
+function buildZoneGroup(z, f){
+  var wrap = document.createElement("div");
+  wrap.className = "zone-chip-group";
+
+  var chip = document.createElement("div");
+  chip.className = "zone-chip";
+  var label = document.createElement("span");
+  label.textContent = z.name;
+  chip.appendChild(label);
+  chip.appendChild(buildRemoveBtn(z.name, function(){
+    apiDelete('/api/zones/' + encodeURIComponent(z.id)).then(loadFloorList).catch(function(){});
+  }));
+  wrap.appendChild(chip);
+
+  var subWrap = document.createElement("div");
+  subWrap.className = "subzone-chip-list";
+  (z.subzones || []).forEach(function(s){
+    var subChip = document.createElement("span");
+    subChip.className = "zone-chip subzone-chip";
+    var subLabel = document.createElement("span");
+    subLabel.textContent = s.name;
+    subChip.appendChild(subLabel);
+    subChip.appendChild(buildRemoveBtn(s.name, function(){
+      apiDelete('/api/zones/' + encodeURIComponent(s.id)).then(loadFloorList).catch(function(){});
+    }));
+    subWrap.appendChild(subChip);
+  });
+
+  var addSubForm = document.createElement("form");
+  addSubForm.className = "subzone-add-form";
+  addSubForm.innerHTML = '<input type="text" placeholder="Sub-area, e.g. Corridor A" maxlength="40">'
+    + '<input type="text" class="range-input" placeholder="or a range, e.g. 101-120" maxlength="20">'
+    + '<button type="submit" aria-label="Add sub-area">+</button>';
+  addSubForm.addEventListener("submit", function(e){
+    e.preventDefault();
+    var nameInput = addSubForm.querySelector("input:not(.range-input)");
+    var rangeInput = addSubForm.querySelector(".range-input");
+    var names = [];
+    if(rangeInput.value.trim()){
+      var m = rangeInput.value.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+      if(!m){ showToast("Range must look like 101-120"); return; }
+      var start = parseInt(m[1], 10), end = parseInt(m[2], 10);
+      if(end < start || end - start > 200){ showToast("Check that range"); return; }
+      var prefix = nameInput.value.trim() || "Room ";
+      for(var n = start; n <= end; n++) names.push(prefix + n);
+    } else if(nameInput.value.trim()){
+      names.push(nameInput.value.trim());
+    } else {
+      return;
+    }
+    Promise.all(names.map(function(nm){
+      return apiSend('/api/zones', 'POST', { floorId: f.id, parentZoneId: z.id, name: nm }).catch(function(){});
+    })).then(loadFloorList);
+  });
+  subWrap.appendChild(addSubForm);
+  wrap.appendChild(subWrap);
+  return wrap;
+}
+addFloorForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var input = addFloorForm.querySelector("input");
+  var val = input.value.trim();
+  if(!val) return;
+  apiSend('/api/floors', 'POST', { name: val }).then(function(){ input.value = ""; loadFloorList(); }).catch(function(){ showToast("Couldn't add that floor"); });
+});
+
+/* ---------------- Hotel setup: per-department test location stub ---------------- */
+function flattenZonesForPicker(floors){
+  var out = [];
+  floors.forEach(function(f){
+    f.zones.forEach(function(z){
+      out.push({ id: z.id, label: f.name + " – " + z.name });
+      (z.subzones || []).forEach(function(s){ out.push({ id: s.id, label: f.name + " – " + z.name + ", " + s.name }); });
+    });
+  });
+  return out;
+}
+function loadZoneStubList(){
+  var options = flattenZonesForPicker(CURRENT_FLOORS);
+  apiGet('/api/department-zone-stub').then(function(res){
+    zoneStubListEl.innerHTML = "";
+    DEPT_ORDER.forEach(function(id){
+      zoneStubListEl.appendChild(buildStubRow(id, res.stubs[id], options));
+    });
+  }).catch(function(){ zoneStubListEl.innerHTML = '<div class="handover-empty">Couldn\'t load test locations.</div>'; });
+}
+function buildStubRow(deptId, stub, options){
+  var row = document.createElement("div");
+  row.className = "staff-row";
+  var name = document.createElement("span");
+  name.className = "staff-row-name-text";
+  name.textContent = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+
+  var select = document.createElement("select");
+  var noneOpt = document.createElement("option");
+  noneOpt.value = ""; noneOpt.textContent = "Not set";
+  select.appendChild(noneOpt);
+  options.forEach(function(o){
+    var opt = document.createElement("option");
+    opt.value = o.id; opt.textContent = o.label;
+    if(stub && stub.zoneId === o.id) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", function(){
+    if(!select.value){
+      apiDelete('/api/department-zone-stub/' + encodeURIComponent(deptId)).catch(function(){});
+      return;
+    }
+    apiSend('/api/department-zone-stub/' + encodeURIComponent(deptId), 'PUT', { zoneId: select.value }).catch(function(){ showToast("Couldn't set that test location"); });
+  });
+
+  row.appendChild(name);
+  row.appendChild(select);
   return row;
 }
 
 adminBtn.addEventListener("click", openAdmin);
 adminClose.addEventListener("click", function(){ adminOverlay.hidden = true; });
 adminOverlay.addEventListener("click", function(e){ if(e.target === adminOverlay) adminOverlay.hidden = true; });
-
-addStaffForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  var fd = new FormData(addStaffForm);
-  var name = String(fd.get("name") || "").trim();
-  var pin = String(fd.get("pin") || "").trim();
-  var departmentId = fd.get("departmentId");
-  addStaffError.textContent = "";
-  if(!/^\d{4,6}$/.test(pin)){ addStaffError.textContent = "PIN must be 4-6 digits."; return; }
-  apiSend('/api/staff', 'POST', { name: name, pin: pin, departmentId: departmentId }).then(function(){
-    addStaffForm.reset();
-    loadStaffList();
-  }).catch(function(err){
-    addStaffError.textContent = err.message || "Couldn't add staff.";
-  });
-});
 
 /* ---------------- Broadcast ---------------- */
 var broadcastOverlay = document.getElementById("broadcastOverlay");
@@ -4189,15 +4414,35 @@ function helpCancelArmed(){
   setTimeout(helpBackToIdle, 1100);
 }
 
+function captureGeoFix(timeoutMs){
+  return new Promise(function(resolve){
+    if(!navigator.geolocation){ resolve(null); return; }
+    var done = false;
+    var timer = setTimeout(function(){ if(!done){ done = true; resolve(null); } }, timeoutMs);
+    navigator.geolocation.getCurrentPosition(function(pos){
+      if(done) return; done = true; clearTimeout(timer);
+      resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
+    }, function(){
+      if(done) return; done = true; clearTimeout(timer);
+      resolve(null);
+    }, { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 15000 });
+  });
+}
 function helpSendHelpAlert(){
   helpHoldRing.style.background = "none";
-  apiSend('/api/help-alerts', 'POST', {}).then(function(res){
+  // A device fix is a nice-to-have, never a reason to delay the alert: give
+  // it a short window, then send with whatever's known (or nothing).
+  captureGeoFix(1500).then(function(coords){
+    var body = coords ? { lat: coords.lat, lng: coords.lng, accuracy: coords.accuracy } : {};
+    return apiSend('/api/help-alerts', 'POST', body);
+  }).then(function(res){
     if(navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 20]);
     helpSetPhase("sent", HELP_CHECK_SVG + "Sent");
     showToast("Help request sent");
     STATE.myHelpAlertId = res.alert.id;
     pollHelpAlerts();
     setTimeout(helpBackToIdle, 2200);
+    openWhereAreYou(res.alert.id);
   }).catch(function(){
     helpSetPhase("error", "Failed – retry");
     helpHoldBtn.classList.add("shake");
@@ -4208,9 +4453,71 @@ function helpSendHelpAlert(){
   });
 }
 
+/* ---------------- Where are you? (tap-to-confirm predefined area) ---------------- */
+var whereAreYouOverlay = document.getElementById("whereAreYouOverlay");
+var whereAreYouClose = document.getElementById("whereAreYouClose");
+var whereAreYouList = document.getElementById("whereAreYouList");
+var whereAreYouAlertId = null;
+function openWhereAreYou(alertId){
+  whereAreYouAlertId = alertId;
+  whereAreYouList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  whereAreYouOverlay.hidden = false;
+  apiGet('/api/floors').then(function(res){
+    renderWhereAreYouList(res.floors || []);
+  }).catch(function(){
+    whereAreYouList.innerHTML = '<div class="handover-empty">Couldn\'t load areas.</div>';
+  });
+}
+function renderWhereAreYouList(floors){
+  whereAreYouList.innerHTML = "";
+  var any = false;
+  floors.forEach(function(f){
+    if(!f.zones.length) return;
+    any = true;
+    var label = document.createElement("div");
+    label.className = "where-floor-label";
+    label.textContent = f.name;
+    whereAreYouList.appendChild(label);
+    var row = document.createElement("div");
+    row.className = "where-chip-row";
+    f.zones.forEach(function(z){
+      row.appendChild(buildWhereChip(z.name, z.id, false));
+      (z.subzones || []).forEach(function(s){
+        row.appendChild(buildWhereChip(s.name, s.id, true));
+      });
+    });
+    whereAreYouList.appendChild(row);
+  });
+  if(!any) whereAreYouList.innerHTML = '<div class="handover-empty">No areas set up yet – ask an admin to map them in Hotel setup.</div>';
+}
+function buildWhereChip(name, zoneId, isSub){
+  var chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "where-chip" + (isSub ? " subzone" : "");
+  chip.textContent = name;
+  chip.addEventListener("click", function(){
+    if(!whereAreYouAlertId) return;
+    apiSend('/api/help-alerts/' + encodeURIComponent(whereAreYouAlertId) + '/location', 'PATCH', { zoneId: zoneId }).then(function(){
+      showToast("Location confirmed: " + name);
+      whereAreYouOverlay.hidden = true;
+      pollHelpAlerts();
+    }).catch(function(){ showToast("Couldn't update location"); });
+  });
+  return chip;
+}
+whereAreYouClose.addEventListener("click", function(){ whereAreYouOverlay.hidden = true; });
+whereAreYouOverlay.addEventListener("click", function(e){ if(e.target === whereAreYouOverlay) whereAreYouOverlay.hidden = true; });
+
+function helpLocationLabel(loc){
+  if(!loc || !loc.available) return "Location not available";
+  var parts = [loc.subzoneName, loc.zoneName].filter(Boolean);
+  var place = parts.join(", ") || loc.floorName || "Unknown area";
+  return loc.floorName && loc.zoneName ? loc.floorName + " – " + place : place;
+}
+
 function renderHelpBanners(alerts){
   helpBannerStack.innerHTML = "";
-  var isResponder = STATE.self === HELP_ALERT_RESPONDER_DEPT || (AUTH.staff && AUTH.staff.isAdmin);
+  var isResponder = HELP_ALERT_RESPONDER_DEPTS.includes(STATE.self) || (AUTH.staff && AUTH.staff.isAdmin);
 
   if(STATE.myHelpAlertId){
     var mine = alerts.find(function(a){ return a.id === STATE.myHelpAlertId; });
@@ -4223,9 +4530,11 @@ function renderHelpBanners(alerts){
         '</svg></span>' +
         '<div class="help-banner-body">' +
           '<div class="help-banner-title">' + (mine.respondedAt ? "Help is on the way" : "Help request sent") + '</div>' +
-          '<div class="help-banner-sub">' + (mine.respondedAt ? esc(mine.respondedByName || "GM") + " is responding" : "Waiting for a response…") + '</div>' +
+          '<div class="help-banner-sub">' + (mine.respondedAt ? esc(mine.respondedByName || "GM") + " is responding" : "Waiting for a response…") + ' · ' + esc(helpLocationLabel(mine.location)) + '</div>' +
         '</div>' +
+        '<button type="button" class="help-banner-locate" aria-label="Update location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="6"/></svg></button>' +
         '<button type="button" class="help-banner-dismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+      banner.querySelector(".help-banner-locate").addEventListener("click", function(){ openWhereAreYou(mine.id); });
       banner.querySelector(".help-banner-dismiss").addEventListener("click", function(){
         helpDismissed[mine.id] = true;
         STATE.myHelpAlertId = null;
@@ -4239,15 +4548,15 @@ function renderHelpBanners(alerts){
 
   if(isResponder){
     alerts.filter(function(a){
-      return !a.respondedAt && a.departmentId !== HELP_ALERT_RESPONDER_DEPT && !helpDismissed[a.id];
+      return !a.respondedAt && !HELP_ALERT_RESPONDER_DEPTS.includes(a.departmentId) && !helpDismissed[a.id];
     }).forEach(function(a){
       var banner = document.createElement("div");
       banner.className = "help-banner";
       banner.innerHTML =
         '<span class="help-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg></span>' +
         '<div class="help-banner-body">' +
-          '<div class="help-banner-title">' + esc(DEPTS[a.departmentId] ? DEPTS[a.departmentId].name : a.departmentId) + ' needs help</div>' +
-          '<div class="help-banner-sub">' + fmtNoteTime(a.createdAt) + '</div>' +
+          '<div class="help-banner-title">' + esc(DEPTS[a.departmentId] ? DEPTS[a.departmentId].name : a.departmentId) + (a.raisedByName ? ' (' + esc(a.raisedByName) + ')' : '') + ' needs help</div>' +
+          '<div class="help-banner-sub">' + fmtNoteTime(a.createdAt) + ' · ' + esc(helpLocationLabel(a.location)) + '</div>' +
         '</div>' +
         '<button type="button" class="help-banner-respond">Responding</button>';
       var btn = banner.querySelector(".help-banner-respond");

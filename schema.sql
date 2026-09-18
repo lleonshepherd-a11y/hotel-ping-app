@@ -302,16 +302,62 @@ CREATE TABLE IF NOT EXISTS asset_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
 
+-- Floor plans and named zones/subzones. This is the data half of the
+-- location service the SOS flow calls - see resolveLocation() in worker.js
+-- for the service boundary itself.
+CREATE TABLE IF NOT EXISTS floors (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  plan_image_path TEXT,
+  created_at TEXT NOT NULL
+);
+-- lat/lng are optional and approximate - a single reference point for the
+-- zone, not a boundary. They're what let resolveLocation() match a real
+-- device-reported position (see below) to a zone; a zone with no
+-- coordinates set can still be used manually via department_zone_stub.
+CREATE TABLE IF NOT EXISTS zones (
+  id TEXT PRIMARY KEY,
+  floor_id TEXT NOT NULL,
+  parent_zone_id TEXT,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  lat REAL,
+  lng REAL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_zones_floor ON zones(floor_id, position);
+
+-- Location service STUB: until real indoor positioning (BLE beacons, WiFi
+-- RTT, UWB tags, whatever) is wired in, each department's "current zone"
+-- is just whatever an admin last set it to here for testing. resolveLocation()
+-- is the only thing that reads this table - swapping in a real positioning
+-- backend later means rewriting that one function, nothing else.
+CREATE TABLE IF NOT EXISTS department_zone_stub (
+  department_id TEXT PRIMARY KEY,
+  zone_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- Press-and-hold safety alerts. Deliberately separate from the messages
 -- table - no typing, no department picker, never appears in a chat thread.
--- Always goes to the predefined responder (GM) with just department + time.
+-- Goes to every predefined responder department with department + time,
+-- plus whatever the location service could resolve (zone-level at best -
+-- never more precise than what's actually known).
 CREATE TABLE IF NOT EXISTS help_alerts (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,
   raised_by_name TEXT,
+  raised_by_staff_id TEXT,
   created_at TEXT NOT NULL,
   responded_by_name TEXT,
-  responded_at TEXT
+  responded_at TEXT,
+  location_available INTEGER NOT NULL DEFAULT 0,
+  location_source TEXT,
+  floor_name TEXT,
+  zone_name TEXT,
+  subzone_name TEXT,
+  location_accuracy_m REAL
 );
 CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
 

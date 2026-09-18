@@ -15,8 +15,63 @@ DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
 DEPT_NAMES.dashboard = 'Head Office';
 const DEFAULT_QUICK_REPLIES = ['On it', 'Done', '5 mins', 'On my way', 'Noted', 'Course away', 'Hold 10 mins', 'Ready for dessert'];
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
-const HELP_ALERT_RESPONDER_DEPT = 'gm';
+const HELP_ALERT_RESPONDER_DEPTS = ['gm'];
 const HELP_ALERT_WINDOW_MINUTES = 30;
+const MAX_DEVICE_MATCH_METERS = 60;
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function resolveLocation(requester, deviceCoords) {
+  try {
+    if (deviceCoords && typeof deviceCoords.lat === 'number' && typeof deviceCoords.lng === 'number') {
+      const rows = db.prepare(
+        `SELECT z.id, z.name AS zone_name, z.parent_zone_id, z.lat, z.lng, f.name AS floor_name
+         FROM zones z JOIN floors f ON f.id = z.floor_id WHERE z.lat IS NOT NULL AND z.lng IS NOT NULL`
+      ).all();
+      let best = null, bestDist = Infinity;
+      for (const z of rows) {
+        const dist = haversineMeters(deviceCoords.lat, deviceCoords.lng, z.lat, z.lng);
+        if (dist < bestDist) { bestDist = dist; best = z; }
+      }
+      if (best && bestDist <= MAX_DEVICE_MATCH_METERS) {
+        let zoneName = best.zone_name, subzoneName = null;
+        if (best.parent_zone_id) {
+          const parent = db.prepare('SELECT name FROM zones WHERE id = ?').get(best.parent_zone_id);
+          if (parent) { zoneName = parent.name; subzoneName = best.zone_name; }
+        }
+        return {
+          available: true, source: 'device', floorName: best.floor_name, zoneName, subzoneName,
+          accuracyMeters: typeof deviceCoords.accuracy === 'number' ? deviceCoords.accuracy : null,
+        };
+      }
+    }
+    const row = db.prepare(
+      `SELECT z.id AS zone_id, z.name AS zone_name, z.parent_zone_id, f.name AS floor_name
+       FROM department_zone_stub dzs JOIN zones z ON z.id = dzs.zone_id JOIN floors f ON f.id = z.floor_id
+       WHERE dzs.department_id = ?`
+    ).get(requester.department_id);
+    if (!row) return { available: false };
+    let zoneName = row.zone_name, subzoneName = null;
+    if (row.parent_zone_id) {
+      const parent = db.prepare('SELECT name FROM zones WHERE id = ?').get(row.parent_zone_id);
+      if (parent) { zoneName = parent.name; subzoneName = row.zone_name; }
+    }
+    return { available: true, source: 'stub', floorName: row.floor_name, zoneName, subzoneName };
+  } catch (e) {
+    console.error('resolveLocation error:', e && e.stack || e);
+    return { available: false };
+  }
+}
+function formatLocationLabel(location) {
+  if (!location || !location.available) return 'location not available';
+  const parts = [location.subzoneName, location.zoneName].filter(Boolean);
+  const place = parts.join(', ') || location.floorName || 'unknown zone';
+  return location.floorName && location.zoneName ? location.floorName + ' - ' + place : place;
+}
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
@@ -1121,26 +1176,49 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/help-alerts') {
       const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const deviceCoords = (typeof body.lat === 'number' && typeof body.lng === 'number')
+        ? { lat: body.lat, lng: body.lng, accuracy: typeof body.accuracy === 'number' ? body.accuracy : null }
+        : null;
+      const location = resolveLocation(requester, deviceCoords);
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
-      db.prepare('INSERT INTO help_alerts (id, department_id, raised_by_name, created_at) VALUES (?, ?, ?, ?)')
-        .run(id, requester.department_id, requester.name || null, now);
-      if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT) {
-        console.log('[help alert]', HELP_ALERT_RESPONDER_DEPT, ': ', (DEPT_NAMES[requester.department_id] || requester.department_id), 'needs help now');
+      db.prepare(
+        `INSERT INTO help_alerts (id, department_id, raised_by_name, raised_by_staff_id, created_at,
+           location_available, location_source, floor_name, zone_name, subzone_name, location_accuracy_m)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        id, requester.department_id, requester.name || null, requester.id, now,
+        location.available ? 1 : 0, location.source || null, location.floorName || null,
+        location.zoneName || null, location.subzoneName || null,
+        location.accuracyMeters != null ? location.accuracyMeters : null
+      );
+      const locationLabel = formatLocationLabel(location);
+      for (const deptId of HELP_ALERT_RESPONDER_DEPTS) {
+        if (deptId === requester.department_id) continue;
+        console.log('[help alert]', deptId, ': ', (DEPT_NAMES[requester.department_id] || requester.department_id), 'needs help now -', locationLabel);
       }
-      return send(res, 201, { alert: { id, departmentId: requester.department_id, createdAt: now, respondedByName: null, respondedAt: null } });
+      return send(res, 201, { alert: {
+        id, departmentId: requester.department_id, raisedByName: requester.name || null, createdAt: now,
+        respondedByName: null, respondedAt: null, location,
+      } });
     }
 
     if (req.method === 'GET' && p === '/api/help-alerts') {
       const requester = staffFromToken(req);
       const cutoffMs = Date.now() - HELP_ALERT_WINDOW_MINUTES * 60000;
       const rows = db.prepare('SELECT * FROM help_alerts WHERE created_at > ? ORDER BY created_at DESC').all(new Date(cutoffMs).toISOString());
-      const isResponder = requester.department_id === HELP_ALERT_RESPONDER_DEPT || requester.is_admin;
+      const isResponder = HELP_ALERT_RESPONDER_DEPTS.includes(requester.department_id) || requester.is_admin;
       const alerts = rows
         .filter((r) => isResponder || r.department_id === requester.department_id)
         .map((r) => ({
-          id: r.id, departmentId: r.department_id, createdAt: r.created_at,
+          id: r.id, departmentId: r.department_id, raisedByName: r.raised_by_name || null, createdAt: r.created_at,
           respondedByName: r.responded_by_name || null, respondedAt: r.responded_at || null,
+          location: {
+            available: !!r.location_available, source: r.location_source || undefined,
+            floorName: r.floor_name || undefined, zoneName: r.zone_name || undefined,
+            subzoneName: r.subzone_name || undefined, accuracyMeters: r.location_accuracy_m != null ? r.location_accuracy_m : undefined,
+          },
         }));
       return send(res, 200, { alerts });
     }
@@ -1148,8 +1226,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && p.startsWith('/api/help-alerts/') && p.endsWith('/respond')) {
       const id = decodeURIComponent(p.slice('/api/help-alerts/'.length, -'/respond'.length));
       const requester = staffFromToken(req);
-      if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT && !requester.is_admin) {
-        return send(res, 403, { error: 'Only the designated responder can respond to this' });
+      if (!HELP_ALERT_RESPONDER_DEPTS.includes(requester.department_id) && !requester.is_admin) {
+        return send(res, 403, { error: 'Only a designated responder can respond to this' });
       }
       const existing = db.prepare('SELECT * FROM help_alerts WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Not found' });
@@ -1162,6 +1240,185 @@ const server = http.createServer(async (req, res) => {
         id: row.id, departmentId: row.department_id, createdAt: row.created_at,
         respondedByName: row.responded_by_name || null, respondedAt: row.responded_at || null,
       } });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/help-alerts/') && p.endsWith('/location')) {
+      const id = decodeURIComponent(p.slice('/api/help-alerts/'.length, -'/location'.length));
+      const requester = staffFromToken(req);
+      const existing = db.prepare('SELECT * FROM help_alerts WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      if (existing.raised_by_staff_id !== requester.id && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the person who raised this alert can update its location' });
+      }
+      const body = await readJsonBody(req);
+      if (!body.zoneId) return send(res, 400, { error: 'zoneId is required' });
+      const zone = db.prepare('SELECT * FROM zones WHERE id = ?').get(body.zoneId);
+      if (!zone) return send(res, 404, { error: 'Unknown zone' });
+      const floor = db.prepare('SELECT name FROM floors WHERE id = ?').get(zone.floor_id);
+      let zoneName = zone.name, subzoneName = null;
+      if (zone.parent_zone_id) {
+        const parent = db.prepare('SELECT name FROM zones WHERE id = ?').get(zone.parent_zone_id);
+        if (parent) { zoneName = parent.name; subzoneName = zone.name; }
+      }
+      db.prepare(
+        `UPDATE help_alerts SET location_available = 1, location_source = 'manual',
+           floor_name = ?, zone_name = ?, subzone_name = ?, location_accuracy_m = NULL WHERE id = ?`
+      ).run(floor ? floor.name : null, zoneName, subzoneName, id);
+      return send(res, 200, { location: { available: true, source: 'manual', floorName: floor ? floor.name : null, zoneName, subzoneName } });
+    }
+
+    if (req.method === 'GET' && p === '/api/floors') {
+      const floorRows = db.prepare('SELECT * FROM floors ORDER BY position, created_at').all();
+      const zoneRows = db.prepare('SELECT * FROM zones ORDER BY position, created_at').all();
+      const zonesByFloor = {};
+      for (const z of zoneRows) (zonesByFloor[z.floor_id] = zonesByFloor[z.floor_id] || []).push(z);
+      const floors = floorRows.map((f) => {
+        const zones = zonesByFloor[f.id] || [];
+        const top = zones.filter((z) => !z.parent_zone_id);
+        const bySubzone = {};
+        for (const z of zones) if (z.parent_zone_id) (bySubzone[z.parent_zone_id] = bySubzone[z.parent_zone_id] || []).push(z);
+        return {
+          id: f.id, name: f.name, position: f.position,
+          planImageUrl: f.plan_image_path ? '/uploads/' + f.plan_image_path : null,
+          zones: top.map((z) => ({
+            id: z.id, name: z.name, lat: z.lat, lng: z.lng,
+            subzones: (bySubzone[z.id] || []).map((s) => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng })),
+          })),
+        };
+      });
+      return send(res, 200, { floors });
+    }
+
+    if (req.method === 'POST' && p === '/api/floors') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      if (!body.name || !body.name.trim()) return send(res, 400, { error: 'Floor name is required' });
+      const id = crypto.randomUUID();
+      const n = db.prepare('SELECT COUNT(*) AS n FROM floors').get().n;
+      db.prepare('INSERT INTO floors (id, name, position, created_at) VALUES (?, ?, ?, ?)').run(id, body.name.trim(), n, new Date().toISOString());
+      return send(res, 201, { floor: { id, name: body.name.trim(), position: n, planImageUrl: null, zones: [] } });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/floors/') && !p.includes('/plan')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/floors/'.length));
+      const existing = db.prepare('SELECT id FROM floors WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      const body = await readJsonBody(req);
+      if (typeof body.name === 'string' && body.name.trim()) db.prepare('UPDATE floors SET name = ? WHERE id = ?').run(body.name.trim(), id);
+      if (typeof body.position === 'number') db.prepare('UPDATE floors SET position = ? WHERE id = ?').run(body.position, id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/floors/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/floors/'.length));
+      const zoneIds = db.prepare('SELECT id FROM zones WHERE floor_id = ?').all(id).map((z) => z.id);
+      for (const zid of zoneIds) db.prepare('DELETE FROM department_zone_stub WHERE zone_id = ?').run(zid);
+      db.prepare('DELETE FROM zones WHERE floor_id = ?').run(id);
+      db.prepare('DELETE FROM floors WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/floors/') && p.endsWith('/plan')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/floors/'.length, -'/plan'.length));
+      const existing = db.prepare('SELECT id FROM floors WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      const body = await readJsonBody(req);
+      if (!body.fileBase64) return send(res, 400, { error: 'Plan image is required' });
+      const buf = Buffer.from(body.fileBase64, 'base64');
+      if (buf.length > 8 * 1024 * 1024) return send(res, 400, { error: 'Plan image is too large (8MB max)' });
+      const ext = (body.fileMime && body.fileMime.split('/')[1]) ? '.' + body.fileMime.split('/')[1].split(';')[0] : '';
+      const safeName = 'floor-' + id + '-' + crypto.randomUUID() + ext;
+      fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
+      db.prepare('UPDATE floors SET plan_image_path = ? WHERE id = ?').run(safeName, id);
+      return send(res, 200, { planImageUrl: '/uploads/' + safeName });
+    }
+
+    if (req.method === 'POST' && p === '/api/zones') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      if (!body.floorId || !body.name || !body.name.trim()) return send(res, 400, { error: 'floorId and name are required' });
+      const floor = db.prepare('SELECT id FROM floors WHERE id = ?').get(body.floorId);
+      if (!floor) return send(res, 404, { error: 'Unknown floor' });
+      if (body.parentZoneId) {
+        const parent = db.prepare('SELECT id FROM zones WHERE id = ? AND floor_id = ?').get(body.parentZoneId, body.floorId);
+        if (!parent) return send(res, 404, { error: 'Unknown parent zone' });
+      }
+      const id = crypto.randomUUID();
+      const n = db.prepare('SELECT COUNT(*) AS n FROM zones WHERE floor_id = ?').get(body.floorId).n;
+      const lat = typeof body.lat === 'number' ? body.lat : null;
+      const lng = typeof body.lng === 'number' ? body.lng : null;
+      db.prepare(
+        'INSERT INTO zones (id, floor_id, parent_zone_id, name, position, lat, lng, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, body.floorId, body.parentZoneId || null, body.name.trim(), n, lat, lng, new Date().toISOString());
+      return send(res, 201, { zone: { id, name: body.name.trim(), lat, lng, subzones: [] } });
+    }
+
+    if (req.method === 'PATCH' && p.startsWith('/api/zones/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/zones/'.length));
+      const existing = db.prepare('SELECT id FROM zones WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      const body = await readJsonBody(req);
+      if (typeof body.name === 'string' && body.name.trim()) db.prepare('UPDATE zones SET name = ? WHERE id = ?').run(body.name.trim(), id);
+      if (typeof body.lat === 'number' && typeof body.lng === 'number') db.prepare('UPDATE zones SET lat = ?, lng = ? WHERE id = ?').run(body.lat, body.lng, id);
+      else if (body.lat === null && body.lng === null) db.prepare('UPDATE zones SET lat = NULL, lng = NULL WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/zones/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/zones/'.length));
+      const childIds = db.prepare('SELECT id FROM zones WHERE parent_zone_id = ?').all(id).map((z) => z.id);
+      for (const cid of childIds) db.prepare('DELETE FROM department_zone_stub WHERE zone_id = ?').run(cid);
+      db.prepare('DELETE FROM zones WHERE parent_zone_id = ?').run(id);
+      db.prepare('DELETE FROM department_zone_stub WHERE zone_id = ?').run(id);
+      db.prepare('DELETE FROM zones WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/department-zone-stub') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const rows = db.prepare(
+        `SELECT dzs.department_id, dzs.zone_id, dzs.updated_at, z.name AS zone_name, z.parent_zone_id, f.name AS floor_name
+         FROM department_zone_stub dzs JOIN zones z ON z.id = dzs.zone_id JOIN floors f ON f.id = z.floor_id`
+      ).all();
+      const stubs = {};
+      for (const r of rows) stubs[r.department_id] = { zoneId: r.zone_id, floorName: r.floor_name, zoneName: r.zone_name, updatedAt: r.updated_at };
+      return send(res, 200, { stubs });
+    }
+
+    if (req.method === 'PUT' && p.startsWith('/api/department-zone-stub/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const deptId = decodeURIComponent(p.slice('/api/department-zone-stub/'.length));
+      if (!DEPT_IDS.has(deptId)) return send(res, 404, { error: 'Unknown department' });
+      const body = await readJsonBody(req);
+      if (!body.zoneId) return send(res, 400, { error: 'zoneId is required' });
+      const zone = db.prepare('SELECT id FROM zones WHERE id = ?').get(body.zoneId);
+      if (!zone) return send(res, 404, { error: 'Unknown zone' });
+      db.prepare(
+        'INSERT INTO department_zone_stub (department_id, zone_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(department_id) DO UPDATE SET zone_id = excluded.zone_id, updated_at = excluded.updated_at'
+      ).run(deptId, body.zoneId, new Date().toISOString());
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/department-zone-stub/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const deptId = decodeURIComponent(p.slice('/api/department-zone-stub/'.length));
+      db.prepare('DELETE FROM department_zone_stub WHERE department_id = ?').run(deptId);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'GET' && p === '/api/blockers') {

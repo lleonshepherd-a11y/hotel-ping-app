@@ -146,7 +146,7 @@
     <div class="sb-menu-list">
       <button class="sb-menu-row" id="adminBtn" hidden type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-        <span class="sb-menu-label">Manage staff</span>
+        <span class="sb-menu-label">Hotel setup</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="feedBtn" hidden type="button">
@@ -675,21 +675,36 @@
 </div>
 
 <div class="admin-overlay" id="adminOverlay" hidden>
-  <div class="admin-modal">
+  <div class="admin-modal admin-modal-wide">
     <div class="admin-modal-head">
-      <h2>Manage staff</h2>
+      <h2>Hotel setup</h2>
       <button class="admin-close" id="adminClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div id="staffList"></div>
-    <form class="admin-add-form" id="addStaffForm">
-      <input type="text" name="name" placeholder="Name" required>
-      <input type="text" name="pin" placeholder="4-6 digit PIN" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required>
-      <select name="departmentId" id="addStaffDept" required></select>
-      <button type="submit" class="admin-add-btn">Add staff</button>
-      <div class="admin-add-error" id="addStaffError"></div>
-    </form>
+    <div class="setup-checklist" id="setupChecklist"></div>
+    <div class="setup-tabs" id="setupTabs">
+      <button type="button" class="setup-tab active" data-tab="team">Team</button>
+      <button type="button" class="setup-tab" data-tab="departments">Departments</button>
+      <button type="button" class="setup-tab" data-tab="areas">Hotel areas</button>
+    </div>
+    <div class="setup-panel" id="setupPanelTeam">
+      <div id="staffList"></div>
+      <div class="setup-note">Adding staff, removing staff and PIN resets are managed from the dashboard. Names and department can be updated here.</div>
+    </div>
+    <div class="setup-panel" id="setupPanelDepartments" hidden>
+      <div id="deptSetupList"></div>
+    </div>
+    <div class="setup-panel" id="setupPanelAreas" hidden>
+      <div class="setup-note">Named areas an SOS responder can see, and (until a hotel has real indoor positioning everywhere) the test location used for the "current zone" a hold-for-help alert reports.</div>
+      <div id="floorList"></div>
+      <form class="admin-add-form" id="addFloorForm">
+        <input type="text" name="name" placeholder="Floor name, e.g. Ground floor" required maxlength="60">
+        <button type="submit" class="admin-add-btn">Add floor</button>
+      </form>
+      <div class="setup-subhead">Test locations (per department, until real positioning covers everywhere)</div>
+      <div id="zoneStubList"></div>
+    </div>
   </div>
 </div>
 
@@ -1121,6 +1136,19 @@
 <div class="toast" id="appToast" hidden></div>
 
 <div class="help-banner-stack" id="helpBannerStack"></div>
+
+<div class="admin-overlay" id="whereAreYouOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Where are you?</h2>
+      <button class="admin-close" id="whereAreYouClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="setup-note">Tap your area so responders know exactly where to go.</div>
+    <div id="whereAreYouList" class="where-list"></div>
+  </div>
+</div>
 
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>

@@ -831,6 +831,46 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .poll-option-input{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
 .admin-modal-head-actions{display:flex;align-items:center;gap:4px}
+
+/* ---- Hotel setup ---- */
+.admin-modal-wide{width:600px}
+.setup-note{font-size:12px;color:var(--text-faint);line-height:1.5;margin-bottom:14px}
+.setup-checklist{margin-bottom:16px}
+.setup-checklist-heading{font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.setup-checklist-row{display:flex;flex-wrap:wrap;gap:8px}
+.setup-checklist-item{display:flex;align-items:center;gap:6px;border:1.5px solid var(--border);background:var(--surface-2);border-radius:20px;padding:6px 12px 6px 10px;font-size:12px;font-weight:700;color:var(--text-faint)}
+.setup-checklist-item.done{border-color:transparent;background:var(--active-tint);color:var(--accent)}
+.setup-checklist-dot{width:7px;height:7px;border-radius:50%;background:var(--urgent);flex:none}
+.setup-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:10px}
+.setup-tab{border:none;background:none;font-size:13px;font-weight:700;color:var(--text-faint);padding:6px 10px;border-radius:10px}
+.setup-tab.active{background:var(--surface-2);color:var(--text)}
+.setup-subhead{font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px}
+.floor-card{border:1.5px solid var(--border);border-radius:14px;padding:12px;margin-bottom:10px}
+.floor-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.floor-card-title{font-weight:800;font-size:13.5px}
+.zone-chip-list{display:flex;flex-direction:column;gap:8px}
+.zone-chip-group{display:flex;flex-direction:column;gap:6px}
+.zone-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface-2);border-radius:14px;padding:5px 6px 5px 11px;font-size:12.5px;font-weight:700;width:fit-content}
+.subzone-chip{background:var(--active-tint);font-weight:600}
+.subzone-chip-list{display:flex;flex-wrap:wrap;gap:6px;padding-left:16px}
+.zone-chip-del{border:none;background:none;color:var(--text-faint);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+.zone-chip-del:hover{color:var(--urgent);background:var(--urgent-tint)}
+.zone-chip-del svg{width:11px;height:11px}
+.area-add-form{margin-top:10px;padding-top:10px;flex-direction:row;gap:8px;border-top:1px dashed var(--border)}
+.area-add-form input{flex:1}
+.area-add-form .admin-add-btn{width:auto;flex:none}
+.subzone-add-form{display:flex;gap:6px;align-items:center;width:100%}
+.subzone-add-form input{font-size:12.5px;padding:6px 9px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2)}
+.subzone-add-form input:not(.range-input){flex:1;min-width:90px}
+.subzone-add-form .range-input{flex:1;min-width:110px}
+.subzone-add-form button{border:none;background:var(--surface-2);border:1.5px solid var(--border);width:28px;height:28px;border-radius:50%;font-weight:800;color:var(--accent);flex:none}
+
+.where-list{display:flex;flex-direction:column;gap:10px;max-height:50vh;overflow-y:auto}
+.where-floor-label{font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.where-chip-row{display:flex;flex-wrap:wrap;gap:8px}
+.where-chip{border:1.5px solid var(--border);background:var(--surface-2);border-radius:16px;padding:8px 14px;font-size:13px;font-weight:700}
+.where-chip:active{transform:scale(.96);background:var(--active-tint)}
+.where-chip.subzone{font-weight:600;color:var(--text-faint)}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}
@@ -1275,6 +1315,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .help-banner-respond:disabled{opacity:.6}
 .help-banner-dismiss{flex:none;width:24px;height:24px;border:none;background:none;color:var(--text-faint);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .help-banner-dismiss svg{width:14px;height:14px}
+.help-banner-locate{flex:none;width:24px;height:24px;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.help-banner-locate svg{width:15px;height:15px}
 
 .toast{
   position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);z-index:60;
