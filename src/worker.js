@@ -315,6 +315,95 @@ async function checkDashboardDepartmentDrift(env) {
   }
 }
 
+function dashboardApiOrigin(env) {
+  if (!env.DASHBOARD_DEPARTMENTS_URL) return null;
+  try { return new URL(env.DASHBOARD_DEPARTMENTS_URL).origin; } catch (e) { return null; }
+}
+
+// Maintenance tickets live in the dashboard's own NOIR_DB table, shared by
+// both systems - so a ticket the dashboard creates directly is already
+// visible in Hotel Ping's Repairs board without any bridging. What's
+// missing is the *alert*: Hotel Ping only ever notifies staff (push +
+// chat message) at the moment ITS OWN POST /api/maintenance handler
+// creates a ticket, which a dashboard-side insert never goes through.
+// This tick spots any ticket with no local meta row yet - the exact
+// signal that it bypassed our creation flow - and sends the same
+// notification + chat message our own flow would have sent.
+async function checkUnnotifiedTickets(env, ctx) {
+  const rows = await env.NOIR_DB.prepare(
+    `SELECT id, room_number, description, priority, guest_present, deadline, created_at
+     FROM maintenance_tickets WHERE status != 'fixed' ORDER BY created_at DESC LIMIT 50`
+  ).all();
+  if (!rows.results.length) return;
+  const ids = rows.results.map((r) => r.id);
+  const placeholders = ids.map(() => "?").join(",");
+  const metaRows = await env.DB.prepare(
+    `SELECT ticket_id FROM maintenance_ticket_meta WHERE ticket_id IN (${placeholders})`
+  ).bind(...ids).all();
+  const known = new Set(metaRows.results.map((r) => r.ticket_id));
+  for (const t of rows.results) {
+    if (known.has(t.id)) continue;
+    // Give our own creation flow a moment to write its meta row first,
+    // so this never races a ticket Hotel Ping itself just created.
+    if (Date.now() - new Date(t.created_at).getTime() < 30000) continue;
+    await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(t.id).run();
+    let body = (t.room_number ? "Room " + t.room_number + ": " : "") + t.description;
+    if (t.guest_present) body += " · Guest in room";
+    if (t.deadline) body += " · Needed by " + t.deadline;
+    await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from dashboard: " + body });
+    const notifyPromise = notifyDepartment(env, "maintenance", {
+      title: t.priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
+      body, url: "/", tag: "hotel-ping-maintenance-" + t.id,
+    }, null).catch((e) => console.error("notifyDepartment (dashboard ticket) error:", e && e.stack || e));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+  }
+}
+
+// Same idea for the dashboard's planner: no Hotel Ping screen shows it, so
+// the only way a manager finds out about a diary entry is if it reaches
+// them as a message. Best-effort and silent no-op until the dashboard side
+// confirms this read endpoint/key - if it 401s or the shape is wrong this
+// just logs and skips, it never breaks the cron tick.
+async function checkPlannerAlerts(env, ctx) {
+  const origin = dashboardApiOrigin(env);
+  if (!origin || !env.DASHBOARD_DEPARTMENTS_KEY) return;
+  try {
+    const res = await fetch(origin + "/api/external/planner?hotelId=" + encodeURIComponent(NOIR_HOTEL_ID), {
+      headers: { "x-api-key": env.DASHBOARD_DEPARTMENTS_KEY },
+    });
+    if (!res.ok) {
+      console.error("Planner alert check: request failed with status " + res.status);
+      return;
+    }
+    const data = await res.json();
+    const entries = data.entries || data.plannerEntries || data.results || [];
+    if (!entries.length) return;
+    const ids = entries.map((e) => e.id).filter(Boolean);
+    if (!ids.length) return;
+    const placeholders = ids.map(() => "?").join(",");
+    const seenRows = await env.DB.prepare(
+      `SELECT entry_id FROM planner_alerts_sent WHERE entry_id IN (${placeholders})`
+    ).bind(...ids).all();
+    const seen = new Set(seenRows.results.map((r) => r.entry_id));
+    for (const entry of entries) {
+      if (!entry.id || seen.has(entry.id)) continue;
+      if (entry.status && entry.status !== "scheduled") continue;
+      const dept = fromNoirDept(entry.departmentId || entry.department_id);
+      if (!DEPT_IDS.has(dept)) continue;
+      const when = entry.startsAt || entry.starts_at || "";
+      const title = entry.title || "Planner entry";
+      await insertMessage(env, ctx, {
+        from: "dashboard", to: dept, type: "text",
+        body: "📅 Planner: " + title + (when ? " — " + when : "") + (entry.details ? "\n" + entry.details : ""),
+      });
+      await env.DB.prepare("INSERT OR IGNORE INTO planner_alerts_sent (entry_id, sent_at) VALUES (?, ?)")
+        .bind(entry.id, new Date().toISOString()).run();
+    }
+  } catch (e) {
+    console.error("Planner alert check error:", e && e.stack || e);
+  }
+}
+
 async function checkEscalations(env) {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -2478,6 +2567,8 @@ export default {
       if (method === "POST" && p === "/api/escalations/check") {
         if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
         const count = await checkEscalations(env);
+        await checkUnnotifiedTickets(env, ctx);
+        await checkPlannerAlerts(env, ctx);
         return json({ escalated: count });
       }
 
@@ -2490,5 +2581,7 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(checkEscalations(env));
     ctx.waitUntil(checkDashboardDepartmentDrift(env));
+    ctx.waitUntil(checkUnnotifiedTickets(env, ctx));
+    ctx.waitUntil(checkPlannerAlerts(env, ctx));
   },
 };

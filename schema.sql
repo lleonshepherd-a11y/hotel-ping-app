@@ -202,6 +202,14 @@ CREATE TABLE IF NOT EXISTS maintenance_ticket_meta (
   escalated_at TEXT
 );
 
+-- Tracks which of the dashboard's planner entries we've already turned
+-- into a chat message alert, so the cron check never re-alerts the same
+-- entry on its next tick.
+CREATE TABLE IF NOT EXISTS planner_alerts_sent (
+  entry_id TEXT PRIMARY KEY,
+  sent_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS blockers (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,
