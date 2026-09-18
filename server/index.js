@@ -262,8 +262,8 @@ function insertMessage(opts) {
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -278,7 +278,8 @@ function insertMessage(opts) {
     opts.poll ? opts.poll.question : null,
     pollOptionsJson,
     opts.poll ? '{}' : null,
-    opts.affectsGuest ? 1 : 0
+    opts.affectsGuest ? 1 : 0,
+    opts.dashboardConversationId || null
   );
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId && !opts.silent) {
@@ -388,6 +389,8 @@ const server = http.createServer(async (req, res) => {
       const idempotencyKey = String(body.idempotencyKey || '').trim();
       const departmentId = body.departmentId;
       const message = String(body.message || '').trim();
+      const conversationId = body.conversationId ? String(body.conversationId).trim() : null;
+      const senderName = body.senderName ? String(body.senderName).trim().slice(0, 80) : null;
       if (!idempotencyKey) return send(res, 400, { error: 'idempotencyKey is required' });
       if (!DEPT_IDS.has(departmentId)) return send(res, 400, { error: 'Unknown department' });
       if (!message) return send(res, 400, { error: 'message is required' });
@@ -395,7 +398,11 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT message_id FROM external_notifications WHERE idempotency_key = ?').get(idempotencyKey);
       if (existing) return send(res, 200, { ok: true, duplicate: true, messageId: existing.message_id });
 
-      const row = insertMessage({ from: 'dashboard', to: departmentId, type: 'text', body: message });
+      const row = insertMessage({
+        from: 'dashboard', to: departmentId, type: 'text',
+        body: senderName ? senderName + ': ' + message : message,
+        dashboardConversationId: conversationId,
+      });
       db.prepare('INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)')
         .run(idempotencyKey, row.id, new Date().toISOString());
       return send(res, 201, { ok: true, duplicate: false, messageId: row.id });

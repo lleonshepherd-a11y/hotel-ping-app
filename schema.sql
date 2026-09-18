@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS messages (
   poll_options TEXT,
   poll_votes TEXT,
   escalation_level INTEGER NOT NULL DEFAULT 0,
-  affects_guest INTEGER NOT NULL DEFAULT 0
+  affects_guest INTEGER NOT NULL DEFAULT 0,
+  dashboard_conversation_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 

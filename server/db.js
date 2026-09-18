@@ -131,6 +131,9 @@ if (!messageColumns.includes('signoff_decided_at')) {
 if (!messageColumns.includes('signoff_code')) {
   db.exec('ALTER TABLE messages ADD COLUMN signoff_code TEXT');
 }
+if (!messageColumns.includes('dashboard_conversation_id')) {
+  db.exec('ALTER TABLE messages ADD COLUMN dashboard_conversation_id TEXT');
+}
 if (!messageColumns.includes('poll_question')) {
   db.exec('ALTER TABLE messages ADD COLUMN poll_question TEXT');
 }

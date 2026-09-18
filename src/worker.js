@@ -267,6 +267,7 @@ async function notifyDashboard(env, ctx, opts) {
       staffName: opts.staffName,
       message: opts.message,
       urgency: opts.urgency || "normal",
+      replyToConversationId: opts.replyToConversationId || undefined,
     }),
   }).catch((e) => console.error("notifyDashboard error:", e && e.stack || e));
   if (ctx && ctx.waitUntil) ctx.waitUntil(promise); else await promise;
@@ -386,8 +387,8 @@ async function insertMessage(env, ctx, opts) {
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -402,7 +403,8 @@ async function insertMessage(env, ctx, opts) {
     opts.poll ? opts.poll.question : null,
     pollOptionsJson,
     opts.poll ? "{}" : null,
-    opts.affectsGuest ? 1 : 0
+    opts.affectsGuest ? 1 : 0,
+    opts.dashboardConversationId || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -773,6 +775,13 @@ export default {
         const idempotencyKey = String(body.idempotencyKey || "").trim();
         const departmentId = body.departmentId;
         const message = String(body.message || "").trim();
+        // Optional: present only for a direct (person-to-department) message on
+        // the dashboard's side, not an ordinary department-wide one. Stored so
+        // a reply from Hotel Ping can be threaded back to the same person via
+        // replyToConversationId, instead of landing in the department's
+        // general inbox.
+        const conversationId = body.conversationId ? String(body.conversationId).trim() : null;
+        const senderName = body.senderName ? String(body.senderName).trim().slice(0, 80) : null;
         if (!idempotencyKey) return json({ error: "idempotencyKey is required" }, 400);
         if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
         if (!message) return json({ error: "message is required" }, 400);
@@ -784,7 +793,11 @@ export default {
           return json({ ok: true, duplicate: true, messageId: existing.message_id });
         }
 
-        const row = await insertMessage(env, ctx, { from: "dashboard", to: departmentId, type: "text", body: message });
+        const row = await insertMessage(env, ctx, {
+          from: "dashboard", to: departmentId, type: "text",
+          body: senderName ? senderName + ": " + message : message,
+          dashboardConversationId: conversationId,
+        });
         await env.DB.prepare(
           "INSERT INTO external_notifications (idempotency_key, message_id, created_at) VALUES (?, ?, ?)"
         ).bind(idempotencyKey, row.id, new Date().toISOString()).run();
@@ -1698,9 +1711,18 @@ export default {
         });
 
         if (to === "dashboard" && row.body) {
+          // If this is a reply (swiped-to-reply) to a message that itself
+          // came from a dashboard direct conversation, thread it back to
+          // that same conversation rather than the department's general
+          // inbox - see dashboard_conversation_id on /api/external/notify.
+          let replyToConversationId = null;
+          if (replyToId) {
+            const repliedTo = await env.DB.prepare("SELECT dashboard_conversation_id FROM messages WHERE id = ?").bind(replyToId).first();
+            replyToConversationId = repliedTo ? repliedTo.dashboard_conversation_id : null;
+          }
           await notifyDashboard(env, ctx, {
             messageId: row.id, departmentId: from, staffName: request._staff.name, message: row.body,
-            urgency: urgent ? "urgent" : "normal",
+            urgency: urgent ? "urgent" : "normal", replyToConversationId,
           });
         }
 
