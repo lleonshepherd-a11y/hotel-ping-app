@@ -5547,6 +5547,7 @@ function enableTicketDrag(card){
     card.removeEventListener("pointercancel", finishDrag);
   }
 
+  card.addEventListener("contextmenu", function(e){ e.preventDefault(); });
   card.addEventListener("pointerdown", function(e){
     if(e.button !== undefined && e.button !== 0) return;
     if(e.target.closest("button")) return;
