@@ -347,6 +347,16 @@ db.exec(`
     returned_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
+
+  CREATE TABLE IF NOT EXISTS help_alerts (
+    id TEXT PRIMARY KEY,
+    department_id TEXT NOT NULL,
+    raised_by_name TEXT,
+    created_at TEXT NOT NULL,
+    responded_by_name TEXT,
+    responded_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

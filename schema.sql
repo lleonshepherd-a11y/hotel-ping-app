@@ -302,6 +302,19 @@ CREATE TABLE IF NOT EXISTS asset_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
 
+-- Press-and-hold safety alerts. Deliberately separate from the messages
+-- table - no typing, no department picker, never appears in a chat thread.
+-- Always goes to the predefined responder (GM) with just department + time.
+CREATE TABLE IF NOT EXISTS help_alerts (
+  id TEXT PRIMARY KEY,
+  department_id TEXT NOT NULL,
+  raised_by_name TEXT,
+  created_at TEXT NOT NULL,
+  responded_by_name TEXT,
+  responded_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Head Receptionist', NULL, 1),

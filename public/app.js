@@ -64,6 +64,7 @@ var DEPTS = {
   dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
+var HELP_ALERT_RESPONDER_DEPT = "gm";
 
 // Real per-department state (contact name, on-duty flag) - loaded from the
 // server on boot and kept in sync with it, not held only in memory.
@@ -118,7 +119,8 @@ var STATE = {
   typingFrom: {},
   replyingTo: null,
   muted: {},
-  threadOpened: false
+  threadOpened: false,
+  myHelpAlertId: null
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -719,26 +721,7 @@ hGroupAvatars.addEventListener("click", function(){
 var offDutyBanner = document.getElementById("offDutyBanner");
 var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
-var muteBtn = document.getElementById("muteBtn");
 var callBtn = document.getElementById("callBtn");
-muteBtn.addEventListener("click", function(){
-  var deptId = STATE.active;
-  var wasMuted = !!STATE.muted[deptId];
-  STATE.muted[deptId] = !wasMuted;
-  muteBtn.classList.toggle("active", !wasMuted);
-  renderList();
-  apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
-    STATE.muted[deptId] = res.muted;
-    muteBtn.classList.toggle("active", res.muted);
-    muteBtn.title = res.muted ? "Unmute this conversation" : "Mute notifications for this conversation";
-    renderList();
-    showToast(res.muted ? "Muted" : "Unmuted");
-  }).catch(function(){
-    STATE.muted[deptId] = wasMuted;
-    muteBtn.classList.toggle("active", wasMuted);
-    renderList();
-  });
-});
 
 function renderHeader(){
   if(STATE.activeGroupId){
@@ -757,8 +740,6 @@ function renderHeader(){
     }).join("") : "";
     offDutyBanner.hidden = true;
     eventNotice.hidden = !!(g && g.archivedAt);
-    muteBtn.hidden = true;
-    filesBtn.hidden = true;
     callBtn.hidden = true;
     optTask.hidden = true;
     if(taskActive) setTaskActive(false);
@@ -769,8 +750,6 @@ function renderHeader(){
   eventNotice.hidden = true;
   hDot.hidden = false;
   hGroupAvatars.hidden = true;
-  muteBtn.hidden = false;
-  filesBtn.hidden = false;
   optTask.hidden = false;
   optSignoff.hidden = false;
   var d = DEPTS[STATE.active];
@@ -788,8 +767,6 @@ function renderHeader(){
   hDot.classList.toggle("off", !targetOn);
   renderContactName();
   renderOffDutyBanner();
-  muteBtn.classList.toggle("active", !!STATE.muted[STATE.active]);
-  muteBtn.title = STATE.muted[STATE.active] ? "Unmute this conversation" : "Mute notifications for this conversation";
   renderCallBtn();
 }
 
@@ -2864,6 +2841,7 @@ function startPolling(){
     refreshActiveThread().catch(function(){});
     refreshMaintenanceBadge();
     pollMissed();
+    pollHelpAlerts();
     flushOfflineQueue();
   }, 1500);
   slowPollTimer = setInterval(function(){
@@ -3921,7 +3899,6 @@ function renderNotifSettings(mutedIds){
     unmuteBtn.addEventListener("click", function(){
       apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
         STATE.muted[deptId] = res.muted;
-        if(STATE.active === deptId){ muteBtn.classList.toggle("active", res.muted); }
         showToast("Unmuted");
         loadNotifSettings();
       }).catch(function(){ showToast("Couldn't unmute"); });
@@ -4133,6 +4110,112 @@ function pollMissed(){
   }).catch(function(){});
 }
 
+/* ---- Hold-for-help safety alert ---- */
+var helpHoldBtn = document.getElementById("helpHoldBtn");
+var helpHoldRing = document.getElementById("helpHoldRing");
+var helpBannerStack = document.getElementById("helpBannerStack");
+var HELP_HOLD_MS = 2000;
+var helpHoldStart = 0, helpHoldRAF = null;
+var helpDismissed = {};
+
+function helpHoldReset(){
+  if(helpHoldRAF) cancelAnimationFrame(helpHoldRAF);
+  helpHoldRAF = null;
+  helpHoldBtn.classList.remove("holding");
+  helpHoldRing.style.background = "none";
+}
+function helpHoldTick(){
+  var elapsed = Date.now() - helpHoldStart;
+  var pct = Math.min(100, (elapsed / HELP_HOLD_MS) * 100);
+  helpHoldRing.style.background = "conic-gradient(rgba(255,255,255,.85) " + pct + "%, transparent 0)";
+  if(elapsed >= HELP_HOLD_MS){
+    helpHoldReset();
+    triggerHelpAlert();
+    return;
+  }
+  helpHoldRAF = requestAnimationFrame(helpHoldTick);
+}
+helpHoldBtn.addEventListener("pointerdown", function(e){
+  e.preventDefault();
+  helpHoldBtn.classList.add("holding");
+  helpHoldStart = Date.now();
+  helpHoldRAF = requestAnimationFrame(helpHoldTick);
+});
+["pointerup", "pointercancel", "pointerleave"].forEach(function(evt){
+  helpHoldBtn.addEventListener(evt, helpHoldReset);
+});
+helpHoldBtn.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+
+function triggerHelpAlert(){
+  if(navigator.vibrate) navigator.vibrate([15, 40, 15]);
+  apiSend('/api/help-alerts', 'POST', {}).then(function(res){
+    showToast("Help request sent");
+    STATE.myHelpAlertId = res.alert.id;
+    pollHelpAlerts();
+  }).catch(function(){ showToast("Couldn't send help request"); });
+}
+
+function renderHelpBanners(alerts){
+  helpBannerStack.innerHTML = "";
+  var isResponder = STATE.self === HELP_ALERT_RESPONDER_DEPT || (AUTH.staff && AUTH.staff.isAdmin);
+
+  if(STATE.myHelpAlertId){
+    var mine = alerts.find(function(a){ return a.id === STATE.myHelpAlertId; });
+    if(mine && !helpDismissed[mine.id]){
+      var banner = document.createElement("div");
+      banner.className = "help-banner" + (mine.respondedAt ? " responded" : "");
+      banner.innerHTML =
+        '<span class="help-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          (mine.respondedAt ? '<path d="M20 6L9 17l-5-5"/>' : '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>') +
+        '</svg></span>' +
+        '<div class="help-banner-body">' +
+          '<div class="help-banner-title">' + (mine.respondedAt ? "Help is on the way" : "Help request sent") + '</div>' +
+          '<div class="help-banner-sub">' + (mine.respondedAt ? esc(mine.respondedByName || "GM") + " is responding" : "Waiting for a response…") + '</div>' +
+        '</div>' +
+        '<button type="button" class="help-banner-dismiss" aria-label="Dismiss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+      banner.querySelector(".help-banner-dismiss").addEventListener("click", function(){
+        helpDismissed[mine.id] = true;
+        STATE.myHelpAlertId = null;
+        renderHelpBanners(alerts);
+      });
+      helpBannerStack.appendChild(banner);
+    } else if(!mine){
+      STATE.myHelpAlertId = null;
+    }
+  }
+
+  if(isResponder){
+    alerts.filter(function(a){
+      return !a.respondedAt && a.departmentId !== HELP_ALERT_RESPONDER_DEPT && !helpDismissed[a.id];
+    }).forEach(function(a){
+      var banner = document.createElement("div");
+      banner.className = "help-banner";
+      banner.innerHTML =
+        '<span class="help-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg></span>' +
+        '<div class="help-banner-body">' +
+          '<div class="help-banner-title">' + esc(DEPTS[a.departmentId] ? DEPTS[a.departmentId].name : a.departmentId) + ' needs help</div>' +
+          '<div class="help-banner-sub">' + fmtNoteTime(a.createdAt) + '</div>' +
+        '</div>' +
+        '<button type="button" class="help-banner-respond">Responding</button>';
+      var btn = banner.querySelector(".help-banner-respond");
+      btn.addEventListener("click", function(){
+        btn.disabled = true; btn.textContent = "…";
+        apiSend('/api/help-alerts/' + encodeURIComponent(a.id) + '/respond', 'POST', {}).then(function(){
+          pollHelpAlerts();
+        }).catch(function(){ btn.disabled = false; btn.textContent = "Responding"; });
+      });
+      helpBannerStack.appendChild(banner);
+    });
+  }
+}
+
+function pollHelpAlerts(){
+  if(!AUTH.staff) return;
+  apiGet('/api/help-alerts').then(function(res){
+    renderHelpBanners(res.alerts || []);
+  }).catch(function(){});
+}
+
 var privacyBtn = document.getElementById("privacyBtn");
 var privacyOverlay = document.getElementById("privacyOverlay");
 var privacyClose = document.getElementById("privacyClose");
@@ -4226,55 +4309,6 @@ showTab("chat");
     startEl = null;
   });
 })();
-
-var filesBtn = document.getElementById("filesBtn");
-var filesOverlay = document.getElementById("filesOverlay");
-var filesClose = document.getElementById("filesClose");
-var filesGrid = document.getElementById("filesGrid");
-
-function jumpToMessage(id){
-  filesOverlay.hidden = true;
-  var target = threadScroll.querySelector('[data-msg-id="'+id+'"]');
-  if(target){
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
-    target.classList.add("flash-highlight");
-    setTimeout(function(){ target.classList.remove("flash-highlight"); }, 1200);
-  }
-}
-
-var FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg>';
-var AUDIO_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
-
-filesBtn.addEventListener("click", function(){
-  var msgs = (STATE.data[STATE.active] || []).filter(function(m){ return !m.deleted && (m.type === "image" || m.type === "file" || m.type === "audio"); });
-  msgs = msgs.slice().reverse();
-  if(!msgs.length){
-    filesGrid.innerHTML = '<div class="handover-empty" style="grid-column:1/-1">No shared files in this conversation.</div>';
-  } else {
-    filesGrid.innerHTML = "";
-    msgs.forEach(function(m){
-      var el = document.createElement("button");
-      el.type = "button";
-      if(m.type === "image"){
-        el.className = "files-thumb";
-        el.innerHTML = '<img src="'+(m.dataUrl || m.url)+'" alt="Shared photo">';
-        el.addEventListener("click", function(){ window.open(m.url || m.dataUrl, "_blank"); });
-      } else if(m.type === "file"){
-        el.className = "files-thumb doc";
-        el.innerHTML = FILE_ICON + '<span class="files-thumb-label">'+esc(m.fileName || "File")+'</span>';
-        el.addEventListener("click", function(){ if(m.url) window.open(m.url, "_blank"); });
-      } else {
-        el.className = "files-thumb audio";
-        el.innerHTML = AUDIO_ICON + '<span class="files-thumb-label">Voice note</span>';
-        el.addEventListener("click", function(){ jumpToMessage(m.id); });
-      }
-      filesGrid.appendChild(el);
-    });
-  }
-  filesOverlay.hidden = false;
-});
-filesClose.addEventListener("click", function(){ filesOverlay.hidden = true; });
-filesOverlay.addEventListener("click", function(e){ if(e.target === filesOverlay) filesOverlay.hidden = true; });
 
 var feedBtn = document.getElementById("feedBtn");
 var feedOverlay = document.getElementById("feedOverlay");

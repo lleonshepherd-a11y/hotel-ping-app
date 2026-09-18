@@ -54,6 +54,8 @@ const DEPT_NAMES = {
   dashboard: "Head Office",
 };
 const PIN_RE = /^\d{4,6}$/;
+const HELP_ALERT_RESPONDER_DEPT = "gm";
+const HELP_ALERT_WINDOW_MINUTES = 30;
 const TASK_STATUSES = ["not_started", "in_progress", "completed"];
 const MAINT_STATUSES = ["reported", "in_progress", "fixed"];
 const MAINT_PRIORITIES = ["safety", "guest", "problem", "routine"];
@@ -1719,6 +1721,70 @@ export default {
         }
         await env.DB.prepare("UPDATE planner_alerts_sent SET read_at = ? WHERE entry_id = ?").bind(new Date().toISOString(), id).run();
         return json({ ok: true });
+      }
+
+      // ---- Hold-for-help safety alerts ----
+      // Deliberately its own thing, not a message: no typing, no department
+      // picker, always goes straight to the predefined responder (GM).
+      if (method === "POST" && p === "/api/help-alerts") {
+        const requester = request._staff;
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          "INSERT INTO help_alerts (id, department_id, raised_by_name, created_at) VALUES (?, ?, ?, ?)"
+        ).bind(id, requester.department_id, requester.name || null, now).run();
+        if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT) {
+          const notifyPromise = notifyDepartment(env, HELP_ALERT_RESPONDER_DEPT, {
+            title: "🆘 Help needed", body: (DEPT_NAMES[requester.department_id] || requester.department_id) + " needs help now",
+            url: "/", tag: "hotel-ping-help-" + id,
+          }, null).catch((e) => console.error("notifyDepartment (help alert) error:", e && e.stack || e));
+          if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+        }
+        const timeLabel = new Date(now).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        const dashboardPromise = notifyDashboard(env, ctx, {
+          messageId: "help-alert-" + id,
+          departmentId: requester.department_id,
+          staffName: requester.name,
+          message: "🆘 Hold-for-help alert raised by " + (DEPT_NAMES[requester.department_id] || requester.department_id) + " at " + timeLabel,
+          urgency: "emergency",
+        }).catch((e) => console.error("notifyDashboard (help alert) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(dashboardPromise); else await dashboardPromise;
+        return json({ alert: { id, departmentId: requester.department_id, createdAt: now, respondedByName: null, respondedAt: null } }, 201);
+      }
+
+      if (method === "GET" && p === "/api/help-alerts") {
+        const requester = request._staff;
+        const cutoff = new Date(Date.now() - HELP_ALERT_WINDOW_MINUTES * 60000).toISOString();
+        const rows = await env.DB.prepare(
+          "SELECT * FROM help_alerts WHERE created_at > ? ORDER BY created_at DESC"
+        ).bind(cutoff).all();
+        const isResponder = requester.department_id === HELP_ALERT_RESPONDER_DEPT || requester.is_admin;
+        const alerts = rows.results
+          .filter((r) => isResponder || r.department_id === requester.department_id)
+          .map((r) => ({
+            id: r.id, departmentId: r.department_id, createdAt: r.created_at,
+            respondedByName: r.responded_by_name || null, respondedAt: r.responded_at || null,
+          }));
+        return json({ alerts });
+      }
+
+      if (method === "POST" && p.startsWith("/api/help-alerts/") && p.endsWith("/respond")) {
+        const id = decodeURIComponent(p.slice("/api/help-alerts/".length, -"/respond".length));
+        const requester = request._staff;
+        if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT && !requester.is_admin) {
+          return json({ error: "Only the designated responder can respond to this" }, 403);
+        }
+        const existing = await env.DB.prepare("SELECT * FROM help_alerts WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Not found" }, 404);
+        if (!existing.responded_at) {
+          await env.DB.prepare("UPDATE help_alerts SET responded_by_name = ?, responded_at = ? WHERE id = ?")
+            .bind(requester.name || "GM", new Date().toISOString(), id).run();
+        }
+        const row = await env.DB.prepare("SELECT * FROM help_alerts WHERE id = ?").bind(id).first();
+        return json({ alert: {
+          id: row.id, departmentId: row.department_id, createdAt: row.created_at,
+          respondedByName: row.responded_by_name || null, respondedAt: row.responded_at || null,
+        } });
       }
 
       // ---- Blockers (cross-department "waiting on") ----

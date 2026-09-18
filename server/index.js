@@ -15,6 +15,8 @@ DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
 DEPT_NAMES.dashboard = 'Head Office';
 const DEFAULT_QUICK_REPLIES = ['On it', 'Done', '5 mins', 'On my way', 'Noted', 'Course away', 'Hold 10 mins', 'Ready for dessert'];
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
+const HELP_ALERT_RESPONDER_DEPT = 'gm';
+const HELP_ALERT_WINDOW_MINUTES = 30;
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
@@ -1115,6 +1117,51 @@ const server = http.createServer(async (req, res) => {
 
       items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
       return send(res, 200, { items });
+    }
+
+    if (req.method === 'POST' && p === '/api/help-alerts') {
+      const requester = staffFromToken(req);
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO help_alerts (id, department_id, raised_by_name, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, requester.department_id, requester.name || null, now);
+      if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT) {
+        console.log('[help alert]', HELP_ALERT_RESPONDER_DEPT, ': ', (DEPT_NAMES[requester.department_id] || requester.department_id), 'needs help now');
+      }
+      return send(res, 201, { alert: { id, departmentId: requester.department_id, createdAt: now, respondedByName: null, respondedAt: null } });
+    }
+
+    if (req.method === 'GET' && p === '/api/help-alerts') {
+      const requester = staffFromToken(req);
+      const cutoffMs = Date.now() - HELP_ALERT_WINDOW_MINUTES * 60000;
+      const rows = db.prepare('SELECT * FROM help_alerts WHERE created_at > ? ORDER BY created_at DESC').all(new Date(cutoffMs).toISOString());
+      const isResponder = requester.department_id === HELP_ALERT_RESPONDER_DEPT || requester.is_admin;
+      const alerts = rows
+        .filter((r) => isResponder || r.department_id === requester.department_id)
+        .map((r) => ({
+          id: r.id, departmentId: r.department_id, createdAt: r.created_at,
+          respondedByName: r.responded_by_name || null, respondedAt: r.responded_at || null,
+        }));
+      return send(res, 200, { alerts });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/help-alerts/') && p.endsWith('/respond')) {
+      const id = decodeURIComponent(p.slice('/api/help-alerts/'.length, -'/respond'.length));
+      const requester = staffFromToken(req);
+      if (requester.department_id !== HELP_ALERT_RESPONDER_DEPT && !requester.is_admin) {
+        return send(res, 403, { error: 'Only the designated responder can respond to this' });
+      }
+      const existing = db.prepare('SELECT * FROM help_alerts WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      if (!existing.responded_at) {
+        db.prepare('UPDATE help_alerts SET responded_by_name = ?, responded_at = ? WHERE id = ?')
+          .run(requester.name || 'GM', new Date().toISOString(), id);
+      }
+      const row = db.prepare('SELECT * FROM help_alerts WHERE id = ?').get(id);
+      return send(res, 200, { alert: {
+        id: row.id, departmentId: row.department_id, createdAt: row.created_at,
+        respondedByName: row.responded_by_name || null, respondedAt: row.responded_at || null,
+      } });
     }
 
     if (req.method === 'GET' && p === '/api/blockers') {
