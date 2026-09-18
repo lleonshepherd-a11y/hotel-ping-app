@@ -5495,6 +5495,10 @@ function enableTicketDrag(card){
     draggedIndex = cardEls.indexOf(card);
     targetIndex = draggedIndex;
     itemHeight = card.getBoundingClientRect().height + 13;
+    if(navigator.vibrate) navigator.vibrate(15);
+    card.style.transition = "transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s ease";
+    card.style.transform = "translateY(-7px) scale(1.06) rotate(-1.2deg)";
+    setTimeout(function(){ if(dragging) card.style.transition = "none"; }, 150);
   }
 
   function applyShift(dy){
@@ -5520,15 +5524,17 @@ function enableTicketDrag(card){
       return;
     }
     e.preventDefault();
-    card.style.transform = "translateY(" + dy + "px) scale(1.02)";
+    card.style.transform = "translateY(" + (dy - 7) + "px) scale(1.06) rotate(-1.2deg)";
     applyShift(dy);
   }
 
   function finishDrag(){
     if(dragging){
       cardEls.forEach(function(el){ el.style.transform = ""; });
-      card.classList.remove("dragging");
+      card.style.transition = "transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease";
       card.style.transform = "";
+      card.classList.remove("dragging");
+      setTimeout(function(){ card.style.transition = ""; }, 220);
       if(targetIndex !== draggedIndex){
         var reordered = cardEls.slice();
         reordered.splice(draggedIndex, 1);
