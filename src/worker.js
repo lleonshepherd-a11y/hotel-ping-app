@@ -1880,8 +1880,10 @@ export default {
             const repliedTo = await env.DB.prepare("SELECT dashboard_conversation_id FROM messages WHERE id = ?").bind(replyToId).first();
             replyToConversationId = repliedTo ? repliedTo.dashboard_conversation_id : null;
           }
+          // No staffName here - the dashboard should only ever see the
+          // department (GM), never the individual person behind it.
           await notifyDashboard(env, ctx, {
-            messageId: row.id, departmentId: from, staffName: request._staff.name, message: row.body,
+            messageId: row.id, departmentId: from, message: row.body,
             urgency: urgent ? "urgent" : "normal", replyToConversationId,
           });
         }
