@@ -203,12 +203,18 @@ CREATE TABLE IF NOT EXISTS maintenance_ticket_meta (
   sort_order REAL
 );
 
--- Tracks which of the dashboard's planner entries we've already turned
--- into a chat message alert, so the cron check never re-alerts the same
--- entry on its next tick.
+-- Planner/calendar entries from the dashboard, surfaced to a department as
+-- a standalone notification in "Missed" - never as a chat message from a
+-- pretend sender. entry_id is the dashboard's own id, so this table also
+-- dedupes: the cron check never re-notifies the same entry twice.
 CREATE TABLE IF NOT EXISTS planner_alerts_sent (
   entry_id TEXT PRIMARY KEY,
-  sent_at TEXT NOT NULL
+  sent_at TEXT NOT NULL,
+  department_id TEXT,
+  title TEXT,
+  starts_at TEXT,
+  details TEXT,
+  read_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS blockers (

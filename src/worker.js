@@ -352,16 +352,17 @@ async function checkUnnotifiedTickets(env, ctx) {
     if (t.guest_present) body += " · Guest in room";
     if (t.deadline) body += " · Needed by " + t.deadline;
     // Deliver as if the reporting department (restaurant, reception, kitchen,
-    // ...) messaged maintenance directly - no "Dashboard" contact involved -
-    // since that's who actually reported it. Only fall back to the "Head
-    // Office" channel when the reporter's department doesn't map to one of
-    // ours, or is maintenance itself (self-messaging makes no sense).
+    // ...) messaged maintenance directly - that's who actually reported it.
+    // If it doesn't map to a real department (or is maintenance itself,
+    // where self-messaging makes no sense), skip the chat message entirely
+    // rather than inventing a sender - the push notification below still
+    // gets sent either way, so the ticket doesn't go unnoticed.
     const originDept = t.creator_dept ? fromNoirDept(t.creator_dept) : null;
     const validOrigin = originDept && DEPT_IDS.has(originDept) && originDept !== "maintenance";
     if (validOrigin) {
       await insertMessage(env, ctx, { from: originDept, to: "maintenance", type: "text", body: "🔧 New ticket: " + body });
     } else {
-      await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from Head Office: " + body });
+      console.error("Unnotified ticket " + t.id + ": reporting department could not be resolved (creator_dept=" + t.creator_dept + "), no chat message sent");
     }
     const notifyPromise = notifyDepartment(env, "maintenance", {
       title: t.priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
@@ -373,9 +374,13 @@ async function checkUnnotifiedTickets(env, ctx) {
 
 // Same idea for the dashboard's planner: no Hotel Ping screen shows it, so
 // the only way a manager finds out about a diary entry is if it reaches
-// them as a message. Best-effort and silent no-op until the dashboard side
-// confirms this read endpoint/key - if it 401s or the shape is wrong this
-// just logs and skips, it never breaks the cron tick.
+// them some other way. A planner entry isn't "from" any department though -
+// it's the calendar, not a person - so this never creates a chat message or
+// a fake "Head Office" sender. It's stored as its own notification, surfaced
+// only in that department's Missed feed (no sender shown), plus a push.
+// Best-effort and silent no-op until the dashboard side confirms this read
+// endpoint/key - if it 401s or the shape is wrong this just logs and skips,
+// it never breaks the cron tick.
 async function checkPlannerAlerts(env, ctx) {
   const origin = dashboardApiOrigin(env);
   if (!origin || !env.DASHBOARD_DEPARTMENTS_KEY) return;
@@ -401,15 +406,20 @@ async function checkPlannerAlerts(env, ctx) {
       if (!entry.id || seen.has(entry.id)) continue;
       if (entry.status && entry.status !== "scheduled") continue;
       const dept = fromNoirDept(entry.departmentId || entry.department_id);
-      if (!DEPT_IDS.has(dept)) continue;
+      if (!DEPT_IDS.has(dept)) {
+        console.error("Planner alert: entry " + entry.id + " has no resolvable department, skipping");
+        continue;
+      }
       const when = entry.startsAt || entry.starts_at || "";
       const title = entry.title || "Planner entry";
-      await insertMessage(env, ctx, {
-        from: "dashboard", to: dept, type: "text",
-        body: "📅 Planner: " + title + (when ? " — " + when : "") + (entry.details ? "\n" + entry.details : ""),
-      });
-      await env.DB.prepare("INSERT OR IGNORE INTO planner_alerts_sent (entry_id, sent_at) VALUES (?, ?)")
-        .bind(entry.id, new Date().toISOString()).run();
+      const details = entry.details || null;
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO planner_alerts_sent (entry_id, sent_at, department_id, title, starts_at, details) VALUES (?, ?, ?, ?, ?, ?)"
+      ).bind(entry.id, new Date().toISOString(), dept, title, when || null, details).run();
+      const notifyPromise = notifyDepartment(env, dept, {
+        title: "📅 Planner", body: title + (when ? " — " + when : ""), url: "/", tag: "hotel-ping-planner-" + entry.id,
+      }, null).catch((e) => console.error("notifyDepartment (planner) error:", e && e.stack || e));
+      if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
     }
   } catch (e) {
     console.error("Planner alert check error:", e && e.stack || e);
@@ -884,16 +894,22 @@ export default {
         // replyToConversationId, instead of landing in the department's
         // general inbox.
         const conversationId = body.conversationId ? String(body.conversationId).trim() : null;
-        const senderName = body.senderName ? String(body.senderName).trim().slice(0, 80) : null;
-        // Optional: when the message genuinely comes from one of our own 8
-        // departments (a ticket, a report from a real team), pass their
-        // slug here so it's delivered as if they messaged directly - no
-        // "Head Office" wrapper. Leave it out for a real head-office/system
-        // message that has no department behind it.
+        // Required: the real one of our 8 departments this message is
+        // actually from (a ticket, a report from a real team) - it's
+        // delivered as if that department messaged directly. There's no
+        // "unattributed" fallback anymore - every message needs a real
+        // sender, so a caller that can't supply one gets an error instead
+        // of a fake "Head Office" contact standing in for it.
         const fromDepartmentId = body.fromDepartmentId ? String(body.fromDepartmentId).trim() : null;
         if (!idempotencyKey) return json({ error: "idempotencyKey is required" }, 400);
         if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
         if (!message) return json({ error: "message is required" }, 400);
+        if (!fromDepartmentId || !DEPT_IDS.has(fromDepartmentId)) {
+          return json({ error: "fromDepartmentId is required and must be a real department" }, 400);
+        }
+        if (fromDepartmentId === departmentId) {
+          return json({ error: "fromDepartmentId can't be the same as the target department" }, 400);
+        }
 
         const existing = await env.DB.prepare(
           "SELECT message_id FROM external_notifications WHERE idempotency_key = ?"
@@ -902,14 +918,9 @@ export default {
           return json({ ok: true, duplicate: true, messageId: existing.message_id });
         }
 
-        const validOrigin = fromDepartmentId && DEPT_IDS.has(fromDepartmentId) && fromDepartmentId !== departmentId;
-        // Unattributed head-office messages (no real department behind them)
-        // always land with the GM - he's the only one with a Head Office
-        // contact - regardless of which department the caller named.
         const row = await insertMessage(env, ctx, {
-          from: validOrigin ? fromDepartmentId : "dashboard",
-          to: validOrigin ? departmentId : "gm", type: "text",
-          body: validOrigin ? message : (senderName ? senderName + ": " + message : message),
+          from: fromDepartmentId, to: departmentId, type: "text",
+          body: message,
           dashboardConversationId: conversationId,
         });
         await env.DB.prepare(
@@ -1684,8 +1695,30 @@ export default {
           }
         }
 
+        const plannerRows = await env.DB.prepare(
+          "SELECT * FROM planner_alerts_sent WHERE department_id = ? AND read_at IS NULL ORDER BY sent_at ASC"
+        ).bind(dept).all();
+        for (const p of plannerRows.results) {
+          items.push({
+            kind: "planner", id: p.entry_id, createdAt: p.sent_at,
+            planner: { id: p.entry_id, title: p.title, startsAt: p.starts_at || undefined, details: p.details || undefined },
+          });
+        }
+
         items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
         return json({ items });
+      }
+
+      if (method === "POST" && p.startsWith("/api/planner-notifications/") && p.endsWith("/read")) {
+        const id = decodeURIComponent(p.slice("/api/planner-notifications/".length, -"/read".length));
+        const requester = request._staff;
+        const existing = await env.DB.prepare("SELECT department_id FROM planner_alerts_sent WHERE entry_id = ?").bind(id).first();
+        if (!existing) return json({ error: "Not found" }, 404);
+        if (existing.department_id !== requester.department_id && !requester.is_admin) {
+          return json({ error: "Not part of this department" }, 403);
+        }
+        await env.DB.prepare("UPDATE planner_alerts_sent SET read_at = ? WHERE entry_id = ?").bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
       }
 
       // ---- Blockers (cross-department "waiting on") ----

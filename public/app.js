@@ -3989,6 +3989,9 @@ var missedTicketCount = document.getElementById("missedTicketCount");
 var missedGuestsBox = document.getElementById("missedGuestsBox");
 var missedGuestList = document.getElementById("missedGuestList");
 var missedGuestCount = document.getElementById("missedGuestCount");
+var missedPlannerBox = document.getElementById("missedPlannerBox");
+var missedPlannerList = document.getElementById("missedPlannerList");
+var missedPlannerCount = document.getElementById("missedPlannerCount");
 
 function buildMissedMessageCard(item){
   var m = item.message;
@@ -4056,6 +4059,27 @@ function buildMissedApprovalCard(item){
   return card;
 }
 
+function buildMissedPlannerCard(item){
+  var p = item.planner;
+  var card = document.createElement("div");
+  card.className = "missed-msg-card missed-planner-card";
+  card.innerHTML =
+    '<div class="missed-msg-body">' +
+      '<div class="missed-msg-preview">' + esc(p.title) + (p.startsAt ? ' — ' + esc(p.startsAt) : '') + '</div>' +
+      (p.details ? '<div class="missed-msg-time">' + esc(p.details) + '</div>' : '') +
+    '</div>';
+  card.addEventListener("click", function(){
+    card.classList.add("dismissing");
+    apiSend('/api/planner-notifications/' + encodeURIComponent(p.id) + '/read', 'POST', {}).then(function(){
+      pollMissed();
+    }).catch(function(){
+      card.classList.remove("dismissing");
+      showToast("Couldn't dismiss that");
+    });
+  });
+  return card;
+}
+
 function renderMissedFeed(items){
   var approvals = items.filter(function(i){ return i.kind === "approval"; });
   missedApprovalsBox.hidden = approvals.length === 0;
@@ -4095,6 +4119,12 @@ function renderMissedFeed(items){
       missedGuestList.appendChild(buildGuestCard(item.request));
     });
   }
+
+  var planners = items.filter(function(i){ return i.kind === "planner"; });
+  missedPlannerBox.hidden = planners.length === 0;
+  missedPlannerCount.textContent = String(planners.length);
+  missedPlannerList.innerHTML = "";
+  planners.forEach(function(item){ missedPlannerList.appendChild(buildMissedPlannerCard(item)); });
 }
 
 function pollMissed(){
