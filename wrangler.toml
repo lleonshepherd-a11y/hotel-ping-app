@@ -26,7 +26,7 @@ VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19Z
 VAPID_SUBJECT = "mailto:admin@hotelping.co.uk"
 
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["* * * * *"]
 
 [[routes]]
 pattern = "hotelping.co.uk"
