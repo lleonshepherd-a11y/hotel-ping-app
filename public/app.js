@@ -33,7 +33,9 @@ function shadeColor(hex, pct){
   return "#" + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
 }
 function avatarGradient(deptId){
-  return "linear-gradient(155deg, #2c2c30, #131315)";
+  var d = DEPTS[deptId];
+  if(!d || !d.color) return "linear-gradient(155deg, #2c2c30, #131315)";
+  return "linear-gradient(155deg, "+shadeColor(d.color, 16)+", "+shadeColor(d.color, -26)+")";
 }
 function avatarStyleAttr(deptId){
   return "position:relative;background:"+avatarGradient(deptId);
@@ -3683,7 +3685,7 @@ function renderStoriesRow(){
       '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
         (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
       '</span>' +
-      '<span class="story-item-label">'+(isMine ? "Your update" : esc(d ? d.name : id))+'</span>';
+      '<span class="story-item-label">'+(isMine ? "Your story" : esc(d ? d.name : id))+'</span>';
     btn.addEventListener("click", function(e){
       if(isMine && e.target.closest(".story-add-badge")){ openPostStoryOverlay(); return; }
       if(reel.length) openStoryViewer(id);
