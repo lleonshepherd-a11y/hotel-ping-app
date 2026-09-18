@@ -776,7 +776,7 @@ function renderHeader(){
   var d = DEPTS[STATE.active];
   hAvatar.setAttribute("style", avatarStyleAttr(STATE.active));
   hAvatar.innerHTML = avatarInnerHtml(STATE.active);
-  hName.textContent = d.name;
+  hName.textContent = contactNameFor(STATE.active) || d.name;
   var targetOn = isOnDuty(STATE.active);
   if(STATE.typingFrom[STATE.active]){
     hSub.textContent = "Typing…";
@@ -844,12 +844,14 @@ function renderOffDutyBanner(){
 
 function renderContactName(){
   var deptId = STATE.active;
-  var name = contactNameFor(deptId);
+  var d = DEPTS[deptId];
+  var contact = contactNameFor(deptId);
   hContactWrap.innerHTML = "";
-  if(name){
+  var roleLabel = (contact && contact !== d.name) ? d.name : null;
+  if(roleLabel){
     var span = document.createElement("span");
     span.className = "h-contact-name";
-    span.textContent = name;
+    span.textContent = roleLabel;
     hContactWrap.appendChild(span);
     var sep = document.createElement("span");
     sep.textContent = " ·";
