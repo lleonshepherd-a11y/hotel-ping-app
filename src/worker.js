@@ -331,8 +331,9 @@ function dashboardApiOrigin(env) {
 // notification + chat message our own flow would have sent.
 async function checkUnnotifiedTickets(env, ctx) {
   const rows = await env.NOIR_DB.prepare(
-    `SELECT id, room_number, description, priority, guest_present, deadline, created_at
-     FROM maintenance_tickets WHERE status != 'fixed' ORDER BY created_at DESC LIMIT 50`
+    `SELECT mt.id, mt.room_number, mt.description, mt.priority, mt.guest_present, mt.deadline, mt.created_at, s.department_id AS creator_dept
+     FROM maintenance_tickets mt LEFT JOIN staff s ON s.id = mt.created_by_staff_id
+     WHERE mt.status != 'fixed' ORDER BY mt.created_at DESC LIMIT 50`
   ).all();
   if (!rows.results.length) return;
   const ids = rows.results.map((r) => r.id);
@@ -350,7 +351,12 @@ async function checkUnnotifiedTickets(env, ctx) {
     let body = (t.room_number ? "Room " + t.room_number + ": " : "") + t.description;
     if (t.guest_present) body += " · Guest in room";
     if (t.deadline) body += " · Needed by " + t.deadline;
-    await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from dashboard: " + body });
+    // Name the department that actually reported it (restaurant, reception,
+    // kitchen, ...) rather than the generic "dashboard" - only fall back to
+    // that when the reporter's department doesn't map to one of ours.
+    const originDept = t.creator_dept ? fromNoirDept(t.creator_dept) : null;
+    const originLabel = originDept && DEPT_NAMES[originDept] ? DEPT_NAMES[originDept] : "the dashboard";
+    await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from " + originLabel + ": " + body });
     const notifyPromise = notifyDepartment(env, "maintenance", {
       title: t.priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
       body, url: "/", tag: "hotel-ping-maintenance-" + t.id,
