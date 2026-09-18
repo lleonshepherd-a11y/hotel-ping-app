@@ -266,6 +266,7 @@ async function notifyDashboard(env, ctx, opts) {
       departmentId: opts.departmentId,
       staffName: opts.staffName,
       message: opts.message,
+      urgency: opts.urgency || "normal",
     }),
   }).catch((e) => console.error("notifyDashboard error:", e && e.stack || e));
   if (ctx && ctx.waitUntil) ctx.waitUntil(promise); else await promise;
@@ -1699,6 +1700,7 @@ export default {
         if (to === "dashboard" && row.body) {
           await notifyDashboard(env, ctx, {
             messageId: row.id, departmentId: from, staffName: request._staff.name, message: row.body,
+            urgency: urgent ? "urgent" : "normal",
           });
         }
 
