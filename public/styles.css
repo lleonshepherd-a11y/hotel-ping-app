@@ -95,19 +95,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   display:flex;justify-content:space-around;touch-action:none;
   margin:0;padding:6px 3px;
   background:#f9f9f7;border-radius:22px;
-  box-shadow:0 12px 26px -10px rgba(20,20,15,.32), 0 4px 10px -2px rgba(20,20,15,.14), 0 0 0 1.5px rgba(20,20,15,.45);
+  box-shadow:0 14px 32px -14px rgba(20,20,15,.28), 0 4px 12px -4px rgba(20,20,15,.1), 0 0 0 1px rgba(20,20,15,.08);
 }
 .bottom-tab{
   flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   padding:3px 2px;border:none;background:none;color:var(--text-faint);border-radius:10px;
   transition:color .18s ease;
 }
-.bottom-tab-icon{position:relative;display:flex;align-items:center;justify-content:center;width:22px;height:22px}
+.bottom-tab-icon{position:relative;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:13px;transition:background .18s ease,width .18s ease}
 .bottom-tab-icon svg{width:20px;height:20px}
-.bottom-tab-label{display:block;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bottom-tab-label{display:none;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .bottom-tab:active{opacity:.6}
 .bottom-tab.active{color:#4d84f5}
-.bottom-tab.active .bottom-tab-label{font-weight:800}
+.bottom-tab.active .bottom-tab-icon{background:rgba(77,132,245,.14);width:42px;height:26px}
+.bottom-tab.active .bottom-tab-label{display:block;font-weight:800}
 .bottom-tab.drag-hover{background:var(--surface-3);color:var(--text)}
 .bottom-tab .tab-badge{
   position:absolute;top:-3px;right:-7px;min-width:15px;height:15px;padding:0 3px;
