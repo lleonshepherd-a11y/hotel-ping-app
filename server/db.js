@@ -278,6 +278,12 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS external_guest_request_keys (
+    idempotency_key TEXT PRIMARY KEY,
+    request_id TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS maintenance_replies (
     id TEXT PRIMARY KEY,
     ticket_id TEXT NOT NULL,

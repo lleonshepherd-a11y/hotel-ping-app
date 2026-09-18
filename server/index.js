@@ -408,6 +408,33 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { ok: true, duplicate: false, messageId: row.id });
     }
 
+    if (req.method === 'POST' && p === '/api/external/guest-requests') {
+      const apiKey = req.headers['x-api-key'] || '';
+      if (apiKey !== EXTERNAL_API_KEY) return send(res, 401, { error: 'Unauthorized' });
+      const body = await readJsonBody(req);
+      const idempotencyKey = String(body.idempotencyKey || '').trim();
+      const roomNumber = String(body.roomNumber || '').trim();
+      const requestText = String(body.requestText || '').trim();
+      const guestReference = body.guestReference ? String(body.guestReference).trim().slice(0, 80) : null;
+      if (!idempotencyKey) return send(res, 400, { error: 'idempotencyKey is required' });
+      if (!roomNumber) return send(res, 400, { error: 'roomNumber is required' });
+      if (!requestText) return send(res, 400, { error: 'requestText is required' });
+
+      const existing = db.prepare('SELECT request_id FROM external_guest_request_keys WHERE idempotency_key = ?').get(idempotencyKey);
+      if (existing) return send(res, 200, { ok: true, duplicate: true, id: existing.request_id });
+
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const text = guestReference ? requestText + ' (' + guestReference + ')' : requestText;
+      db.prepare(
+        "INSERT INTO guest_requests (id, room_number, request_text, status, created_at, updated_at) VALUES (?, ?, ?, 'new', ?, ?)"
+      ).run(id, roomNumber, text, now, now);
+      db.prepare('INSERT INTO external_guest_request_keys (idempotency_key, request_id, created_at) VALUES (?, ?, ?)')
+        .run(idempotencyKey, id, now);
+      console.log('[guest request notify] reception department: Room ' + roomNumber + ': ' + text);
+      return send(res, 201, { ok: true, duplicate: false, id });
+    }
+
     // ---- Guest concierge requests (public, no staff session, reached via a room QR code) ----
     if (req.method === 'POST' && p === '/api/guest-requests') {
       const body = await readJsonBody(req);

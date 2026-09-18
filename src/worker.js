@@ -894,6 +894,52 @@ export default {
         return json({ ok: true, duplicate: false, messageId: row.id }, 201);
       }
 
+      // Same auth/idempotency pattern as /api/external/notify, for a guest
+      // request created on the dashboard's side to land in our own
+      // guest_requests table, always routed to reception (foh) - never
+      // broadcast to a department head.
+      if (method === "POST" && p === "/api/external/guest-requests") {
+        const apiKey = request.headers.get("x-api-key") || "";
+        if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
+          return json({ error: "Unauthorized" }, 401);
+        }
+        const body = await readJsonBody(request);
+        const idempotencyKey = String(body.idempotencyKey || "").trim();
+        const roomNumber = String(body.roomNumber || "").trim();
+        const requestText = String(body.requestText || "").trim();
+        const guestReference = body.guestReference ? String(body.guestReference).trim().slice(0, 80) : null;
+        if (!idempotencyKey) return json({ error: "idempotencyKey is required" }, 400);
+        if (!roomNumber) return json({ error: "roomNumber is required" }, 400);
+        if (!requestText) return json({ error: "requestText is required" }, 400);
+
+        const existing = await env.DB.prepare(
+          "SELECT request_id FROM external_guest_request_keys WHERE idempotency_key = ?"
+        ).bind(idempotencyKey).first();
+        if (existing) {
+          return json({ ok: true, duplicate: true, id: existing.request_id });
+        }
+
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const text = guestReference ? requestText + " (" + guestReference + ")" : requestText;
+        await env.DB.prepare(
+          "INSERT INTO guest_requests (id, room_number, request_text, status, created_at, updated_at) VALUES (?, ?, ?, 'new', ?, ?)"
+        ).bind(id, roomNumber, text, now, now).run();
+        await env.DB.prepare(
+          "INSERT INTO external_guest_request_keys (idempotency_key, request_id, created_at) VALUES (?, ?, ?)"
+        ).bind(idempotencyKey, id, now).run();
+
+        const notifyPromise = notifyDepartment(env, "foh", {
+          title: "🛎️ Guest request, Room " + roomNumber,
+          body: text,
+          url: "/",
+          tag: "hotel-ping-guest-request-" + id,
+        }, null).catch((e) => console.error("notifyDepartment (external guest request) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+
+        return json({ ok: true, duplicate: false, id }, 201);
+      }
+
       // ---- Guest concierge requests (public, no staff session, reached via a room QR code) ----
       if (method === "POST" && p === "/api/guest-requests") {
         const body = await readJsonBody(request);
