@@ -668,7 +668,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/messages') {
       const self = url.searchParams.get('self');
       const other = url.searchParams.get('with');
-      if (!DEPT_IDS.has(self) || !DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || other === 'dashboard')) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
       if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
       const rows = db.prepare(`
@@ -1212,7 +1212,7 @@ const server = http.createServer(async (req, res) => {
         const memberRows = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(groupId);
         validMembers = new Set(memberRows.map((m) => m.department_id));
         if (!validMembers.has(from)) return send(res, 403, { error: 'Not a member of this group' });
-      } else if (!DEPT_IDS.has(to)) {
+      } else if (!DEPT_IDS.has(to) && to !== 'dashboard') {
         return send(res, 400, { error: 'Unknown department' });
       }
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
