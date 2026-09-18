@@ -4113,46 +4113,99 @@ function pollMissed(){
 /* ---- Hold-for-help safety alert ---- */
 var helpHoldBtn = document.getElementById("helpHoldBtn");
 var helpHoldRing = document.getElementById("helpHoldRing");
+var helpHoldLabel = document.getElementById("helpHoldLabel");
 var helpBannerStack = document.getElementById("helpBannerStack");
 var HELP_HOLD_MS = 2000;
-var helpHoldStart = 0, helpHoldRAF = null;
+var HELP_UNDO_MS = 3000;
+var helpHoldStart = 0, helpHoldRAF = null, helpArmRAF = null, helpArmStart = 0;
 var helpDismissed = {};
+var HELP_CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex:none"><path d="M20 6L9 17l-5-5"/></svg>';
 
-function helpHoldReset(){
-  if(helpHoldRAF) cancelAnimationFrame(helpHoldRAF);
-  helpHoldRAF = null;
-  helpHoldBtn.classList.remove("holding");
-  helpHoldRing.style.background = "none";
+function helpSetPhase(phase, labelHtml){
+  helpHoldBtn.className = "help-hold-btn" + (phase ? " " + phase : "");
+  if(labelHtml !== undefined) helpHoldLabel.innerHTML = labelHtml;
 }
+function helpBackToIdle(){
+  helpHoldRing.style.background = "none";
+  helpSetPhase("", "SOS");
+}
+
 function helpHoldTick(){
   var elapsed = Date.now() - helpHoldStart;
   var pct = Math.min(100, (elapsed / HELP_HOLD_MS) * 100);
-  helpHoldRing.style.background = "conic-gradient(rgba(255,255,255,.85) " + pct + "%, transparent 0)";
+  helpHoldRing.style.background = "linear-gradient(to right, rgba(193,104,95,.55) " + pct + "%, transparent " + pct + "%)";
   if(elapsed >= HELP_HOLD_MS){
-    helpHoldReset();
-    triggerHelpAlert();
+    helpHoldRAF = null;
+    helpArmHelp();
     return;
   }
   helpHoldRAF = requestAnimationFrame(helpHoldTick);
 }
+function helpCancelHold(){
+  if(!helpHoldRAF) return;
+  cancelAnimationFrame(helpHoldRAF);
+  helpHoldRAF = null;
+  helpBackToIdle();
+}
 helpHoldBtn.addEventListener("pointerdown", function(e){
+  if(helpHoldBtn.classList.contains("armed")){
+    helpCancelArmed();
+    return;
+  }
+  if(helpHoldBtn.classList.length > 1) return; // busy: holding, sent, or error
   e.preventDefault();
-  helpHoldBtn.classList.add("holding");
+  helpSetPhase("holding", "SOS");
   helpHoldStart = Date.now();
   helpHoldRAF = requestAnimationFrame(helpHoldTick);
 });
 ["pointerup", "pointercancel", "pointerleave"].forEach(function(evt){
-  helpHoldBtn.addEventListener(evt, helpHoldReset);
+  helpHoldBtn.addEventListener(evt, helpCancelHold);
 });
 helpHoldBtn.addEventListener("contextmenu", function(e){ e.preventDefault(); });
 
-function triggerHelpAlert(){
-  if(navigator.vibrate) navigator.vibrate([15, 40, 15]);
+function helpArmHelp(){
+  if(navigator.vibrate) navigator.vibrate(12);
+  playChime(false);
+  helpSetPhase("armed", HELP_CHECK_SVG + "Armed");
+  helpArmStart = Date.now();
+  helpArmTick();
+}
+function helpArmTick(){
+  var elapsed = Date.now() - helpArmStart;
+  var pct = Math.min(100, (elapsed / HELP_UNDO_MS) * 100);
+  helpHoldRing.style.background = "linear-gradient(to right, rgba(20,20,15,.1) " + pct + "%, transparent " + pct + "%)";
+  if(elapsed >= HELP_UNDO_MS){
+    helpArmRAF = null;
+    helpSendHelpAlert();
+    return;
+  }
+  helpArmRAF = requestAnimationFrame(helpArmTick);
+}
+function helpCancelArmed(){
+  if(helpArmRAF) cancelAnimationFrame(helpArmRAF);
+  helpArmRAF = null;
+  helpHoldRing.style.background = "none";
+  helpSetPhase("", "Cancelled");
+  setTimeout(helpBackToIdle, 1100);
+}
+
+function helpSendHelpAlert(){
+  helpHoldRing.style.background = "none";
   apiSend('/api/help-alerts', 'POST', {}).then(function(res){
+    if(navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 20]);
+    helpSetPhase("sent", HELP_CHECK_SVG + "Sent");
     showToast("Help request sent");
     STATE.myHelpAlertId = res.alert.id;
     pollHelpAlerts();
-  }).catch(function(){ showToast("Couldn't send help request"); });
+    setTimeout(helpBackToIdle, 2200);
+  }).catch(function(){
+    helpSetPhase("error", "Failed – retry");
+    helpHoldBtn.classList.add("shake");
+    setTimeout(function(){
+      helpHoldBtn.classList.remove("shake");
+      helpBackToIdle();
+    }, 1600);
+  });
 }
 
 function renderHelpBanners(alerts){
