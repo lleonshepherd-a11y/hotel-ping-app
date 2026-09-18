@@ -61,7 +61,7 @@ var DEPTS = {
   bar:          { name:"Bar Manager",              initials:"BM", color:"#3f9d6c" },
   housekeeping: { name:"Head Housekeeper",         initials:"HH", color:"#2f9aa0" },
   maintenance:  { name:"Maintenance Manager",      initials:"MM", color:"#6c6d78" },
-  dashboard:    { name:"Dashboard",                initials:"DB", color:"#555b66" }
+  dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
 

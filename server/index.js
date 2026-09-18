@@ -12,7 +12,7 @@ if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const DEPT_IDS = new Set(DEPARTMENTS.map((d) => d.id));
 const DEPT_NAMES = {};
 DEPARTMENTS.forEach((d) => { DEPT_NAMES[d.id] = d.name; });
-DEPT_NAMES.dashboard = 'Dashboard';
+DEPT_NAMES.dashboard = 'Head Office';
 const DEFAULT_QUICK_REPLIES = ['On it', 'Done', '5 mins', 'On my way', 'Noted', 'Course away', 'Hold 10 mins', 'Ready for dessert'];
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
 const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];

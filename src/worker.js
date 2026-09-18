@@ -51,7 +51,7 @@ const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "ba
 const DEPT_NAMES = {
   gm: "General Manager", foh: "Head Receptionist", concierge: "Head Concierge", restaurant: "Restaurant Manager",
   kitchen: "Head Chef", bar: "Bar Manager", housekeeping: "Head Housekeeper", maintenance: "Maintenance Manager",
-  dashboard: "Dashboard",
+  dashboard: "Head Office",
 };
 const PIN_RE = /^\d{4,6}$/;
 const TASK_STATUSES = ["not_started", "in_progress", "completed"];
@@ -351,12 +351,18 @@ async function checkUnnotifiedTickets(env, ctx) {
     let body = (t.room_number ? "Room " + t.room_number + ": " : "") + t.description;
     if (t.guest_present) body += " · Guest in room";
     if (t.deadline) body += " · Needed by " + t.deadline;
-    // Name the department that actually reported it (restaurant, reception,
-    // kitchen, ...) rather than the generic "dashboard" - only fall back to
-    // that when the reporter's department doesn't map to one of ours.
+    // Deliver as if the reporting department (restaurant, reception, kitchen,
+    // ...) messaged maintenance directly - no "Dashboard" contact involved -
+    // since that's who actually reported it. Only fall back to the "Head
+    // Office" channel when the reporter's department doesn't map to one of
+    // ours, or is maintenance itself (self-messaging makes no sense).
     const originDept = t.creator_dept ? fromNoirDept(t.creator_dept) : null;
-    const originLabel = originDept && DEPT_NAMES[originDept] ? DEPT_NAMES[originDept] : "the dashboard";
-    await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from " + originLabel + ": " + body });
+    const validOrigin = originDept && DEPT_IDS.has(originDept) && originDept !== "maintenance";
+    if (validOrigin) {
+      await insertMessage(env, ctx, { from: originDept, to: "maintenance", type: "text", body: "🔧 New ticket: " + body });
+    } else {
+      await insertMessage(env, ctx, { from: "dashboard", to: "maintenance", type: "text", body: "🔧 New ticket from Head Office: " + body });
+    }
     const notifyPromise = notifyDepartment(env, "maintenance", {
       title: t.priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
       body, url: "/", tag: "hotel-ping-maintenance-" + t.id,
