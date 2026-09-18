@@ -286,8 +286,15 @@
 
     <div class="sb-page events-page" id="eventsPage" hidden>
       <div class="events-page-header">
-        <div class="sb-list-label">Events</div>
-        <p class="broadcast-hint events-hint">Drag a department onto an event to bring them in. Drag a member out to let them leave.</p>
+        <div class="guests-header assets-header">
+          <div class="guests-header-icon assets-header-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><rect x="6.5" y="13" width="2.4" height="2.4"/><rect x="10.8" y="13" width="2.4" height="2.4"/><path d="M15 14.5l1.4 1.4 2.6-2.6"/></svg>
+          </div>
+          <div class="guests-header-text">
+            <div class="sb-title">Events</div>
+            <div class="sb-sub">Drag a department onto an event to bring them in. Drag a member out to let them leave.</div>
+          </div>
+        </div>
         <div class="event-palette" id="eventPalette"></div>
         <form class="event-new-form" id="newEventForm">
           <input type="text" id="newEventName" placeholder="Event name, e.g. Wedding" required maxlength="60">
@@ -316,7 +323,15 @@
     </div>
 
     <div class="sb-page" id="maintenancePage" hidden>
-      <div class="sb-list-label">Maintenance repairs</div>
+      <div class="guests-header assets-header">
+        <div class="guests-header-icon assets-header-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
+        </div>
+        <div class="guests-header-text">
+          <div class="sb-title">Repairs</div>
+          <div class="sb-sub">Report a maintenance job and track it through to fixed</div>
+        </div>
+      </div>
       <div class="off-duty-banner" id="maintOffDutyBanner" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>
         <span><b>Maintenance</b> is off duty right now. They'll still get this, just not until they're back on.</span>
