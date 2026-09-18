@@ -2938,7 +2938,7 @@ function enterApp(staff){
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
-  tabGuestsBtn.hidden = staff.departmentId !== "concierge";
+  tabGuestsBtn.hidden = staff.departmentId !== "foh";
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
   startPolling();
@@ -4082,7 +4082,7 @@ function renderMissedFeed(items){
     });
   }
 
-  var showGuests = STATE.self === "concierge" && guests.length > 0;
+  var showGuests = STATE.self === "foh" && guests.length > 0;
   missedGuestsBox.hidden = !showGuests;
   if(showGuests){
     missedGuestCount.textContent = String(guests.length);

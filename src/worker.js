@@ -822,7 +822,7 @@ export default {
         ).bind(id, roomNumber, text, now, now).run();
         const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
 
-        const notifyPromise = notifyDepartment(env, "concierge", {
+        const notifyPromise = notifyDepartment(env, "foh", {
           title: "🛎️ Guest request, Room " + roomNumber,
           body: text,
           url: "/",
@@ -1515,7 +1515,7 @@ export default {
           }
         }
 
-        if (dept === "concierge") {
+        if (dept === "foh") {
           const reqRows = await env.DB.prepare(
             "SELECT * FROM guest_requests WHERE status = 'new' ORDER BY created_at ASC"
           ).all();
@@ -2358,8 +2358,8 @@ export default {
 
       if (method === "GET" && p === "/api/guest-requests") {
         const requester = request._staff;
-        if (requester.department_id !== "concierge") {
-          return json({ error: "Concierge access required" }, 403);
+        if (requester.department_id !== "foh") {
+          return json({ error: "Reception access required" }, 403);
         }
         const rows = await env.DB.prepare("SELECT * FROM guest_requests ORDER BY created_at DESC").all();
         return json({ requests: rows.results.map(rowToGuestRequest) });
@@ -2367,8 +2367,8 @@ export default {
 
       if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/status")) {
         const requester = request._staff;
-        if (requester.department_id !== "concierge") {
-          return json({ error: "Concierge access required" }, 403);
+        if (requester.department_id !== "foh") {
+          return json({ error: "Reception access required" }, 403);
         }
         const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/status".length));
         const body = await readJsonBody(request);
@@ -2387,8 +2387,8 @@ export default {
 
       if (method === "POST" && p.startsWith("/api/guest-requests/") && p.endsWith("/pin")) {
         const requester = request._staff;
-        if (requester.department_id !== "concierge") {
-          return json({ error: "Concierge access required" }, 403);
+        if (requester.department_id !== "foh") {
+          return json({ error: "Reception access required" }, 403);
         }
         const id = decodeURIComponent(p.slice("/api/guest-requests/".length, -"/pin".length));
         const existing = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();

@@ -424,7 +424,7 @@ const server = http.createServer(async (req, res) => {
         "INSERT INTO guest_requests (id, room_number, request_text, status, created_at, updated_at) VALUES (?, ?, ?, 'new', ?, ?)"
       ).run(id, roomNumber, text, now, now);
       const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
-      console.log('[guest request notify] concierge department: Room ' + roomNumber + ': ' + text);
+      console.log('[guest request notify] reception department: Room ' + roomNumber + ': ' + text);
       return send(res, 201, { request: rowToGuestRequest(row) });
     }
 
@@ -1070,7 +1070,7 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      if (dept === 'concierge') {
+      if (dept === 'foh') {
         const reqRows = db.prepare(
           "SELECT * FROM guest_requests WHERE status = 'new' ORDER BY created_at ASC"
         ).all();
@@ -1795,8 +1795,8 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && p === '/api/guest-requests') {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge') {
-        return send(res, 403, { error: 'Concierge access required' });
+      if (requester.department_id !== 'foh') {
+        return send(res, 403, { error: 'Reception access required' });
       }
       const rows = db.prepare('SELECT * FROM guest_requests ORDER BY created_at DESC').all();
       return send(res, 200, { requests: rows.map(rowToGuestRequest) });
@@ -1804,8 +1804,8 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/status')) {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge') {
-        return send(res, 403, { error: 'Concierge access required' });
+      if (requester.department_id !== 'foh') {
+        return send(res, 403, { error: 'Reception access required' });
       }
       const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/status'.length));
       const body = await readJsonBody(req);
@@ -1823,8 +1823,8 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p.startsWith('/api/guest-requests/') && p.endsWith('/pin')) {
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'concierge') {
-        return send(res, 403, { error: 'Concierge access required' });
+      if (requester.department_id !== 'foh') {
+        return send(res, 403, { error: 'Reception access required' });
       }
       const id = decodeURIComponent(p.slice('/api/guest-requests/'.length, -'/pin'.length));
       const existing = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
