@@ -577,6 +577,7 @@ function mergeTicketRow(core, meta) {
     escalation_level: meta ? meta.escalation_level : 0,
     escalated_at: meta ? meta.escalated_at : null,
     owner_staff_id: core.owner_staff_id,
+    sort_order: meta ? meta.sort_order : null,
   };
 }
 function rowToTicket(row) {
@@ -597,6 +598,7 @@ function rowToTicket(row) {
     escalationLevel: row.escalation_level || 0,
     escalatedAt: row.escalated_at || undefined,
     ownerStaffId: row.owner_staff_id || undefined,
+    sortOrder: row.sort_order == null ? undefined : row.sort_order,
   };
 }
 function rowToBlocker(row) {
@@ -2479,6 +2481,25 @@ export default {
         ).bind(id).first();
         const meta = (await ticketMetaMap(env, [id]))[id];
         return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
+      }
+
+      if (method === "POST" && p === "/api/maintenance/reorder") {
+        const body = await readJsonBody(request);
+        const order = Array.isArray(body.order) ? body.order : [];
+        if (!order.length) return json({ error: "order is required" }, 400);
+        for (let i = 0; i < order.length; i++) {
+          await env.DB.prepare(
+            `INSERT INTO maintenance_ticket_meta (ticket_id, sort_order) VALUES (?, ?)
+             ON CONFLICT(ticket_id) DO UPDATE SET sort_order = excluded.sort_order`
+          ).bind(order[i], i * 10).run();
+        }
+        const placeholders = order.map(() => "?").join(",");
+        const rows = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id IN (${placeholders})`
+        ).bind(...order).all();
+        const meta = await ticketMetaMap(env, order);
+        return json({ tickets: rows.results.map((r) => rowToTicket(mergeTicketRow(r, meta[r.id]))) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/pin")) {

@@ -72,6 +72,7 @@ function rowToTicket(row) {
     escalationLevel: row.escalation_level || 0,
     escalatedAt: row.escalated_at || undefined,
     ownerStaffId: row.owner_staff_id || undefined,
+    sortOrder: row.sort_order == null ? undefined : row.sort_order,
   };
 }
 function rowToBlocker(row) {
@@ -1796,6 +1797,16 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?').run(staffId, id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'POST' && p === '/api/maintenance/reorder') {
+      const body = await readJsonBody(req);
+      const order = Array.isArray(body.order) ? body.order : [];
+      if (!order.length) return send(res, 400, { error: 'order is required' });
+      const update = db.prepare('UPDATE maintenance_tickets SET sort_order = ? WHERE id = ?');
+      order.forEach((id, i) => update.run(i * 10, id));
+      const rows = db.prepare(`SELECT * FROM maintenance_tickets WHERE id IN (${order.map(() => '?').join(',')})`).all(...order);
+      return send(res, 200, { tickets: rows.map(rowToTicket) });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/pin')) {

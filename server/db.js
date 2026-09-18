@@ -371,6 +371,9 @@ if (!maintenanceColumns.includes('escalated_at')) {
 if (!maintenanceColumns.includes('owner_staff_id')) {
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN owner_staff_id TEXT');
 }
+if (!maintenanceColumns.includes('sort_order')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN sort_order REAL');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS blockers (

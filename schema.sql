@@ -199,7 +199,8 @@ CREATE TABLE IF NOT EXISTS maintenance_ticket_meta (
   ticket_id TEXT PRIMARY KEY,
   pinned_at TEXT,
   escalation_level INTEGER NOT NULL DEFAULT 0,
-  escalated_at TEXT
+  escalated_at TEXT,
+  sort_order REAL
 );
 
 -- Tracks which of the dashboard's planner entries we've already turned

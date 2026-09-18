@@ -5368,6 +5368,9 @@ function sortedTickets(){
   return (STATE.tickets || []).slice().sort(function(a, b){
     if(!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
     if(order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
+    var aHasOrder = a.sortOrder != null, bHasOrder = b.sortOrder != null;
+    if(aHasOrder && bHasOrder) return a.sortOrder - b.sortOrder;
+    if(aHasOrder !== bHasOrder) return aHasOrder ? -1 : 1;
     var pa = MAINT_PRIORITY_ORDER[a.priority] != null ? MAINT_PRIORITY_ORDER[a.priority] : 2;
     var pb = MAINT_PRIORITY_ORDER[b.priority] != null ? MAINT_PRIORITY_ORDER[b.priority] : 2;
     if(pa !== pb) return pa - pb;
@@ -5461,9 +5464,105 @@ function buildPinButton(t){
   pinBtn.addEventListener("click", function(e){ e.stopPropagation(); togglePinTicket(t.id); });
   return pinBtn;
 }
+function reorderTickets(ids){
+  ids.forEach(function(id, i){
+    var t = STATE.tickets.find(function(x){ return x.id === id; });
+    if(t) t.sortOrder = i * 10;
+  });
+  apiSend('/api/maintenance/reorder', 'POST', { order: ids }).then(function(res){
+    (res.tickets || []).forEach(function(updated){
+      var idx = STATE.tickets.findIndex(function(x){ return x.id === updated.id; });
+      if(idx !== -1) STATE.tickets[idx] = updated;
+    });
+  }).catch(function(){
+    showToast("Couldn't save that order");
+  });
+}
+var MAINT_DRAG_HOLD_MS = 380;
+var MAINT_DRAG_MOVE_CANCEL = 9;
+function enableTicketDrag(card){
+  var holdTimer = null, dragging = false, pointerId = null;
+  var startX = 0, startY = 0;
+  var cardEls = [], itemHeight = 0, draggedIndex = -1, targetIndex = -1;
+
+  function cleanupTimer(){ if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; } }
+
+  function beginDrag(){
+    dragging = true;
+    card._wasDragged = true;
+    card.classList.add("dragging");
+    cardEls = Array.prototype.slice.call(maintFeed.children).filter(function(el){ return el.classList.contains("maint-card"); });
+    draggedIndex = cardEls.indexOf(card);
+    targetIndex = draggedIndex;
+    itemHeight = card.getBoundingClientRect().height + 13;
+  }
+
+  function applyShift(dy){
+    if(itemHeight <= 0) return;
+    var newIndex = Math.round(draggedIndex + dy / itemHeight);
+    newIndex = Math.max(0, Math.min(cardEls.length - 1, newIndex));
+    if(newIndex === targetIndex) return;
+    cardEls.forEach(function(el, i){
+      if(i === draggedIndex) return;
+      var shift = 0;
+      if(draggedIndex < newIndex && i > draggedIndex && i <= newIndex) shift = -itemHeight;
+      else if(draggedIndex > newIndex && i >= newIndex && i < draggedIndex) shift = itemHeight;
+      el.style.transform = shift ? "translateY(" + shift + "px)" : "";
+    });
+    targetIndex = newIndex;
+  }
+
+  function onPointerMove(e){
+    if(pointerId === null || e.pointerId !== pointerId) return;
+    var dx = e.clientX - startX, dy = e.clientY - startY;
+    if(!dragging){
+      if(Math.abs(dx) > MAINT_DRAG_MOVE_CANCEL || Math.abs(dy) > MAINT_DRAG_MOVE_CANCEL) cleanupTimer();
+      return;
+    }
+    e.preventDefault();
+    card.style.transform = "translateY(" + dy + "px) scale(1.02)";
+    applyShift(dy);
+  }
+
+  function finishDrag(){
+    if(dragging){
+      cardEls.forEach(function(el){ el.style.transform = ""; });
+      card.classList.remove("dragging");
+      card.style.transform = "";
+      if(targetIndex !== draggedIndex){
+        var reordered = cardEls.slice();
+        reordered.splice(draggedIndex, 1);
+        reordered.splice(targetIndex, 0, card);
+        reordered.forEach(function(el){ maintFeed.appendChild(el); });
+        reorderTickets(reordered.map(function(el){ return el.dataset.ticketId; }));
+      }
+      setTimeout(function(){ card._wasDragged = false; }, 50);
+    }
+    dragging = false;
+    cleanupTimer();
+    if(pointerId !== null){ try{ card.releasePointerCapture(pointerId); }catch(e){} }
+    pointerId = null;
+    card.removeEventListener("pointermove", onPointerMove);
+    card.removeEventListener("pointerup", finishDrag);
+    card.removeEventListener("pointercancel", finishDrag);
+  }
+
+  card.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    if(e.target.closest("button")) return;
+    startX = e.clientX; startY = e.clientY;
+    pointerId = e.pointerId;
+    card.setPointerCapture(pointerId);
+    card.addEventListener("pointermove", onPointerMove);
+    card.addEventListener("pointerup", finishDrag);
+    card.addEventListener("pointercancel", finishDrag);
+    holdTimer = setTimeout(beginDrag, MAINT_DRAG_HOLD_MS);
+  });
+}
 function buildMaintCard(t){
   var card = document.createElement("div");
   card.className = "maint-card status-" + t.status + (t.pinned ? " pinned" : "");
+  card.dataset.ticketId = t.id;
   var isVideo = isTicketVideo(t);
   var top = document.createElement("div");
   top.className = "maint-card-top";
@@ -5493,7 +5592,11 @@ function buildMaintCard(t){
   card.appendChild(top);
   card.appendChild(buildPinButton(t));
   card.appendChild(buildStatusActions(t));
-  card.addEventListener("click", function(){ openTicketDetail(t.id); });
+  card.addEventListener("click", function(){
+    if(card._wasDragged) return;
+    openTicketDetail(t.id);
+  });
+  enableTicketDrag(card);
   return card;
 }
 
