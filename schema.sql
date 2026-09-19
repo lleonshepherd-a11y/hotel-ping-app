@@ -378,10 +378,10 @@ CREATE INDEX IF NOT EXISTS idx_rooms_position ON rooms(position);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
-  ('foh', 'Head Receptionist', NULL, 1),
-  ('concierge', 'Head Concierge', NULL, 1),
-  ('restaurant', 'Restaurant Manager', NULL, 1),
-  ('kitchen', 'Head Chef', 'Peter', 1),
-  ('bar', 'Bar Manager', NULL, 1),
-  ('housekeeping', 'Head Housekeeper', NULL, 1),
-  ('maintenance', 'Maintenance Manager', NULL, 1);
+  ('foh', 'Reception', NULL, 1),
+  ('concierge', 'Concierge', NULL, 1),
+  ('restaurant', 'Restaurant', NULL, 1),
+  ('kitchen', 'Kitchen', 'Peter', 1),
+  ('bar', 'Bar', NULL, 1),
+  ('housekeeping', 'Housekeeping', NULL, 1),
+  ('maintenance', 'Maintenance', NULL, 1);

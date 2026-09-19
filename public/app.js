@@ -54,13 +54,13 @@ function avatarInnerHtml(deptId){
 
 var DEPTS = {
   gm:           { name:"General Manager",          initials:"GM", color:"#a3854f" },
-  foh:          { name:"Head Receptionist",   initials:"HR", color:"#4c6f92" },
-  concierge:    { name:"Head Concierge",           initials:"CN", color:"#7c62a8" },
-  restaurant:   { name:"Restaurant Manager",       initials:"RM", color:"#b16a3f" },
-  kitchen:      { name:"Head Chef",                initials:"HC", color:"#c95a2c" },
-  bar:          { name:"Bar Manager",              initials:"BM", color:"#3f9d6c" },
-  housekeeping: { name:"Head Housekeeper",         initials:"HH", color:"#2f9aa0" },
-  maintenance:  { name:"Maintenance Manager",      initials:"MM", color:"#6c6d78" },
+  foh:          { name:"Reception",           initials:"RE", color:"#4c6f92" },
+  concierge:    { name:"Concierge",                initials:"CN", color:"#7c62a8" },
+  restaurant:   { name:"Restaurant",                initials:"RS", color:"#b16a3f" },
+  kitchen:      { name:"Kitchen",                  initials:"KT", color:"#c95a2c" },
+  bar:          { name:"Bar",                      initials:"BR", color:"#3f9d6c" },
+  housekeeping: { name:"Housekeeping",              initials:"HK", color:"#2f9aa0" },
+  maintenance:  { name:"Maintenance",              initials:"MN", color:"#6c6d78" },
   dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];

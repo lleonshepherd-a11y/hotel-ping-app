@@ -506,13 +506,13 @@ if (!staffColumns.includes('phone')) {
 
 const DEPARTMENTS = [
   { id: 'gm', name: 'General Manager', contact: 'Dave' },
-  { id: 'foh', name: 'Head Receptionist', contact: null },
-  { id: 'concierge', name: 'Head Concierge', contact: null },
-  { id: 'restaurant', name: 'Restaurant Manager', contact: null },
-  { id: 'kitchen', name: 'Head Chef', contact: 'Peter' },
-  { id: 'bar', name: 'Bar Manager', contact: null },
-  { id: 'housekeeping', name: 'Head Housekeeper', contact: null },
-  { id: 'maintenance', name: 'Maintenance Manager', contact: null },
+  { id: 'foh', name: 'Reception', contact: null },
+  { id: 'concierge', name: 'Concierge', contact: null },
+  { id: 'restaurant', name: 'Restaurant', contact: null },
+  { id: 'kitchen', name: 'Kitchen', contact: 'Peter' },
+  { id: 'bar', name: 'Bar', contact: null },
+  { id: 'housekeeping', name: 'Housekeeping', contact: null },
+  { id: 'maintenance', name: 'Maintenance', contact: null },
 ];
 
 const insertDept = db.prepare(

@@ -50,8 +50,8 @@ function noirIdentity(staffRow) {
 
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
 const DEPT_NAMES = {
-  gm: "General Manager", foh: "Head Receptionist", concierge: "Head Concierge", restaurant: "Restaurant Manager",
-  kitchen: "Head Chef", bar: "Bar Manager", housekeeping: "Head Housekeeper", maintenance: "Maintenance Manager",
+  gm: "General Manager", foh: "Reception", concierge: "Concierge", restaurant: "Restaurant",
+  kitchen: "Kitchen", bar: "Bar", housekeeping: "Housekeeping", maintenance: "Maintenance",
   dashboard: "Head Office",
 };
 const PIN_RE = /^\d{4,6}$/;
