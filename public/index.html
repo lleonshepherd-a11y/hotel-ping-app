@@ -462,24 +462,38 @@
     <div class="sb-page" id="roomsPage" hidden>
       <div class="guests-header">
         <div class="guests-header-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10"/><path d="M15 18v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/><path d="M2 18h20"/><path d="M9 12h4"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
         </div>
         <div class="guests-header-text">
           <div class="sb-title">Rooms</div>
           <div class="sb-sub">Tap a room when it's clean</div>
         </div>
+        <button type="button" class="rooms-edit-btn" id="roomsEditBtn" hidden>Edit</button>
       </div>
-      <div class="rooms-progress">
-        <div class="rooms-progress-head">
-          <strong><span id="roomsCleanCount">0</span> of <span id="roomsTotalCount">0</span> rooms clean</strong>
-          <span id="roomsRemaining" class="text-muted"></span>
+      <div class="rooms-body">
+        <div class="rooms-progress">
+          <div class="rooms-progress-head">
+            <strong><span id="roomsCleanCount">0</span> of <span id="roomsTotalCount">0</span> rooms clean</strong>
+            <span id="roomsRemaining" class="text-muted"></span>
+          </div>
+          <div class="rooms-track"><div class="rooms-fill" id="roomsFill"></div></div>
         </div>
-        <div class="rooms-track"><div class="rooms-fill" id="roomsFill"></div></div>
+        <div class="rooms-grid" id="roomsGrid"></div>
+        <div class="rooms-empty" id="roomsEmpty" hidden>No rooms set up yet. Add them below.</div>
+        <p class="rooms-hint">One tap marks it clean and lets reception know. Tap a clean room again to undo.</p>
+        <div class="rooms-actions-row">
+          <button type="button" class="rooms-action-btn" id="roomsAddToggleBtn" hidden>
+            <span>Add rooms</span>
+            <svg class="rooms-action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <button type="button" class="rooms-action-btn" id="roomsResetBtn" hidden>Reset for new day</button>
+        </div>
+        <form class="subzone-add-form room-add-form" id="roomsBoardAddForm" hidden>
+          <input type="text" name="label" placeholder="Room no." maxlength="40">
+          <input type="text" name="range" class="range-input" placeholder="Range e.g. 101-140" maxlength="20">
+          <button type="submit" class="admin-add-btn">Add</button>
+        </form>
       </div>
-      <div class="rooms-grid" id="roomsGrid"></div>
-      <div class="rooms-empty" id="roomsEmpty" hidden>No rooms set up yet. Add them from Hotel setup &gt; Rooms.</div>
-      <p class="rooms-hint">One tap marks it clean and lets reception know.</p>
-      <button type="button" class="rooms-reset-btn" id="roomsResetBtn" hidden>Reset all for a new day</button>
     </div>
 
     <div class="bottom-tabs">
@@ -508,8 +522,7 @@
         <span class="bottom-tab-label">Guests</span>
       </button>
       <button class="bottom-tab" id="tabRoomsBtn" type="button" aria-label="Rooms" title="Rooms" hidden>
-        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v10"/><path d="M15 18v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/><path d="M2 18h20"/><path d="M9 12h4"/></svg><span class="tab-badge" id="tabRoomsBadge" hidden></span></span>
-        <span class="bottom-tab-label">Rooms</span>
+        <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg><span class="tab-badge" id="tabRoomsBadge" hidden></span></span>
       </button>
     </div>
   </aside>
@@ -737,8 +750,8 @@
       <div class="setup-note">The room list Housekeeping's board shows for marking rooms clean - separate from the areas mapped for SOS.</div>
       <div class="zone-chip-list" id="roomSetupList"></div>
       <form class="subzone-add-form room-add-form" id="addRoomForm">
-        <input type="text" name="label" placeholder="Room label, e.g. 12" maxlength="40">
-        <input type="text" name="range" class="range-input" placeholder="or a range, e.g. 101-140" maxlength="20">
+        <input type="text" name="label" placeholder="Room no." maxlength="40">
+        <input type="text" name="range" class="range-input" placeholder="Range e.g. 101-140" maxlength="20">
         <button type="submit" class="admin-add-btn">Add</button>
       </form>
     </div>

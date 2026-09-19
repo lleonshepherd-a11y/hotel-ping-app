@@ -873,6 +873,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .where-chip.subzone{font-weight:600;color:var(--text-faint)}
 
 /* ---- Housekeeping rooms board ---- */
+.rooms-body{padding:16px 20px 24px}
 .rooms-progress{margin:4px 0 18px;padding:16px 18px;border:1px solid var(--border);border-radius:18px;background:var(--surface-2)}
 .rooms-progress-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;color:var(--text-faint);margin-bottom:10px}
 .rooms-progress-head strong{font-weight:700;color:var(--text);font-size:13px}
@@ -885,10 +886,23 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .room-tile-check{position:absolute;top:6px;right:7px;font-size:10px}
 .rooms-hint{text-align:center;margin:16px 0 4px;font-size:11.5px;color:var(--text-faint)}
 .rooms-empty{text-align:center;padding:30px 10px;font-size:13px;color:var(--text-faint)}
-.rooms-reset-btn{display:block;width:100%;margin-top:18px;padding:11px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text-dim);font-weight:700;font-size:12.5px}
-.rooms-reset-btn:active{background:var(--active-tint)}
+.rooms-actions-row{display:flex;gap:8px;margin-top:16px}
+.rooms-action-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text-dim);font-weight:700;font-size:12.5px;font-family:inherit}
+.rooms-action-btn:active{background:var(--active-tint);transform:scale(.97)}
+.rooms-action-chevron{width:13px;height:13px;transition:transform .2s ease}
+.rooms-action-btn.open{color:var(--accent);border-color:var(--outline-soft)}
+.rooms-action-btn.open .rooms-action-chevron{transform:rotate(180deg)}
+.room-add-form{margin-top:10px}
 .room-add-form{flex-wrap:wrap}
 .room-add-form .admin-add-btn{width:auto;height:auto;border-radius:10px;padding:0 14px;flex:none}
+.rooms-edit-btn{flex:none;border:none;background:none;color:var(--accent);font-weight:700;font-size:13px;padding:4px 2px}
+.rooms-edit-btn.active{color:var(--urgent)}
+.room-tile.edit-mode{cursor:default}
+.room-tile-del{position:absolute;top:-6px;right:-6px;width:19px;height:19px;border-radius:50%;background:var(--urgent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+.room-tile-del svg{width:11px;height:11px}
+@keyframes roomJiggle{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+.room-tile.edit-mode{animation:roomJiggle .22s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.room-tile.edit-mode{animation:none}}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}

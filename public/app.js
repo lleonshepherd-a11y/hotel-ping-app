@@ -2919,7 +2919,7 @@ function enterApp(staff){
   opsOverviewBtn.hidden = !staff.isAdmin;
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
-  tabRoomsBtn.hidden = staff.departmentId !== "housekeeping" && !staff.isAdmin;
+  tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
   startPolling();
@@ -4815,6 +4815,7 @@ function renderOpsOverview(data){
     '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.exceptions.openTickets+'</span><span class="ops-exception-label">Rooms/jobs still open</span></div>'+
     '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.exceptions.openGuestRequests+'</span><span class="ops-exception-label">Guest requests unresolved</span></div>'+
     '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.blockerChains.length+'</span><span class="ops-exception-label">Blocked chains right now</span></div>'+
+    (data.rooms && data.rooms.total > 0 ? '<div class="ops-exception-tile"><span class="ops-exception-n">'+data.rooms.clean+'/'+data.rooms.total+'</span><span class="ops-exception-label">Rooms clean today</span></div>' : '')+
   '</div>';
 
   var needsAttention = data.escalatedMessages.filter(function(m){ return m.escalationLevel >= 2; })
@@ -6685,12 +6686,25 @@ var roomsFillEl = document.getElementById("roomsFill");
 var roomsGridEl = document.getElementById("roomsGrid");
 var roomsEmptyEl = document.getElementById("roomsEmpty");
 var roomsResetBtn = document.getElementById("roomsResetBtn");
+var roomsEditBtn = document.getElementById("roomsEditBtn");
+var roomsAddToggleBtn = document.getElementById("roomsAddToggleBtn");
+var roomsBoardAddForm = document.getElementById("roomsBoardAddForm");
 var STATE_ROOMS = [];
+var STATE_ROOMS_EDIT = false;
+var ROOM_DEL_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 function canManageRoomsClient(){ return STATE.self === "housekeeping" || (AUTH.staff && AUTH.staff.isAdmin); }
 
 function openRoomsTab(){
-  roomsResetBtn.hidden = !canManageRoomsClient();
+  STATE_ROOMS_EDIT = false;
+  var canManage = canManageRoomsClient();
+  roomsResetBtn.hidden = !canManage;
+  roomsEditBtn.hidden = !canManage;
+  roomsAddToggleBtn.hidden = !canManage;
+  roomsAddToggleBtn.classList.remove("open");
+  roomsBoardAddForm.hidden = true;
+  roomsEditBtn.textContent = "Edit";
+  roomsEditBtn.classList.remove("active");
   loadRooms();
 }
 
@@ -6714,33 +6728,81 @@ function renderRoomsBoard(){
   roomsFillEl.style.width = (total === 0 ? 0 : (clean / total * 100)) + "%";
   roomsGridEl.innerHTML = "";
   roomsEmptyEl.hidden = total > 0;
+  var canManage = canManageRoomsClient();
   STATE_ROOMS.forEach(function(r){
     var btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "room-tile";
+    btn.className = "room-tile" + (STATE_ROOMS_EDIT ? " edit-mode" : "");
     btn.dataset.clean = String(r.status === "clean");
-    btn.setAttribute("aria-label", r.status === "clean" ? "Room " + r.label + ", clean. Reception notified." : "Room " + r.label + ". Mark clean and notify reception.");
-    btn.innerHTML = esc(r.label) + (r.status === "clean" ? '<span class="room-tile-check" aria-hidden="true">✓</span>' : "");
-    if(r.status !== "clean" && canManageRoomsClient()){
+    var isClean = r.status === "clean";
+    btn.setAttribute("aria-label", isClean ? "Room " + r.label + ", clean. Tap to undo." : "Room " + r.label + ". Mark clean and notify reception.");
+    btn.innerHTML = esc(r.label) + (isClean ? '<span class="room-tile-check" aria-hidden="true">✓</span>' : "");
+    if(STATE_ROOMS_EDIT && canManage){
+      var del = document.createElement("span");
+      del.className = "room-tile-del";
+      del.innerHTML = ROOM_DEL_SVG;
+      btn.appendChild(del);
+      btn.addEventListener("click", function(){
+        showConfirm({ title: "Remove room " + r.label + "?", confirmLabel: "Remove" }).then(function(ok){
+          if(!ok) return;
+          apiDelete('/api/rooms/' + encodeURIComponent(r.id)).then(function(){ loadRooms(); }).catch(function(){ showToast("Couldn't remove that room"); });
+        });
+      });
+    } else if(canManage){
       btn.addEventListener("click", function(){
         btn.disabled = true;
-        apiSend('/api/rooms/' + encodeURIComponent(r.id) + '/clean', 'POST', {}).then(function(res){
+        var endpoint = isClean ? "/dirty" : "/clean";
+        apiSend('/api/rooms/' + encodeURIComponent(r.id) + endpoint, 'POST', {}).then(function(res){
           var idx = STATE_ROOMS.findIndex(function(x){ return x.id === r.id; });
           if(idx !== -1) STATE_ROOMS[idx] = res.room;
           renderRoomsBoard();
           refreshRoomsBadge();
-          showToast("Room " + r.label + " is ready");
+          if(!isClean) showToast("Room " + r.label + " is ready");
         }).catch(function(){
           btn.disabled = false;
-          showToast("Couldn't mark that room clean");
+          showToast(isClean ? "Couldn't undo that" : "Couldn't mark that room clean");
         });
       });
-    } else if(r.status !== "clean"){
+    } else {
       btn.disabled = true;
     }
     roomsGridEl.appendChild(btn);
   });
 }
+
+roomsEditBtn.addEventListener("click", function(){
+  STATE_ROOMS_EDIT = !STATE_ROOMS_EDIT;
+  roomsEditBtn.textContent = STATE_ROOMS_EDIT ? "Done" : "Edit";
+  roomsEditBtn.classList.toggle("active", STATE_ROOMS_EDIT);
+  renderRoomsBoard();
+});
+
+roomsAddToggleBtn.addEventListener("click", function(){
+  var open = roomsBoardAddForm.hidden;
+  roomsBoardAddForm.hidden = !open;
+  roomsAddToggleBtn.classList.toggle("open", open);
+  if(open) roomsBoardAddForm.querySelector('input[name="label"]').focus();
+});
+
+roomsBoardAddForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var labelInput = roomsBoardAddForm.querySelector('input[name="label"]');
+  var rangeInput = roomsBoardAddForm.querySelector('input[name="range"]');
+  var body = null;
+  if(rangeInput.value.trim()){
+    var m = rangeInput.value.trim().match(/^(\d+)\s*-\s*(\d+)$/);
+    if(!m){ showToast("Range must look like 101-140"); return; }
+    body = { prefix: labelInput.value.trim(), start: parseInt(m[1], 10), end: parseInt(m[2], 10) };
+  } else if(labelInput.value.trim()){
+    body = { label: labelInput.value.trim() };
+  } else {
+    return;
+  }
+  apiSend('/api/rooms', 'POST', body).then(function(){
+    labelInput.value = ""; rangeInput.value = "";
+    loadRooms();
+  }).catch(function(){ showToast("Couldn't add that room"); });
+});
 
 roomsResetBtn.addEventListener("click", function(){
   showConfirm({ title: "Reset all rooms to dirty?", confirmLabel: "Reset" }).then(function(ok){

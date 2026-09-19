@@ -1436,7 +1436,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/rooms') {
       const requester = staffFromToken(req);
-      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      if (!canManageRooms(requester)) return send(res, 403, { error: 'Only housekeeping can do that' });
       const body = await readJsonBody(req);
       let pos = db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n;
       const now = new Date().toISOString();
@@ -1464,7 +1464,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'DELETE' && p.startsWith('/api/rooms/')) {
       const requester = staffFromToken(req);
-      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      if (!canManageRooms(requester)) return send(res, 403, { error: 'Only housekeeping can do that' });
       const id = decodeURIComponent(p.slice('/api/rooms/'.length));
       db.prepare('DELETE FROM rooms WHERE id = ?').run(id);
       return send(res, 200, { ok: true });
@@ -1566,6 +1566,8 @@ const server = http.createServer(async (req, res) => {
 
       const openTicketCount = db.prepare("SELECT COUNT(*) AS n FROM maintenance_tickets WHERE status != 'fixed'").get();
       const openGuestCount = db.prepare("SELECT COUNT(*) AS n FROM guest_requests WHERE status != 'completed'").get();
+      const roomTotalCount = db.prepare("SELECT COUNT(*) AS n FROM rooms").get();
+      const roomCleanCount = db.prepare("SELECT COUNT(*) AS n FROM rooms WHERE status = 'clean'").get();
 
       return send(res, 200, {
         escalatedMessages: escalatedMsgRows.map((r) => rowToMessage(r, r.to_dept, true)),
@@ -1577,6 +1579,7 @@ const server = http.createServer(async (req, res) => {
           openTickets: openTicketCount.n,
           openGuestRequests: openGuestCount.n,
         },
+        rooms: { clean: roomCleanCount.n, total: roomTotalCount.n },
       });
     }
 

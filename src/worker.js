@@ -1501,7 +1501,7 @@ export default {
       }
 
       if (method === "POST" && p === "/api/rooms") {
-        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        if (!canManageRooms(request._staff)) return json({ error: "Only housekeeping can do that" }, 403);
         const body = await readJsonBody(request);
         const countRow = await env.DB.prepare("SELECT COUNT(*) AS n FROM rooms").first();
         let pos = countRow.n;
@@ -1531,7 +1531,7 @@ export default {
       }
 
       if (method === "DELETE" && p.startsWith("/api/rooms/")) {
-        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        if (!canManageRooms(request._staff)) return json({ error: "Only housekeeping can do that" }, 403);
         const id = decodeURIComponent(p.slice("/api/rooms/".length));
         await env.DB.prepare("DELETE FROM rooms WHERE id = ?").bind(id).run();
         return json({ ok: true });
@@ -2304,6 +2304,8 @@ export default {
 
         const openTicketCount = await env.NOIR_DB.prepare("SELECT COUNT(*) AS n FROM maintenance_tickets WHERE status != 'fixed'").first();
         const openGuestCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM guest_requests WHERE status != 'completed'").first();
+        const roomTotalCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM rooms").first();
+        const roomCleanCount = await env.DB.prepare("SELECT COUNT(*) AS n FROM rooms WHERE status = 'clean'").first();
 
         return json({
           escalatedMessages: escalatedMsgRows.results.map((r) => rowToMessage(r, r.to_dept, true)),
@@ -2315,6 +2317,7 @@ export default {
             openTickets: openTicketCount.n,
             openGuestRequests: openGuestCount.n,
           },
+          rooms: { clean: roomCleanCount.n, total: roomTotalCount.n },
         });
       }
 
