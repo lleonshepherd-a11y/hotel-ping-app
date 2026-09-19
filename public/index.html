@@ -468,31 +468,26 @@
           <div class="sb-title">Rooms</div>
           <div class="sb-sub">Tap a room when it's clean</div>
         </div>
-        <button type="button" class="rooms-edit-btn" id="roomsEditBtn" hidden>Edit</button>
+        <span class="rooms-count-badge" id="roomsCountBadge" hidden>0/0</span>
       </div>
       <div class="rooms-body">
-        <div class="rooms-progress">
-          <div class="rooms-progress-head">
-            <strong><span id="roomsCleanCount">0</span> of <span id="roomsTotalCount">0</span> rooms clean</strong>
-            <span id="roomsRemaining" class="text-muted"></span>
-          </div>
-          <div class="rooms-track"><div class="rooms-fill" id="roomsFill"></div></div>
+        <div class="sb-search rooms-search" id="roomsSearchWrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="text" id="roomsSearchInput" placeholder="Search room number" inputmode="numeric">
+          <button id="roomsSearchClear" hidden aria-label="Clear search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
         <div class="rooms-grid" id="roomsGrid"></div>
-        <div class="rooms-empty" id="roomsEmpty" hidden>No rooms set up yet. Add them below.</div>
+        <div class="rooms-no-match" id="roomsNoMatch" hidden>No rooms match that search.</div>
+        <div class="rooms-empty" id="roomsEmpty" hidden>No rooms set up yet. Use the counter below to add some.</div>
         <p class="rooms-hint">One tap marks it clean and lets reception know. Tap a clean room again to undo.</p>
-        <div class="rooms-actions-row">
-          <button type="button" class="rooms-action-btn" id="roomsAddToggleBtn" hidden>
-            <span>Add rooms</span>
-            <svg class="rooms-action-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <button type="button" class="rooms-action-btn" id="roomsResetBtn" hidden>Reset for new day</button>
+        <div class="rooms-stepper" id="roomsStepper" hidden>
+          <button type="button" class="rooms-step-btn" id="roomsStepDown" aria-label="Remove a room">&minus;</button>
+          <span class="rooms-step-count" id="roomsStepCount">0 rooms</span>
+          <button type="button" class="rooms-step-btn" id="roomsStepUp" aria-label="Add a room">+</button>
         </div>
-        <form class="subzone-add-form room-add-form" id="roomsBoardAddForm" hidden>
-          <input type="text" name="label" placeholder="Room no." maxlength="40">
-          <input type="text" name="range" class="range-input" placeholder="Range e.g. 101-140" maxlength="20">
-          <button type="submit" class="admin-add-btn">Add</button>
-        </form>
+        <button type="button" class="rooms-reset-btn" id="roomsResetBtn" hidden>Reset for new day</button>
       </div>
     </div>
 
