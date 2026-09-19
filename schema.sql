@@ -361,6 +361,21 @@ CREATE TABLE IF NOT EXISTS help_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
 
+-- Housekeeping room status board. A standalone list of room labels (not
+-- the SOS zone mapper's rooms - a hotel's real room numbers rarely line up
+-- with how its floors are zoned for locating someone in an emergency), each
+-- either dirty or clean. Marking a room clean notifies reception (foh).
+CREATE TABLE IF NOT EXISTS rooms (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'dirty' CHECK(status IN ('dirty','clean')),
+  cleaned_at TEXT,
+  cleaned_by_name TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rooms_position ON rooms(position);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Head Receptionist', NULL, 1),

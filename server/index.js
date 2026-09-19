@@ -1421,6 +1421,85 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    function rowToRoom(row) {
+      return {
+        id: row.id, label: row.label, status: row.status,
+        cleanedAt: row.cleaned_at || null, cleanedByName: row.cleaned_by_name || null,
+      };
+    }
+    const canManageRooms = (staff) => staff.department_id === 'housekeeping' || staff.is_admin;
+
+    if (req.method === 'GET' && p === '/api/rooms') {
+      const rows = db.prepare('SELECT * FROM rooms ORDER BY position, created_at').all();
+      return send(res, 200, { rooms: rows.map(rowToRoom) });
+    }
+
+    if (req.method === 'POST' && p === '/api/rooms') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      let pos = db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n;
+      const now = new Date().toISOString();
+      let labels = [];
+      if (typeof body.start === 'number' && typeof body.end === 'number') {
+        if (body.end < body.start || body.end - body.start > 300) {
+          return send(res, 400, { error: 'Check that range' });
+        }
+        const prefix = typeof body.prefix === 'string' ? body.prefix : '';
+        for (let n = body.start; n <= body.end; n++) labels.push(prefix + n);
+      } else if (typeof body.label === 'string' && body.label.trim()) {
+        labels = [body.label.trim()];
+      } else {
+        return send(res, 400, { error: 'label, or start/end, is required' });
+      }
+      const created = [];
+      for (const label of labels) {
+        const id = crypto.randomUUID();
+        db.prepare("INSERT INTO rooms (id, label, position, status, created_at) VALUES (?, ?, ?, 'dirty', ?)").run(id, label, pos, now);
+        created.push({ id, label, status: 'dirty', cleanedAt: null, cleanedByName: null });
+        pos++;
+      }
+      return send(res, 201, { rooms: created });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/rooms/')) {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const id = decodeURIComponent(p.slice('/api/rooms/'.length));
+      db.prepare('DELETE FROM rooms WHERE id = ?').run(id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && p === '/api/rooms/reset-all') {
+      const requester = staffFromToken(req);
+      if (!canManageRooms(requester)) return send(res, 403, { error: 'Only housekeeping can do that' });
+      db.prepare("UPDATE rooms SET status = 'dirty', cleaned_at = NULL, cleaned_by_name = NULL").run();
+      const rows = db.prepare('SELECT * FROM rooms ORDER BY position, created_at').all();
+      return send(res, 200, { rooms: rows.map(rowToRoom) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/rooms/') && (p.endsWith('/clean') || p.endsWith('/dirty'))) {
+      const requester = staffFromToken(req);
+      if (!canManageRooms(requester)) return send(res, 403, { error: 'Only housekeeping can do that' });
+      const clean = p.endsWith('/clean');
+      const suffix = clean ? '/clean' : '/dirty';
+      const id = decodeURIComponent(p.slice('/api/rooms/'.length, -suffix.length));
+      const room = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
+      if (!room) return send(res, 404, { error: 'Not found' });
+      const now = new Date().toISOString();
+      if (clean) {
+        const wasDirty = room.status !== 'clean';
+        db.prepare("UPDATE rooms SET status = 'clean', cleaned_at = ?, cleaned_by_name = ? WHERE id = ?").run(now, requester.name || null, id);
+        if (wasDirty && requester.department_id !== 'foh') {
+          insertMessage({ from: requester.department_id, to: 'foh', type: 'text', body: 'Room ' + room.label + ' is clean and ready.' });
+        }
+      } else {
+        db.prepare("UPDATE rooms SET status = 'dirty', cleaned_at = NULL, cleaned_by_name = NULL WHERE id = ?").run(id);
+      }
+      const row = db.prepare('SELECT * FROM rooms WHERE id = ?').get(id);
+      return send(res, 200, { room: rowToRoom(row) });
+    }
+
     if (req.method === 'GET' && p === '/api/blockers') {
       const rows = db.prepare("SELECT * FROM blockers WHERE resolved_at IS NULL ORDER BY created_at ASC").all();
       return send(res, 200, { blockers: rows.map(rowToBlocker) });

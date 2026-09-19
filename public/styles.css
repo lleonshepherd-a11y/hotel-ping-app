@@ -26,8 +26,8 @@
   --urgent:#c1685f;
   --urgent-2:#9c554c;
   --urgent-tint:rgba(193,104,95,.12);
-  --bubble-in:#f0f0ec;
-  --bubble-in-text:#18181a;
+  --bubble-in:#e9eaee;
+  --bubble-in-text:#1c1e26;
   --sidebar-bg:#f9f9f7;
   --active-tint:rgba(20,20,22,.08);
   --active-tint-strong:rgba(20,20,22,.16);
@@ -349,7 +349,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
 .msg-row.in .bubble{background:var(--bubble-in);color:var(--bubble-in-text)}
-.msg-row.out .bubble{background:linear-gradient(150deg,#4d84f5,#3a63b8);color:#fff}
+.msg-row.out .bubble{background:linear-gradient(135deg,#3b5bfd,#1e2f8c);color:#fff}
 .msg-row.in.urgent .bubble{background:var(--urgent);color:#fff}
 .msg-row.group-end.in .bubble{border-bottom-left-radius:6px}
 .msg-row.group-end.out .bubble{border-bottom-right-radius:6px}
@@ -384,7 +384,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-row.out .file-download-btn{color:#8fe0ab}
 .file-download-btn svg{width:16px;height:16px}
 
-.bubble.audio-bubble{display:flex;align-items:center;gap:10px;padding:9px 13px 9px 9px;min-width:200px;background:linear-gradient(150deg,#4d84f5,#3a63b8) !important;color:#fff !important}
+.bubble.audio-bubble{display:flex;align-items:center;gap:10px;padding:9px 13px 9px 9px;min-width:200px;background:linear-gradient(135deg,#3b5bfd,#1e2f8c) !important;color:#fff !important}
 .play-btn{width:32px;height:32px;border-radius:50%;border:none;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.22);color:inherit}
 .play-btn svg{width:14px;height:14px}
 .wave{flex:1;display:flex;align-items:center;gap:2px;height:22px;position:relative;overflow:hidden}
@@ -871,6 +871,24 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .where-chip{border:1.5px solid var(--border);background:var(--surface-2);border-radius:16px;padding:8px 14px;font-size:13px;font-weight:700}
 .where-chip:active{transform:scale(.96);background:var(--active-tint)}
 .where-chip.subzone{font-weight:600;color:var(--text-faint)}
+
+/* ---- Housekeeping rooms board ---- */
+.rooms-progress{margin:4px 0 18px;padding:16px 18px;border:1px solid var(--border);border-radius:18px;background:var(--surface-2)}
+.rooms-progress-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:12px;color:var(--text-faint);margin-bottom:10px}
+.rooms-progress-head strong{font-weight:700;color:var(--text);font-size:13px}
+.rooms-track{height:5px;border-radius:6px;background:var(--surface-3);overflow:hidden}
+.rooms-fill{height:100%;width:0;border-radius:6px;background:#2f9a5c;transition:width .3s ease}
+.rooms-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.room-tile{position:relative;appearance:none;cursor:pointer;height:64px;border:1.5px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);font-family:inherit;font-size:18px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;justify-content:center;transition:transform .15s ease,background .15s ease,border-color .15s ease}
+.room-tile:active{transform:scale(.94)}
+.room-tile[data-clean="true"]{background:rgba(47,154,92,.1);border-color:rgba(47,154,92,.35);color:#2f9a5c;cursor:default}
+.room-tile-check{position:absolute;top:6px;right:7px;font-size:10px}
+.rooms-hint{text-align:center;margin:16px 0 4px;font-size:11.5px;color:var(--text-faint)}
+.rooms-empty{text-align:center;padding:30px 10px;font-size:13px;color:var(--text-faint)}
+.rooms-reset-btn{display:block;width:100%;margin-top:18px;padding:11px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text-dim);font-weight:700;font-size:12.5px}
+.rooms-reset-btn:active{background:var(--active-tint)}
+.room-add-form{flex-wrap:wrap}
+.room-add-form .admin-add-btn{width:auto;height:auto;border-radius:10px;padding:0 14px;flex:none}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}

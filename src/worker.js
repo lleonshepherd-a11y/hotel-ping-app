@@ -1483,6 +1483,98 @@ export default {
         return json({ ok: true });
       }
 
+      // ---- Housekeeping room status board ----
+      // A standalone list of room labels, independent of the SOS zone
+      // mapper's rooms. Any signed-in staff can see it (reception often
+      // wants a glance); only housekeeping and admins can change it.
+      function rowToRoom(row) {
+        return {
+          id: row.id, label: row.label, status: row.status,
+          cleanedAt: row.cleaned_at || null, cleanedByName: row.cleaned_by_name || null,
+        };
+      }
+      const canManageRooms = (staff) => staff.department_id === "housekeeping" || staff.is_admin;
+
+      if (method === "GET" && p === "/api/rooms") {
+        const rows = await env.DB.prepare("SELECT * FROM rooms ORDER BY position, created_at").all();
+        return json({ rooms: rows.results.map(rowToRoom) });
+      }
+
+      if (method === "POST" && p === "/api/rooms") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const body = await readJsonBody(request);
+        const countRow = await env.DB.prepare("SELECT COUNT(*) AS n FROM rooms").first();
+        let pos = countRow.n;
+        const now = new Date().toISOString();
+        let labels = [];
+        if (typeof body.start === "number" && typeof body.end === "number") {
+          if (body.end < body.start || body.end - body.start > 300) {
+            return json({ error: "Check that range" }, 400);
+          }
+          const prefix = typeof body.prefix === "string" ? body.prefix : "";
+          for (let n = body.start; n <= body.end; n++) labels.push(prefix + n);
+        } else if (typeof body.label === "string" && body.label.trim()) {
+          labels = [body.label.trim()];
+        } else {
+          return json({ error: "label, or start/end, is required" }, 400);
+        }
+        const created = [];
+        for (const label of labels) {
+          const id = crypto.randomUUID();
+          await env.DB.prepare(
+            "INSERT INTO rooms (id, label, position, status, created_at) VALUES (?, ?, ?, 'dirty', ?)"
+          ).bind(id, label, pos, now).run();
+          created.push({ id, label, status: "dirty", cleanedAt: null, cleanedByName: null });
+          pos++;
+        }
+        return json({ rooms: created }, 201);
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/rooms/")) {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const id = decodeURIComponent(p.slice("/api/rooms/".length));
+        await env.DB.prepare("DELETE FROM rooms WHERE id = ?").bind(id).run();
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p === "/api/rooms/reset-all") {
+        const requester = request._staff;
+        if (!canManageRooms(requester)) return json({ error: "Only housekeeping can do that" }, 403);
+        await env.DB.prepare("UPDATE rooms SET status = 'dirty', cleaned_at = NULL, cleaned_by_name = NULL").run();
+        const rows = await env.DB.prepare("SELECT * FROM rooms ORDER BY position, created_at").all();
+        return json({ rooms: rows.results.map(rowToRoom) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/rooms/") && (p.endsWith("/clean") || p.endsWith("/dirty"))) {
+        const requester = request._staff;
+        if (!canManageRooms(requester)) return json({ error: "Only housekeeping can do that" }, 403);
+        const clean = p.endsWith("/clean");
+        const suffix = clean ? "/clean" : "/dirty";
+        const id = decodeURIComponent(p.slice("/api/rooms/".length, -suffix.length));
+        const room = await env.DB.prepare("SELECT * FROM rooms WHERE id = ?").bind(id).first();
+        if (!room) return json({ error: "Not found" }, 404);
+        const now = new Date().toISOString();
+        if (clean) {
+          const wasDirty = room.status !== "clean";
+          await env.DB.prepare("UPDATE rooms SET status = 'clean', cleaned_at = ?, cleaned_by_name = ? WHERE id = ?")
+            .bind(now, requester.name || null, id).run();
+          // One tap - a real message to reception, not just a push ping, so
+          // it shows up in the housekeeping/reception thread like any other
+          // department update. Only on the dirty->clean transition, so a
+          // repeat tap (or a race between two taps) never double-sends it.
+          if (wasDirty && requester.department_id !== "foh") {
+            await insertMessage(env, ctx, {
+              from: requester.department_id, to: "foh", type: "text",
+              body: "Room " + room.label + " is clean and ready.",
+            });
+          }
+        } else {
+          await env.DB.prepare("UPDATE rooms SET status = 'dirty', cleaned_at = NULL, cleaned_by_name = NULL WHERE id = ?").bind(id).run();
+        }
+        const row = await env.DB.prepare("SELECT * FROM rooms WHERE id = ?").bind(id).first();
+        return json({ room: rowToRoom(row) });
+      }
+
       // ---- Conversations ----
       if (method === "GET" && p === "/api/conversations") {
         const self = url.searchParams.get("self");

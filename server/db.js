@@ -389,6 +389,17 @@ db.exec(`
     location_accuracy_m REAL
   );
   CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
+
+  CREATE TABLE IF NOT EXISTS rooms (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'dirty',
+    cleaned_at TEXT,
+    cleaned_by_name TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_rooms_position ON rooms(position);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);
