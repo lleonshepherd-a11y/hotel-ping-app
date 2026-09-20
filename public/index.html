@@ -31,13 +31,32 @@
           <label for="loginName">Name</label>
           <input type="text" id="loginName" autocomplete="username" placeholder="e.g. Dave" required>
         </div>
-        <div class="login-field">
+        <!-- PIN check is off pre-launch (see LOGIN_REQUIRE_PIN in worker.js/server/index.js) - remove
+             this hidden attribute and the required attribute below once real staff are signing in. -->
+        <div class="login-field" hidden>
           <label for="loginPin">PIN</label>
-          <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••" required>
+          <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••">
         </div>
         <button type="submit" class="login-btn" id="loginBtn">Sign in</button>
         <div class="login-error" id="loginError"></div>
       </form>
+      <form id="signupForm" hidden>
+        <div id="signupFields">
+          <div class="login-field">
+            <label for="signupName">Your name</label>
+            <input type="text" id="signupName" autocomplete="name" placeholder="e.g. Dave" required>
+          </div>
+          <div class="login-field">
+            <label for="signupDept">Department</label>
+            <select id="signupDept" required></select>
+          </div>
+        </div>
+        <button type="submit" class="login-btn" id="signupBtn">Request access</button>
+        <div class="login-error" id="signupError"></div>
+        <div class="login-tip" id="signupSentMsg" hidden>Request sent - the General Manager needs to accept it before you can sign in.</div>
+      </form>
+      <button type="button" class="login-toggle-link" id="showSignupBtn">New here? Sign up</button>
+      <button type="button" class="login-toggle-link" id="showLoginBtn" hidden>Already signed up? Sign in</button>
     </div>
   </div>
   <div class="login-footer">Department messaging, one app for every head of department</div>
@@ -70,11 +89,11 @@
     <div class="sb-head">
       <div class="sb-brand">
         <div class="sb-mark">
-          <img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo">
+          <img src="hotel-ping-logo-tight.png" alt="Hotel logo" id="sbMarkImg">
         </div>
         <div style="min-width:0;flex:1;overflow:hidden">
-          <div class="sb-title">Hotel Ping</div>
-          <div class="sb-sub" id="sbSub">Department heads</div>
+          <div class="sb-title" id="sbTitle">Hotel Ping</div>
+          <div class="sb-sub" id="sbSub" hidden>Department heads</div>
         </div>
         <div class="duty-row duty-row-header">
           <span class="duty-caption-label">Duty status</span>
@@ -139,7 +158,7 @@
     </div>
 
     <div class="sb-switcher" id="switcherWrap">
-      <div class="sb-switcher-label">Viewing as</div>
+      <div class="sb-switcher-label" id="switcherLabel">Viewing as</div>
       <div class="switcher-row" id="switcherRow"></div>
     </div>
 
@@ -147,6 +166,7 @@
       <button class="sb-menu-row" id="adminBtn" hidden type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
         <span class="sb-menu-label">Hotel setup</span>
+        <span class="missed-section-count" id="signupsCount" hidden>0</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="feedBtn" hidden type="button">
@@ -233,7 +253,8 @@
     </div>
 
     <div class="powered-by-footer">
-      <span>Powered by Hotel Ping</span>
+      <span>Powered by</span>
+      <img src="/hotel-ping-logo.webp" alt="Hotel Ping" class="powered-by-logo">
     </div>
     </div>
 
@@ -543,10 +564,41 @@
         <button class="mute-btn urgent-header-btn header-icon-big" id="urgentToggleBtn" type="button" aria-label="Mark next message urgent" title="Mark urgent">
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         </button>
-        <button type="button" class="help-hold-btn" id="helpHoldBtn" aria-label="Press and hold for help">
+        <button type="button" class="help-hold-btn" id="helpHoldBtn" aria-label="Press and hold for help" hidden>
           <span class="help-hold-ring" id="helpHoldRing"></span>
           <span class="help-hold-label" id="helpHoldLabel">SOS</span>
         </button>
+        <div class="header-menu-wrap">
+          <button class="mute-btn header-menu-btn" id="headerMenuBtn" type="button" aria-label="More options" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+          </button>
+          <div class="header-menu" id="headerMenu">
+            <button class="plus-opt" id="optAffectsGuest" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8" stroke-width="1.7"/><path d="M2 18h20" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Guest</span>
+            </button>
+            <button class="plus-opt" id="optRoom" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5" stroke-width="1.7"/><circle cx="14.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span>
+              <span class="plus-opt-label">Room</span>
+            </button>
+            <button class="plus-opt" id="optTask" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.7"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="1.7"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="1.7"/><path d="M8.5 18h7" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Task</span>
+            </button>
+            <button class="plus-opt" id="optSignoff" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" stroke-width="1.7"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Sign-off</span>
+            </button>
+            <button class="plus-opt" id="optPoll" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16" stroke-width="1.7"/><rect x="6" y="12" width="3" height="6" rx="0.5" stroke-width="1.7"/><rect x="11" y="8" width="3" height="10" rx="0.5" stroke-width="1.7"/><rect x="16" y="4" width="3" height="14" rx="0.5" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Poll</span>
+            </button>
+            <button class="plus-opt" id="optAssetRequest" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4" stroke-width="1.7"/><path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-width="1.7"/><path d="M7 22l-4-4 4-4" stroke-width="1.7"/><path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Item request</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -632,33 +684,14 @@
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
                   <span class="plus-opt-label">Photo</span>
                 </button>
+                <button class="plus-opt" id="optPdf" type="button">
+                  <span class="plus-opt-ic plus-opt-ic-pdf"><svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg></span>
+                  <span class="plus-opt-label">PDF</span>
+                </button>
+                <input type="file" id="pdfInput" accept="application/pdf" hidden>
                 <button class="plus-opt" id="optCamera" type="button">
                   <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/><circle cx="12" cy="13.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
                   <span class="plus-opt-label">Camera</span>
-                </button>
-                <button class="plus-opt" id="optAffectsGuest" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8" stroke-width="1.7"/><path d="M2 18h20" stroke-width="1.7"/></svg></span>
-                  <span class="plus-opt-label">Guest</span>
-                </button>
-                <button class="plus-opt" id="optRoom" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1.5" stroke-width="1.7"/><circle cx="14.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span>
-                  <span class="plus-opt-label">Room</span>
-                </button>
-                <button class="plus-opt" id="optTask" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="1.7"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="1.7"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="1.7"/><path d="M8.5 18h7" stroke-width="1.7"/></svg></span>
-                  <span class="plus-opt-label">Task</span>
-                </button>
-                <button class="plus-opt" id="optSignoff" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" stroke-width="1.7"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-width="1.7"/></svg></span>
-                  <span class="plus-opt-label">Sign-off</span>
-                </button>
-                <button class="plus-opt" id="optPoll" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16" stroke-width="1.7"/><rect x="6" y="12" width="3" height="6" rx="0.5" stroke-width="1.7"/><rect x="11" y="8" width="3" height="10" rx="0.5" stroke-width="1.7"/><rect x="16" y="4" width="3" height="14" rx="0.5" stroke-width="1.7"/></svg></span>
-                  <span class="plus-opt-label">Poll</span>
-                </button>
-                <button class="plus-opt" id="optAssetRequest" type="button">
-                  <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4" stroke-width="1.7"/><path d="M3 11V9a4 4 0 0 1 4-4h14" stroke-width="1.7"/><path d="M7 22l-4-4 4-4" stroke-width="1.7"/><path d="M21 13v2a4 4 0 0 1-4 4H3" stroke-width="1.7"/></svg></span>
-                  <span class="plus-opt-label">Item request</span>
                 </button>
               </div>
             </div>
@@ -677,10 +710,10 @@
             </div>
           <div class="composer-pill">
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
+            <button class="mic-inline" id="micQuickBtn" aria-label="Record a voice note">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg>
+            </button>
           </div>
-          <button class="send-btn mic-quick" id="micQuickBtn" aria-label="Record a voice note">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg>
-          </button>
           <button class="send-btn" id="sendBtn" aria-label="Send message">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
           </button>
@@ -720,16 +753,29 @@
     <div class="setup-checklist" id="setupChecklist"></div>
     <div class="setup-tabs" id="setupTabs">
       <button type="button" class="setup-tab active" data-tab="team">Team</button>
-      <button type="button" class="setup-tab" data-tab="departments">Departments</button>
       <button type="button" class="setup-tab" data-tab="areas">Hotel areas</button>
       <button type="button" class="setup-tab" data-tab="rooms">Rooms</button>
     </div>
     <div class="setup-panel" id="setupPanelTeam">
+      <div class="setup-subhead">Hotel profile</div>
+      <div class="setup-note">Your hotel's own name and logo, shown at the top of the Profile page.</div>
+      <div class="hotel-profile-row">
+        <button type="button" class="hotel-logo-btn" id="hotelLogoBtn" title="Upload logo">
+          <img id="hotelLogoPreview" alt="" hidden>
+          <span id="hotelLogoPlaceholder">+</span>
+        </button>
+        <input type="file" id="hotelLogoInput" accept="image/*" hidden>
+        <input type="text" class="hotel-name-input" id="hotelNameInput" placeholder="Hotel name" maxlength="60">
+      </div>
+      <div class="setup-subhead">Pending signups</div>
+      <div class="setup-note">Someone you told to sign up is waiting here until you accept or deny them.</div>
+      <div id="signupsList"></div>
+      <div class="setup-subhead">Team</div>
       <div id="staffList"></div>
-      <div class="setup-note">Adding staff, removing staff and PIN resets are managed from the dashboard. Names and department can be updated here.</div>
-    </div>
-    <div class="setup-panel" id="setupPanelDepartments" hidden>
-      <div id="deptSetupList"></div>
+      <div class="setup-note">Removing staff and PIN resets are managed from the dashboard. Names and department can be updated here.</div>
+      <div class="setup-subhead">Department heads</div>
+      <div class="setup-note">A specific, named person who can message a department - and be messaged back - separately from that department's shared line. Their photo shows so everyone knows who it is.</div>
+      <div id="deptHeadsList"></div>
     </div>
     <div class="setup-panel" id="setupPanelAreas" hidden>
       <div class="setup-note">Named areas an SOS responder can see, and (until a hotel has real indoor positioning everywhere) the test location used for the "current zone" a hold-for-help alert reports.</div>
@@ -744,9 +790,9 @@
     <div class="setup-panel" id="setupPanelRooms" hidden>
       <div class="setup-note">The room list Housekeeping's board shows for marking rooms clean - separate from the areas mapped for SOS.</div>
       <div class="zone-chip-list" id="roomSetupList"></div>
-      <form class="subzone-add-form room-add-form" id="addRoomForm">
-        <input type="text" name="label" placeholder="Room no." maxlength="40">
-        <input type="text" name="range" class="range-input" placeholder="Range e.g. 101-140" maxlength="20">
+      <form class="admin-add-form room-add-form" id="addRoomForm">
+        <input type="text" name="label" placeholder="Room no., e.g. 101" maxlength="40">
+        <input type="text" name="range" placeholder="Or a range, e.g. 101-140" maxlength="20">
         <button type="submit" class="admin-add-btn">Add</button>
       </form>
     </div>
@@ -908,7 +954,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <p class="broadcast-hint">Change the photo and name shown across chats. Anyone on your team can update it. The General Manager controls who's allowed on the app at all.</p>
+    <p class="broadcast-hint">Change the photo and name shown across chats. The General Manager controls who's allowed on the app.</p>
     <button type="button" class="dept-photo-preview-wrap" id="deptPhotoPreviewWrap" aria-label="Change photo">
       <div class="dept-photo-preview" id="deptPhotoPreview"></div>
       <span class="dept-photo-cam-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z"/><circle cx="12" cy="13.3" r="3.6"/></svg></span>

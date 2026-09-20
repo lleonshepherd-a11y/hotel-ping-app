@@ -16,6 +16,11 @@ const NOIR_DEPT_ID_MAP = {
 };
 const NOIR_DEPT_ID_REVERSE = Object.fromEntries(Object.entries(NOIR_DEPT_ID_MAP).map(([k, v]) => [v, k]));
 const NOIR_SESSION_MINUTES = 60 * 24 * 30;
+// Pre-launch: nobody is paying to use this yet, so PIN checking is off and
+// signing in only needs a real staff member's name - flip this back to
+// true (and unhide the PIN field in index.html) before real staff/guests
+// start using it.
+const LOGIN_REQUIRE_PIN = false;
 
 // Builds the shape the rest of this Worker expects a "staff" object to have,
 // from a row out of the dashboard's own staff table. status_line/phone have
@@ -49,10 +54,18 @@ function noirIdentity(staffRow) {
 }
 
 const DEPT_IDS = new Set(["gm", "foh", "concierge", "restaurant", "kitchen", "bar", "housekeeping", "maintenance"]);
+// Head-of-department contacts: one specific, named, photographed person per
+// department (assigned in Hotel Setup - see department_heads), separate
+// from the department's own shared line. GM has no paired head - it's
+// already a single accountable person, not a shared queue.
+const HEAD_DEPT_IDS = new Set(["head_foh", "head_concierge", "head_restaurant", "head_kitchen", "head_bar", "head_housekeeping", "head_maintenance"]);
+const ALL_DEPT_IDS = new Set([...DEPT_IDS, ...HEAD_DEPT_IDS]);
 const DEPT_NAMES = {
   gm: "General Manager", foh: "Reception", concierge: "Concierge", restaurant: "Restaurant",
   kitchen: "Kitchen", bar: "Bar", housekeeping: "Housekeeping", maintenance: "Maintenance",
   dashboard: "Head Office",
+  head_foh: "Head Receptionist", head_concierge: "Head Concierge", head_restaurant: "Restaurant Manager",
+  head_kitchen: "Head Chef", head_bar: "Bar Manager", head_housekeeping: "Head Housekeeper", head_maintenance: "Maintenance Manager",
 };
 const PIN_RE = /^\d{4,6}$/;
 // Every department in this list gets alerted and can acknowledge a
@@ -590,8 +603,8 @@ async function insertMessage(env, ctx, opts) {
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -607,7 +620,8 @@ async function insertMessage(env, ctx, opts) {
     pollOptionsJson,
     opts.poll ? "{}" : null,
     opts.affectsGuest ? 1 : 0,
-    opts.dashboardConversationId || null
+    opts.dashboardConversationId || null,
+    opts.roomClean || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -883,6 +897,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     completedBy: row.completed_by || undefined,
     broadcastId: row.broadcast_id || undefined,
     roomNumber: row.room_number || undefined,
+    roomClean: row.room_clean || undefined,
     taskStatus: row.task_status || undefined,
     groupId: row.group_id || undefined,
     editedAt: row.edited_at || undefined,
@@ -908,7 +923,11 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
   };
 }
 function rowToStaff(row) {
-  return { id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at, profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined, phone: row.phone || undefined, role: row.role || undefined };
+  return {
+    id: row.id, name: row.name, departmentId: row.department_id, isAdmin: !!row.is_admin, createdAt: row.created_at,
+    profileComplete: !!row.profile_complete, statusLine: row.status_line || undefined, phone: row.phone || undefined,
+    role: row.role || undefined, photoUrl: row.photo_url || undefined, headDepts: row.head_depts || undefined,
+  };
 }
 
 async function readJsonBody(request) {
@@ -943,7 +962,8 @@ async function staffFromToken(env, request) {
 // admin included - may act or read AS a department they aren't signed in as unless
 // this explicitly allows it. Never trust a "self"/"from" field on its own.
 function canViewAsSelf(requester, self) {
-  return self === requester.department_id || !!requester.is_admin;
+  if (self === requester.department_id || requester.is_admin) return true;
+  return !!(requester.head_depts && requester.head_depts.includes(self));
 }
 
 export default {
@@ -1104,9 +1124,19 @@ export default {
       }
 
       // ---- Auth gate ----
-      if (p !== "/api/auth/login") {
+      if (p !== "/api/auth/login" && p !== "/api/signup") {
         const authed = await staffFromToken(env, request);
         if (!authed) return json({ error: "Not signed in" }, 401);
+        // Head-of-department contacts (see department_heads below) are a
+        // personal identity, not tied to whichever department someone is
+        // logged into - a staff member can act as "head_kitchen" only if
+        // they're specifically assigned there, which this looks up once
+        // per request so every permission check below can treat it as a
+        // plain extra department on their account.
+        const headRows = await env.DB.prepare("SELECT department_id FROM department_heads WHERE staff_id = ?").bind(authed.id).all();
+        authed.head_depts = headRows.results.map((r) => "head_" + r.department_id);
+        const photoRow = await env.DB.prepare("SELECT photo_path FROM staff_photos WHERE staff_id = ?").bind(authed.id).first();
+        if (photoRow) authed.photo_url = "/uploads/" + photoRow.photo_path;
         request._staff = authed;
       }
 
@@ -1114,7 +1144,7 @@ export default {
         const body = await readJsonBody(request);
         const name = String(body.name || "").trim();
         const pin = String(body.pin || "");
-        if (!name || !pin) return json({ error: "Name and PIN are required" }, 400);
+        if (!name || (LOGIN_REQUIRE_PIN && !pin)) return json({ error: "Name and PIN are required" }, 400);
 
         const identifier = "hotelping:" + name.toLowerCase();
         const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
@@ -1129,8 +1159,12 @@ export default {
         ).bind(NOIR_HOTEL_ID).all();
 
         let matched = null;
-        for (const candidate of candidates.results) {
-          if ((await hashPin(pin, candidate.pin_salt)) === candidate.pin_hash) { matched = candidate; break; }
+        if (LOGIN_REQUIRE_PIN) {
+          for (const candidate of candidates.results) {
+            if ((await hashPin(pin, candidate.pin_salt)) === candidate.pin_hash) { matched = candidate; break; }
+          }
+        } else {
+          matched = candidates.results.find((c) => c.display_name.toLowerCase() === name.toLowerCase()) || null;
         }
         if (!matched) {
           await env.NOIR_DB.prepare("INSERT INTO login_failures (id, identifier, created_at) VALUES (?, ?, ?)").bind(crypto.randomUUID(), identifier, new Date().toISOString()).run();
@@ -1148,6 +1182,65 @@ export default {
         ).bind(sessionId, matched.id, matched.department_id, tokenHash, expiresAt, now.toISOString(), now.toISOString()).run();
 
         return json({ token, staff: rowToStaff(noirIdentity(matched)) });
+      }
+
+      // ---- Self-service signup: the GM tells someone directly to sign up,
+      // so a name + department is all that's needed here - the GM already
+      // knows who to expect, and just has to accept or deny it. Nothing is
+      // usable until then: this only queues a request, it never creates a
+      // real staff account by itself. ----
+      if (method === "POST" && p === "/api/signup") {
+        const body = await readJsonBody(request);
+        const name = String(body.name || "").trim();
+        const departmentId = body.departmentId;
+        if (!name) return json({ error: "Name is required" }, 400);
+        if (!DEPT_IDS.has(departmentId)) return json({ error: "Unknown department" }, 400);
+        const existing = await env.DB.prepare(
+          "SELECT id FROM signup_requests WHERE LOWER(name) = LOWER(?) AND status = 'pending'"
+        ).bind(name).first();
+        if (existing) return json({ error: "A request for that name is already waiting on approval" }, 409);
+        const id = crypto.randomUUID();
+        await env.DB.prepare(
+          "INSERT INTO signup_requests (id, name, department_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)"
+        ).bind(id, name, departmentId, new Date().toISOString()).run();
+        return json({ ok: true }, 201);
+      }
+
+      if (method === "GET" && p === "/api/signup-requests") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const rows = await env.DB.prepare(
+          "SELECT id, name, department_id, created_at FROM signup_requests WHERE status = 'pending' ORDER BY created_at ASC"
+        ).all();
+        return json({ requests: rows.results.map((r) => ({ id: r.id, name: r.name, departmentId: r.department_id, createdAt: r.created_at })) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/signup-requests/") && p.endsWith("/approve")) {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const id = decodeURIComponent(p.slice("/api/signup-requests/".length, -"/approve".length));
+        const reqRow = await env.DB.prepare("SELECT * FROM signup_requests WHERE id = ? AND status = 'pending'").bind(id).first();
+        if (!reqRow) return json({ error: "Not found" }, 404);
+        const staffId = crypto.randomUUID();
+        const salt = randomSaltHex();
+        // PIN checking is off pre-launch (see LOGIN_REQUIRE_PIN), so this
+        // password is never actually used to sign in - it only exists to
+        // satisfy NOIR_DB's own not-null column until a real PIN is set.
+        const throwawayPin = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.NOIR_DB.prepare(
+          `INSERT INTO staff (id, hotel_id, department_id, display_name, role, pin_hash, pin_salt, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'staff', ?, ?, 1, ?, ?)`
+        ).bind(staffId, NOIR_HOTEL_ID, toNoirDept(reqRow.department_id), reqRow.name, await hashPin(throwawayPin, salt), salt, now, now).run();
+        await env.DB.prepare("UPDATE signup_requests SET status = 'approved', decided_at = ? WHERE id = ?").bind(now, id).run();
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p.startsWith("/api/signup-requests/") && p.endsWith("/deny")) {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const id = decodeURIComponent(p.slice("/api/signup-requests/".length, -"/deny".length));
+        await env.DB.prepare(
+          "UPDATE signup_requests SET status = 'denied', decided_at = ? WHERE id = ? AND status = 'pending'"
+        ).bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
       }
 
       if (method === "POST" && p === "/api/auth/logout") {
@@ -1224,7 +1317,9 @@ export default {
         const rows = await env.NOIR_DB.prepare(
           "SELECT id, display_name, role, department_id FROM staff WHERE hotel_id = ? AND active = 1 ORDER BY display_name"
         ).bind(NOIR_HOTEL_ID).all();
-        return json({ staff: rows.results.map((r) => rowToStaff(noirIdentity(r))) });
+        const photoRows = await env.DB.prepare("SELECT staff_id, photo_path FROM staff_photos").all();
+        const photoByStaffId = Object.fromEntries(photoRows.results.map((r) => [r.staff_id, "/uploads/" + r.photo_path]));
+        return json({ staff: rows.results.map((r) => rowToStaff({ ...noirIdentity(r), photo_url: photoByStaffId[r.id] })) });
       }
 
       // ---- Staff management now happens on the dashboard side (owner-provisioned) ----
@@ -1309,6 +1404,130 @@ export default {
         await env.DB.prepare("UPDATE departments SET photo_path = NULL WHERE id = ?").bind(id).run();
         const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();
         return json({ department: rowToDepartment(row) });
+      }
+
+      // ---- Staff photos (personal, not the department's shared photo) ----
+      // Used for head-of-department contacts, where the point is a real,
+      // recognizable, named person - not the generic department icon.
+      if (method === "POST" && p.startsWith("/api/staff/") && p.endsWith("/photo")) {
+        const id = decodeURIComponent(p.slice("/api/staff/".length, -"/photo".length));
+        const requester = request._staff;
+        if (requester.id !== id && !requester.is_admin) return json({ error: "You can only change your own photo" }, 403);
+        const body = await readJsonBody(request);
+        if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
+        const binary = atob(body.fileBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Photo is too large (8MB max)" }, 400);
+        const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
+        const safeName = "staff-" + id + "-" + crypto.randomUUID() + ext;
+        await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
+        await env.DB.prepare(
+          "INSERT INTO staff_photos (staff_id, photo_path, updated_at) VALUES (?, ?, ?) ON CONFLICT(staff_id) DO UPDATE SET photo_path = excluded.photo_path, updated_at = excluded.updated_at"
+        ).bind(id, safeName, new Date().toISOString()).run();
+        return json({ photoUrl: "/uploads/" + safeName });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/staff/") && p.endsWith("/photo")) {
+        const id = decodeURIComponent(p.slice("/api/staff/".length, -"/photo".length));
+        const requester = request._staff;
+        if (requester.id !== id && !requester.is_admin) return json({ error: "You can only change your own photo" }, 403);
+        await env.DB.prepare("DELETE FROM staff_photos WHERE staff_id = ?").bind(id).run();
+        return json({ ok: true });
+      }
+
+      // ---- Hotel profile: this hotel's own name + logo, shown on the
+      // Profile page header. Separate from the Hotel Ping product brand,
+      // which only appears in the "Powered by" footer. ----
+      if (method === "GET" && p === "/api/hotel-profile") {
+        const row = await env.DB.prepare("SELECT * FROM hotel_profile WHERE id = 'default'").first();
+        return json({ name: row ? row.name : null, logoUrl: row && row.logo_path ? "/uploads/" + row.logo_path : null });
+      }
+
+      if (method === "PUT" && p === "/api/hotel-profile") {
+        if (!request._staff.is_admin) return json({ error: "Admin only" }, 403);
+        const body = await readJsonBody(request);
+        const name = String(body.name || "").trim();
+        await env.DB.prepare(
+          "INSERT INTO hotel_profile (id, name, updated_at) VALUES ('default', ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at"
+        ).bind(name || null, new Date().toISOString()).run();
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p === "/api/hotel-profile/logo") {
+        if (!request._staff.is_admin) return json({ error: "Admin only" }, 403);
+        const body = await readJsonBody(request);
+        if (!body.fileBase64) return json({ error: "Logo is required" }, 400);
+        const binary = atob(body.fileBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Logo is too large (8MB max)" }, 400);
+        const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
+        const safeName = "hotel-logo-" + crypto.randomUUID() + ext;
+        await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
+        await env.DB.prepare(
+          "INSERT INTO hotel_profile (id, logo_path, updated_at) VALUES ('default', ?, ?) ON CONFLICT(id) DO UPDATE SET logo_path = excluded.logo_path, updated_at = excluded.updated_at"
+        ).bind(safeName, new Date().toISOString()).run();
+        return json({ logoUrl: "/uploads/" + safeName });
+      }
+
+      if (method === "DELETE" && p === "/api/hotel-profile/logo") {
+        if (!request._staff.is_admin) return json({ error: "Admin only" }, 403);
+        await env.DB.prepare("UPDATE hotel_profile SET logo_path = NULL WHERE id = 'default'").run();
+        return json({ ok: true });
+      }
+
+      // ---- Department heads: which specific staff member is the named,
+      // directly-reachable contact for each department (see HEAD_DEPT_IDS
+      // above and canViewAsSelf/request._staff.head_depts for how this
+      // turns into an extra, personal conversation on their account). ----
+      if (method === "GET" && p === "/api/department-heads") {
+        // Readable by anyone signed in (not just admin) - every department's
+        // chat list needs this to know which head contacts to show, and
+        // who a head is is meant to be visible, not privileged information.
+        const rows = await env.DB.prepare(
+          `SELECT dh.department_id, dh.staff_id, sp.photo_path FROM department_heads dh
+           LEFT JOIN staff_photos sp ON sp.staff_id = dh.staff_id`
+        ).all();
+        const staffIds = rows.results.map((r) => r.staff_id);
+        let namesById = {};
+        if (staffIds.length) {
+          const placeholders = staffIds.map(() => "?").join(",");
+          const staffRows = await env.NOIR_DB.prepare(`SELECT id, display_name FROM staff WHERE id IN (${placeholders})`).bind(...staffIds).all();
+          namesById = Object.fromEntries(staffRows.results.map((s) => [s.id, s.display_name]));
+        }
+        const heads = {};
+        for (const r of rows.results) {
+          heads[r.department_id] = {
+            staffId: r.staff_id, staffName: namesById[r.staff_id] || "Unknown",
+            photoUrl: r.photo_path ? "/uploads/" + r.photo_path : null,
+          };
+        }
+        return json({ heads });
+      }
+
+      if (method === "PUT" && p.startsWith("/api/department-heads/")) {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const deptId = decodeURIComponent(p.slice("/api/department-heads/".length));
+        if (!DEPT_IDS.has(deptId) || deptId === "gm") return json({ error: "Unknown department" }, 400);
+        const body = await readJsonBody(request);
+        if (!body.staffId) return json({ error: "staffId is required" }, 400);
+        const staffRow = await env.NOIR_DB.prepare("SELECT id, department_id FROM staff WHERE id = ?").bind(body.staffId).first();
+        if (!staffRow) return json({ error: "Unknown staff member" }, 404);
+        if (fromNoirDept(staffRow.department_id) !== deptId) {
+          return json({ error: "That person isn't in this department" }, 400);
+        }
+        await env.DB.prepare(
+          "INSERT INTO department_heads (department_id, staff_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(department_id) DO UPDATE SET staff_id = excluded.staff_id, updated_at = excluded.updated_at"
+        ).bind(deptId, body.staffId, new Date().toISOString()).run();
+        return json({ ok: true });
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/department-heads/")) {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const deptId = decodeURIComponent(p.slice("/api/department-heads/".length));
+        await env.DB.prepare("DELETE FROM department_heads WHERE department_id = ?").bind(deptId).run();
+        return json({ ok: true });
       }
 
       // ---- Floor plans & zone mapper ----
@@ -1566,6 +1785,7 @@ export default {
             await insertMessage(env, ctx, {
               from: requester.department_id, to: "foh", type: "text",
               body: "Room " + room.label + " is clean and ready.",
+              roomClean: room.label,
             });
           }
         } else {
@@ -1578,9 +1798,9 @@ export default {
       // ---- Conversations ----
       if (method === "GET" && p === "/api/conversations") {
         const self = url.searchParams.get("self");
-        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
-        const others = Array.from(DEPT_IDS).filter((id) => id !== self);
+        const others = Array.from(ALL_DEPT_IDS).filter((id) => id !== self);
         const conversations = [];
         for (const other of others) {
           const last = await env.DB.prepare(
@@ -1606,7 +1826,7 @@ export default {
       if (method === "GET" && p === "/api/messages") {
         const self = url.searchParams.get("self");
         const other = url.searchParams.get("with");
-        if (!DEPT_IDS.has(self) || !(DEPT_IDS.has(other) || (other === "dashboard" && self === "gm"))) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(self) || !(ALL_DEPT_IDS.has(other) || (other === "dashboard" && self === "gm"))) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
@@ -2003,7 +2223,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages/read") {
         const body = await readJsonBody(request);
-        if (!DEPT_IDS.has(body.self) || !DEPT_IDS.has(body.with)) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(body.self) || !ALL_DEPT_IDS.has(body.with)) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, body.self)) return json({ error: "You can only mark your own department's messages as read" }, 403);
         await env.DB.prepare(`UPDATE messages SET status = 'read', read_at = ? WHERE to_dept = ? AND from_dept = ? AND status != 'read'`).bind(new Date().toISOString(), body.self, body.with).run();
         return json({ ok: true });
@@ -2324,8 +2544,11 @@ export default {
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
         const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
-        if (!DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
-        if (from !== request._staff.department_id) return json({ error: "You can only send messages as your own department" }, 403);
+        if (!ALL_DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
+        const sendingAsOwnHead = HEAD_DEPT_IDS.has(from) && request._staff.head_depts && request._staff.head_depts.includes(from);
+        if (from !== request._staff.department_id && !sendingAsOwnHead) {
+          return json({ error: "You can only send messages as your own department" }, 403);
+        }
         let validMembers = null;
         if (groupId) {
           const group = await env.NOIR_DB.prepare("SELECT archived_at FROM groups WHERE id = ?").bind(groupId).first();
@@ -2333,7 +2556,7 @@ export default {
           const memberRows = await env.NOIR_DB.prepare("SELECT department_id FROM group_members WHERE group_id = ?").bind(groupId).all();
           validMembers = new Set(memberRows.results.map((m) => fromNoirDept(m.department_id)));
           if (!validMembers.has(from)) return json({ error: "Not a member of this group" }, 403);
-        } else if (!DEPT_IDS.has(to) && to !== "dashboard") {
+        } else if (!ALL_DEPT_IDS.has(to) && to !== "dashboard") {
           return json({ error: "Unknown department" }, 400);
         } else if (to === "dashboard" && from !== "gm") {
           return json({ error: "Only the GM can message Head Office directly" }, 403);
@@ -2492,6 +2715,14 @@ export default {
         const nextCompleted = !existing.completed_at;
         await env.DB.prepare("UPDATE messages SET completed_at = ?, completed_by = ? WHERE id = ?")
           .bind(nextCompleted ? new Date().toISOString() : null, nextCompleted ? requester.department_id : null, id).run();
+        // A "room clean" card accepted by its recipient (Reception) is worth a
+        // reply so housekeeping has confirmation, not just a silent status flip.
+        if (nextCompleted && existing.room_clean && requester.department_id === existing.to_dept) {
+          await insertMessage(env, ctx, {
+            from: requester.department_id, to: existing.from_dept, type: "text",
+            body: "✅ Room " + existing.room_clean + " confirmed received.",
+          });
+        }
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
@@ -2588,7 +2819,7 @@ export default {
         if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
         const body = await readJsonBody(request);
         const to = body.to;
-        if (!DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
         const row = await insertMessage(env, ctx, {
           from: requester.department_id, to, type: existing.type,
           body: existing.body, fileName: existing.file_name, filePath: existing.file_path, fileSize: existing.file_size,
@@ -2628,7 +2859,7 @@ export default {
       if (method === "POST" && p === "/api/typing") {
         const body = await readJsonBody(request);
         const self = request._staff.department_id;
-        if (!DEPT_IDS.has(body.to)) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(body.to)) return json({ error: "Unknown department" }, 400);
         await env.DB.prepare(
           "INSERT INTO typing_status (from_dept, to_dept, updated_at) VALUES (?, ?, ?) ON CONFLICT(from_dept, to_dept) DO UPDATE SET updated_at = excluded.updated_at"
         ).bind(self, body.to, new Date().toISOString()).run();
@@ -2637,7 +2868,7 @@ export default {
 
       if (method === "GET" && p === "/api/typing") {
         const self = url.searchParams.get("self");
-        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!ALL_DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         const cutoff = new Date(Date.now() - 6000).toISOString();
         const rows = await env.DB.prepare(
           "SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?"

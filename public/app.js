@@ -22,6 +22,13 @@ var ICONS = {
   maintenance: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/>',
   dashboard: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'
 };
+// A head-of-department contact almost always shows a real photo (that's the
+// whole point), so its icon only needs to be a sane fallback while the
+// photo loads or before one's been uploaded - reusing the parent
+// department's icon is enough.
+["foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"].forEach(function(id){
+  ICONS["head_" + id] = ICONS[id];
+});
 function iconSvg(deptId){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+ICONS[deptId]+'</svg>';
 }
@@ -61,9 +68,19 @@ var DEPTS = {
   bar:          { name:"Bar",                      initials:"BR", color:"#3f9d6c" },
   housekeeping: { name:"Housekeeping",              initials:"HK", color:"#2f9aa0" },
   maintenance:  { name:"Maintenance",              initials:"MN", color:"#6c6d78" },
-  dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" }
+  dashboard:    { name:"Head Office",              initials:"HO", color:"#555b66" },
+  // Head-of-department contacts: a specific, named, photographed person
+  // (assigned in Hotel setup), separate from the department's shared line.
+  head_foh:          { name:"Head Receptionist",  initials:"HR", color:"#4c6f92" },
+  head_concierge:    { name:"Head Concierge",     initials:"HC", color:"#7c62a8" },
+  head_restaurant:   { name:"Restaurant Manager", initials:"RM", color:"#b16a3f" },
+  head_kitchen:      { name:"Head Chef",          initials:"HC", color:"#c95a2c" },
+  head_bar:          { name:"Bar Manager",        initials:"BM", color:"#3f9d6c" },
+  head_housekeeping: { name:"Head Housekeeper",   initials:"HH", color:"#2f9aa0" },
+  head_maintenance:  { name:"Maintenance Manager",initials:"MM", color:"#6c6d78" }
 };
 var DEPT_ORDER = ["gm","foh","concierge","restaurant","kitchen","bar","housekeeping","maintenance"];
+var HEAD_DEPT_IDS = ["head_foh","head_concierge","head_restaurant","head_kitchen","head_bar","head_housekeeping","head_maintenance"];
 var HELP_ALERT_RESPONDER_DEPTS = ["gm"];
 
 // Real per-department state (contact name, on-duty flag) - loaded from the
@@ -176,6 +193,7 @@ function mapServerMessage(row, self){
     completedBy: row.completedBy || undefined,
     broadcastId: row.broadcastId || undefined,
     roomNumber: row.roomNumber || undefined,
+    roomClean: row.roomClean || undefined,
     taskStatus: row.taskStatus || undefined,
     edited: !!row.editedAt,
     mentions: row.mentions || undefined,
@@ -189,7 +207,7 @@ function mapServerMessage(row, self){
 function loadDepartmentMeta(){
   return apiGet('/api/departments').then(function(res){
     res.departments.forEach(function(d){ DEPT_META[d.id] = d; });
-  });
+  }).catch(function(){});
 }
 
 var STAFF_BY_DEPT = {};
@@ -203,23 +221,93 @@ function loadStaffMeta(){
   }).catch(function(){});
 }
 
+// Which real department each head-of-department contact is paired with,
+// keyed by the real department id (not "head_kitchen") - e.g.
+// DEPT_HEADS.kitchen = { staffId, staffName, photoUrl }. Cached in a shared
+// promise so switching identities doesn't re-fetch it every time.
+var DEPT_HEADS = {};
+var deptHeadsPromise = null;
+function loadDepartmentHeads(force){
+  if(!deptHeadsPromise || force){
+    deptHeadsPromise = apiGet('/api/department-heads').then(function(res){
+      DEPT_HEADS = res.heads || {};
+      Object.keys(DEPT_HEADS).forEach(function(deptId){
+        var info = DEPT_HEADS[deptId];
+        if(info.photoUrl){
+          DEPT_META["head_" + deptId] = Object.assign({}, DEPT_META["head_" + deptId], { photoUrl: info.photoUrl });
+        }
+      });
+      return DEPT_HEADS;
+    }).catch(function(){ DEPT_HEADS = {}; return DEPT_HEADS; });
+  }
+  return deptHeadsPromise;
+}
+function headRealDeptId(id){
+  return (typeof id === "string" && id.indexOf("head_") === 0) ? id.slice(5) : null;
+}
+
+var HOTEL_PROFILE = { name: null, logoUrl: null };
+function loadHotelProfile(){
+  return apiGet('/api/hotel-profile').then(function(res){
+    HOTEL_PROFILE = res;
+    var sbMarkImg = document.getElementById("sbMarkImg");
+    var sbTitle = document.getElementById("sbTitle");
+    if(sbMarkImg) sbMarkImg.src = res.logoUrl || "hotel-ping-logo-tight.png";
+    if(sbTitle) sbTitle.textContent = res.name || "Hotel Ping";
+  }).catch(function(){});
+}
+
+function mapWithConcurrency(items, limit, fn){
+  var results = new Array(items.length);
+  var next = 0;
+  function runNext(){
+    var i = next++;
+    if(i >= items.length) return Promise.resolve();
+    return fn(items[i], i).then(function(r){ results[i] = r; return runNext(); });
+  }
+  var runners = [];
+  for(var w = 0; w < Math.min(limit, items.length); w++) runners.push(runNext());
+  return Promise.all(runners).then(function(){ return results; });
+}
 function buildData(self){
-  // "dashboard" isn't a real staff department (no PIN login, on-duty toggle,
-  // etc.), so it deliberately stays out of DEPT_ORDER - which drives a lot of
-  // unrelated pickers (station assignment, blocker "waiting on", and so on)
-  // where it wouldn't make sense to offer. It's added here only, so it shows
-  // up as an ordinary conversation in the main chat list.
-  var others = DEPT_ORDER.filter(function(id){ return id !== self; });
-  // Only the GM bridges both systems (app + dashboard) - every other
-  // department reaches head office by messaging the GM directly instead.
-  if(self === "gm") others = others.concat(["dashboard"]);
-  return Promise.all(others.map(function(id){
-    return apiGet('/api/messages?self=' + encodeURIComponent(self) + '&with=' + encodeURIComponent(id))
-      .then(function(res){ return { id: id, messages: res.messages.map(function(row){ return mapServerMessage(row, self); }) }; });
-  })).then(function(results){
-    var data = {};
-    results.forEach(function(r){ data[r.id] = r.messages; });
-    return data;
+  return loadDepartmentHeads().then(function(){
+    // "dashboard" isn't a real staff department (no PIN login, on-duty toggle,
+    // etc.), so it deliberately stays out of DEPT_ORDER - which drives a lot of
+    // unrelated pickers (station assignment, blocker "waiting on", and so on)
+    // where it wouldn't make sense to offer. It's added here only, so it shows
+    // up as an ordinary conversation in the main chat list.
+    var others = DEPT_ORDER.filter(function(id){ return id !== self; });
+    // Only the GM bridges both systems (app + dashboard) - every other
+    // department reaches head office by messaging the GM directly instead.
+    if(self === "gm") others = others.concat(["dashboard"]);
+    // Head-of-department contacts only show up once an admin has actually
+    // assigned someone - an unassigned one would be a dead end to message.
+    var assignedHeads = Object.keys(DEPT_HEADS).map(function(id){ return "head_" + id; })
+      .filter(function(id){ return id !== self; });
+    others = others.concat(assignedHeads);
+    // Fetch the currently open thread first so it's ready fastest, then the
+    // rest in small batches - firing all of them at once (there can be 15+
+    // once heads are assigned) queues behind the browser's per-host
+    // connection limit and makes everything, including the visible thread,
+    // arrive later than it needs to (worst after the app was backgrounded
+    // and connections had gone cold).
+    if(STATE.active){
+      var activeIdx = others.indexOf(STATE.active);
+      if(activeIdx > 0){ others.splice(activeIdx, 1); others.unshift(STATE.active); }
+    }
+    return mapWithConcurrency(others, 5, function(id){
+      return apiGet('/api/messages?self=' + encodeURIComponent(self) + '&with=' + encodeURIComponent(id))
+        .then(function(res){ return { id: id, messages: res.messages.map(function(row){ return mapServerMessage(row, self); }) }; })
+        // One conversation failing (a dropped request, a brief network blip) must not
+        // take the whole list down with it - fall back to whatever we already had
+        // rather than leaving refreshNow()/boot() stuck with a rejected Promise.all
+        // and the list frozen on "Loading conversations...".
+        .catch(function(){ return { id: id, messages: STATE.data[id] || [] }; });
+    }).then(function(results){
+      var data = {};
+      results.forEach(function(r){ data[r.id] = r.messages; });
+      return data;
+    });
   });
 }
 
@@ -238,6 +326,14 @@ function fmtBytes(n){
   if(n < 1024) return n + " B";
   if(n < 1024*1024) return Math.round(n/1024) + " KB";
   return (n/1024/1024).toFixed(1) + " MB";
+}
+function isPdfFile(name){ return !!name && /\.pdf$/i.test(name); }
+function pdfIconSvg(){
+  return '<svg viewBox="0 0 24 24">'+
+    '<path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/>'+
+    '<path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/>'+
+    '<text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text>'+
+    '</svg>';
 }
 function lastOf(arr){ return arr && arr.length ? arr[arr.length-1] : null; }
 function esc(s){ return (s||"").replace(/[&<>]/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
@@ -399,9 +495,19 @@ chatFilterRow.addEventListener("click", function(e){
   renderList();
 });
 
+// Admin sees every department to browse ("Viewing as"). Everyone else sees
+// nothing here UNLESS they hold a head-of-department contact themselves, in
+// which case this becomes the toggle between their real department and
+// that personal identity ("Message as").
+function switcherDeptIds(){
+  var staff = AUTH.staff;
+  if(!staff) return [];
+  var own = (staff.headDepts || []);
+  return staff.isAdmin ? DEPT_ORDER.concat(own) : [staff.departmentId].concat(own);
+}
 function renderSwitcher(){
   switcherRow.innerHTML = "";
-  DEPT_ORDER.forEach(function(id){
+  switcherDeptIds().forEach(function(id){
     var d = DEPTS[id];
     var btn = document.createElement("button");
     btn.className = "sw-chip" + (id === STATE.self ? " active" : "");
@@ -458,6 +564,8 @@ function previewText(m){
 }
 
 function contactNameFor(id){
+  var realDeptId = headRealDeptId(id);
+  if(realDeptId) return DEPT_HEADS[realDeptId] ? DEPT_HEADS[realDeptId].staffName : null;
   var staff = STAFF_BY_DEPT[id];
   if(!staff || !staff.length) return null;
   if(staff.length === 1) return staff[0].name;
@@ -1525,6 +1633,33 @@ function voteOnPoll(m, index){
     renderThread();
   }).catch(function(){ showToast("Couldn't record your vote"); });
 }
+function acceptRoomClean(m){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/complete', 'POST', {}).then(function(res){
+    var msgs = currentMessagesArray();
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
+    renderThread();
+    showToast("Accepted");
+  }).catch(function(){ showToast("Couldn't accept that"); });
+}
+
+function buildRoomCleanCard(m){
+  var card = document.createElement("div");
+  card.className = "room-clean-card";
+  var canAccept = !m.completed && m.to === AUTH.staff.departmentId;
+  var checkSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  card.innerHTML =
+    '<span class="room-clean-icon"><img src="/room-clean-bed-icon.png" alt=""></span>'+
+    '<span class="room-clean-label">Room ' + esc(m.roomClean) + '</span>'+
+    (canAccept
+      ? '<button type="button" class="room-clean-pill room-clean-pill-btn">' + checkSvg + 'It’s Clean</button>'
+      : '<span class="room-clean-pill' + (m.completed ? ' room-clean-pill-accepted' : '') + '">' + checkSvg + (m.completed ? 'Accepted' : 'It’s Clean') + '</span>');
+  if(canAccept){
+    card.querySelector(".room-clean-pill-btn").addEventListener("click", function(){ acceptRoomClean(m); });
+  }
+  return card;
+}
+
 function buildPollCard(m){
   var p = m.poll;
   var votes = p.votes || {};
@@ -1726,6 +1861,11 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     bubble.className = "bubble img-bubble";
     var src = m.img === "fridge" ? fridgeImageSrc() : m.dataUrl;
     bubble.innerHTML = '<img src="'+src+'" alt="Attached photo">' + (m.text ? '<div class="cap">'+esc(m.text)+'</div>' : '');
+  } else if(m.type === "file" && isPdfFile(m.fileName)){
+    bubble = document.createElement("div");
+    bubble.className = "bubble file-bubble file-bubble-pdf";
+    bubble.title = m.fileName;
+    bubble.innerHTML = '<div class="file-ic file-ic-pdf">'+pdfIconSvg()+'</div>';
   } else if(m.type === "file"){
     bubble = document.createElement("div");
     bubble.className = "bubble file-bubble";
@@ -1744,7 +1884,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     bubble = buildAudioNode(m);
   }
   var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
-  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text");
+  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text") || (m.roomClean && m.type === "text");
   if(!hideTextBubble){
     if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(bubble);
@@ -1782,6 +1922,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     wrap.appendChild(signoffCard);
   }
   if(m.poll) wrap.appendChild(buildPollCard(m));
+  if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
 
   var canInlineMeta = m.type === "text" && !hideTextBubble;
   var meta = document.createElement("div");
@@ -1876,7 +2017,10 @@ function activeGroupIsArchived(){
 
 function isViewOnly(){
   if(STATE.activeGroupId) return activeGroupIsArchived();
-  return !!(AUTH.staff && AUTH.staff.isAdmin && STATE.self !== AUTH.staff.departmentId);
+  if(!AUTH.staff || !AUTH.staff.isAdmin) return false;
+  if(STATE.self === AUTH.staff.departmentId) return false;
+  if(AUTH.staff.headDepts && AUTH.staff.headDepts.indexOf(STATE.self) !== -1) return false;
+  return true;
 }
 
 function updateComposerLock(){
@@ -1964,6 +2108,7 @@ var sendBtn = document.getElementById("sendBtn");
 var plusBtn = document.getElementById("plusBtn");
 var plusMenu = document.getElementById("plusMenu");
 var optPhoto = document.getElementById("optPhoto");
+var optPdf = document.getElementById("optPdf");
 var optCamera = document.getElementById("optCamera");
 var micQuickBtn = document.getElementById("micQuickBtn");
 var urgentToggleBtn = document.getElementById("urgentToggleBtn");
@@ -1972,6 +2117,7 @@ var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
 var optSignoff = document.getElementById("optSignoff");
 var fileInput = document.getElementById("fileInput");
+var pdfInput = document.getElementById("pdfInput");
 var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
 var composer = document.getElementById("composer");
@@ -2087,6 +2233,27 @@ plusBtn.addEventListener("click", function(){
 document.addEventListener("click", function(e){
   if(!plusMenu.contains(e.target) && e.target !== plusBtn && !plusBtn.contains(e.target)){
     closePlusMenu();
+  }
+});
+
+var headerMenuBtn = document.getElementById("headerMenuBtn");
+var headerMenu = document.getElementById("headerMenu");
+function closeHeaderMenu(){
+  headerMenu.classList.remove("open");
+  headerMenuBtn.classList.remove("open");
+  headerMenuBtn.setAttribute("aria-expanded", "false");
+}
+function openHeaderMenu(){
+  headerMenu.classList.add("open");
+  headerMenuBtn.classList.add("open");
+  headerMenuBtn.setAttribute("aria-expanded", "true");
+}
+headerMenuBtn.addEventListener("click", function(){
+  if(headerMenu.classList.contains("open")) closeHeaderMenu(); else openHeaderMenu();
+});
+document.addEventListener("click", function(e){
+  if(!headerMenu.contains(e.target) && e.target !== headerMenuBtn && !headerMenuBtn.contains(e.target)){
+    closeHeaderMenu();
   }
 });
 
@@ -2209,6 +2376,7 @@ document.addEventListener("click", function(e){
 });
 
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
+optPdf.addEventListener("click", function(){ closePlusMenu(); pdfInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
 micQuickBtn.addEventListener("click", function(){ startRecording(); });
 urgentToggleBtn.addEventListener("click", function(){
@@ -2220,23 +2388,23 @@ urgentToggleBtn.addEventListener("click", function(){
 optAffectsGuest.addEventListener("click", function(){
   affectsGuestActive = !affectsGuestActive;
   optAffectsGuest.classList.toggle("active", affectsGuestActive);
-  closePlusMenu();
+  closeHeaderMenu();
 });
 optRoom.addEventListener("click", function(){
-  closePlusMenu();
+  closeHeaderMenu();
   showRoomTagBar();
 });
 optTask.addEventListener("click", function(){
   setTaskActive(!taskActive);
-  closePlusMenu();
+  closeHeaderMenu();
 });
 optSignoff.addEventListener("click", function(){
-  closePlusMenu();
+  closeHeaderMenu();
   openSignoffOverlay();
 });
 var optAssetRequest = document.getElementById("optAssetRequest");
 optAssetRequest.addEventListener("click", function(){
-  closePlusMenu();
+  closeHeaderMenu();
   openAssetsOverlay(true);
 });
 
@@ -2270,7 +2438,7 @@ function openPollComposeOverlay(){
   pollComposeOverlay.hidden = false;
 }
 optPoll.addEventListener("click", function(){
-  closePlusMenu();
+  closeHeaderMenu();
   openPollComposeOverlay();
 });
 pollAddOptionBtn.addEventListener("click", addPollOptionInput);
@@ -2328,6 +2496,11 @@ fileInput.addEventListener("change", function(e){
   fileInput.value = "";
   handleAttachedFile(file);
 });
+pdfInput.addEventListener("change", function(e){
+  var file = e.target.files[0];
+  pdfInput.value = "";
+  handleAttachedFile(file);
+});
 cameraInput.addEventListener("change", function(e){
   var file = e.target.files[0];
   cameraInput.value = "";
@@ -2345,7 +2518,9 @@ function renderAttachPreview(){
       '<div class="ap-meta"><b>'+esc(a.name)+'</b><span>Photo</span></div>'+
       '<button class="ap-remove" aria-label="Remove attachment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
   } else {
-    el.innerHTML = '<div class="file-ic" style="background:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg></div>'+
+    el.innerHTML = (isPdfFile(a.name)
+      ? '<div class="file-ic file-ic-pdf">'+pdfIconSvg()+'</div>'
+      : '<div class="file-ic" style="background:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5a1 1 0 0 0 1 1h5M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"/></svg></div>')+
       '<div class="ap-meta"><b>'+esc(a.name)+'</b><span>'+fmtBytes(a.size||0)+'</span></div>'+
       '<button class="ap-remove" aria-label="Remove attachment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
   }
@@ -2777,8 +2952,14 @@ function messagesChangeSignature(msgs){
     return m.id+":"+m.status+":"+(m.edited?1:0)+":"+(m.deleted?1:0)+":"+(m.taskStatus||"")+":"+(m.completed?1:0)+":"+(m.pinned?1:0)+":"+(m.signoff?JSON.stringify(m.signoff):"")+":"+(m.poll?JSON.stringify(m.poll):"");
   }).join("|");
 }
+var refreshNowInFlight = null;
 function refreshNow(){
+  if(refreshNowInFlight) return refreshNowInFlight;
   if(STATE.loading) return Promise.resolve();
+  refreshNowInFlight = refreshNowImpl().finally(function(){ refreshNowInFlight = null; });
+  return refreshNowInFlight;
+}
+function refreshNowImpl(){
   var prevIds = {};
   Object.keys(STATE.data).forEach(function(id){
     prevIds[id] = {};
@@ -2850,11 +3031,13 @@ function startPolling(){
     refreshRequestsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(!tabGuestsBtn.hidden) refreshGuestsBadge();
+    if(AUTH.staff && AUTH.staff.isAdmin) refreshSignupsBadge();
   }, 6000);
   startTypingPoll();
 }
 document.addEventListener("visibilitychange", function(){
   if(!document.hidden && AUTH.staff){
+    if(STATE.active) refreshActiveThread().catch(function(){});
     refreshNow().catch(function(){});
   }
 });
@@ -2897,6 +3080,7 @@ var setupBtn = document.getElementById("setupBtn");
 var setupError = document.getElementById("setupError");
 var sbSub = document.getElementById("sbSub");
 var switcherWrap = document.getElementById("switcherWrap");
+var switcherLabel = document.getElementById("switcherLabel");
 var adminBtn = document.getElementById("adminBtn");
 var broadcastBtn = document.getElementById("broadcastBtn");
 var logoutBtn = document.getElementById("logoutBtn");
@@ -2910,8 +3094,10 @@ function enterApp(staff){
   loginScreen.hidden = true;
   setupScreen.hidden = true;
   appRoot.hidden = false;
-  sbSub.textContent = DEPTS[staff.departmentId] ? DEPTS[staff.departmentId].name : "Department heads";
-  switcherWrap.hidden = !staff.isAdmin;
+  sbSub.hidden = true;
+  loadHotelProfile();
+  switcherWrap.hidden = !staff.isAdmin && !(staff.headDepts && staff.headDepts.length);
+  switcherLabel.textContent = staff.isAdmin ? "Viewing as" : "Message as";
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
   feedBtn.hidden = !staff.isAdmin;
@@ -2929,6 +3115,7 @@ function enterApp(staff){
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(staff.departmentId === "concierge") refreshGuestsBadge();
     if(!tabRoomsBtn.hidden) refreshRoomsBadge();
+    if(staff.isAdmin) refreshSignupsBadge();
     pollMissed();
     checkPushPrompt();
     loadStories();
@@ -2959,7 +3146,7 @@ loginForm.addEventListener("submit", function(e){
   e.preventDefault();
   var name = loginName.value.trim();
   var pin = loginPin.value.trim();
-  if(!name || !pin) return;
+  if(!name) return;
   loginBtn.disabled = true;
   loginError.textContent = "";
   apiSend('/api/auth/login', 'POST', { name: name, pin: pin }).then(function(res){
@@ -2975,6 +3162,51 @@ loginForm.addEventListener("submit", function(e){
     loginPin.value = "";
     loginPin.focus();
   }).finally(function(){ loginBtn.disabled = false; });
+});
+
+/* ---------------- Self-service signup ---------------- */
+var signupForm = document.getElementById("signupForm");
+var signupName = document.getElementById("signupName");
+var signupDept = document.getElementById("signupDept");
+var signupBtn = document.getElementById("signupBtn");
+var signupError = document.getElementById("signupError");
+var signupSentMsg = document.getElementById("signupSentMsg");
+var showSignupBtn = document.getElementById("showSignupBtn");
+var showLoginBtn = document.getElementById("showLoginBtn");
+
+DEPT_ORDER.forEach(function(id){
+  var opt = document.createElement("option");
+  opt.value = id;
+  opt.textContent = DEPTS[id].name;
+  signupDept.appendChild(opt);
+});
+
+showSignupBtn.addEventListener("click", function(){
+  loginForm.hidden = true;
+  signupForm.hidden = false;
+  showSignupBtn.hidden = true;
+  showLoginBtn.hidden = false;
+});
+showLoginBtn.addEventListener("click", function(){
+  signupForm.hidden = true;
+  loginForm.hidden = false;
+  showLoginBtn.hidden = true;
+  showSignupBtn.hidden = false;
+});
+
+signupForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var name = signupName.value.trim();
+  if(!name) return;
+  signupBtn.disabled = true;
+  signupError.textContent = "";
+  apiSend('/api/signup', 'POST', { name: name, departmentId: signupDept.value }).then(function(){
+    document.getElementById("signupFields").hidden = true;
+    signupBtn.hidden = true;
+    signupSentMsg.hidden = false;
+  }).catch(function(err){
+    signupError.textContent = err.message || "Couldn't send that request";
+  }).finally(function(){ signupBtn.disabled = false; });
 });
 
 setupForm.addEventListener("submit", function(e){
@@ -2996,23 +3228,56 @@ logoutBtn.addEventListener("click", function(){
     if(slowPollTimer){ clearInterval(slowPollTimer); slowPollTimer = null; }
     if(typingPollTimer){ clearInterval(typingPollTimer); typingPollTimer = null; }
     if(groupsPollTimer){ clearInterval(groupsPollTimer); groupsPollTimer = null; }
+    clearAuthCache();
     showLogin();
   });
 });
+
+var AUTH_CACHE_KEY = "hp_last_staff";
+function loadAuthCache(){
+  try{ return JSON.parse(localStorage.getItem(AUTH_CACHE_KEY) || "null"); }catch(e){ return null; }
+}
+function saveAuthCache(staff){
+  try{ localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(staff)); }catch(e){}
+}
+function clearAuthCache(){
+  try{ localStorage.removeItem(AUTH_CACHE_KEY); }catch(e){}
+}
 
 (function restoreSession(){
   var token;
   try{ token = localStorage.getItem(TOKEN_KEY); }catch(e){ token = null; }
   if(!token){ showLogin(); return; }
   AUTH.token = token;
-  apiGet('/api/auth/me').then(function(res){
-    if(!res.staff.profileComplete){
-      showSetup(res.staff);
+  // Reveal the last-known screen straight away from cache instead of sitting
+  // on a blank body while /api/auth/me makes a round trip - the real fetch
+  // below still runs and corrects anything stale within a second. Deferred
+  // to a microtask so it runs after the rest of this script has finished
+  // defining everything (enterApp touches tab buttons/pages declared further
+  // down the file - calling it inline here, mid-script, throws and aborts
+  // the remaining setup, including the showTab("chat") default).
+  var cached = loadAuthCache();
+  if(cached){
+    Promise.resolve().then(function(){
+      if(cached.profileComplete) enterApp(cached); else showSetup(cached);
+    });
+  }
+  fetch('/api/auth/me', { headers: authHeaders() }).then(function(r){
+    return r.json().then(function(body){ return { ok: r.ok, status: r.status, body: body }; });
+  }).then(function(result){
+    if(!result.ok){
+      if(result.status === 401){ clearAuthCache(); showLogin(); }
+      else if(!cached){ showLogin(); }
+      return;
+    }
+    saveAuthCache(result.body.staff);
+    if(!result.body.staff.profileComplete){
+      showSetup(result.body.staff);
     } else {
-      enterApp(res.staff);
+      enterApp(result.body.staff);
     }
   }).catch(function(){
-    showLogin();
+    if(!cached) showLogin();
   });
 })();
 
@@ -3023,10 +3288,9 @@ var staffListEl = document.getElementById("staffList");
 var setupChecklistEl = document.getElementById("setupChecklist");
 var setupTabsEl = document.getElementById("setupTabs");
 var setupPanelTeam = document.getElementById("setupPanelTeam");
-var setupPanelDepartments = document.getElementById("setupPanelDepartments");
 var setupPanelAreas = document.getElementById("setupPanelAreas");
 var setupPanelRooms = document.getElementById("setupPanelRooms");
-var deptSetupListEl = document.getElementById("deptSetupList");
+var deptHeadsListEl = document.getElementById("deptHeadsList");
 var floorListEl = document.getElementById("floorList");
 var addFloorForm = document.getElementById("addFloorForm");
 var zoneStubListEl = document.getElementById("zoneStubList");
@@ -3037,17 +3301,59 @@ function openAdmin(){
   setSetupTab("team");
   loadStaffList();
   loadSetupChecklist();
+  loadHotelProfileSetup();
 }
+
+function loadHotelProfileSetup(){
+  var nameInput = document.getElementById("hotelNameInput");
+  var preview = document.getElementById("hotelLogoPreview");
+  var placeholder = document.getElementById("hotelLogoPlaceholder");
+  nameInput.value = HOTEL_PROFILE.name || "";
+  if(HOTEL_PROFILE.logoUrl){
+    preview.src = HOTEL_PROFILE.logoUrl;
+    preview.hidden = false;
+    placeholder.hidden = true;
+  } else {
+    preview.hidden = true;
+    placeholder.hidden = false;
+  }
+}
+
+(function setupHotelProfileWiring(){
+  var btn = document.getElementById("hotelLogoBtn");
+  var input = document.getElementById("hotelLogoInput");
+  var nameInput = document.getElementById("hotelNameInput");
+  btn.addEventListener("click", function(){ input.click(); });
+  input.addEventListener("change", function(){
+    var file = input.files[0];
+    input.value = "";
+    if(!file) return;
+    openPhotoCropper(file).then(function(blob){
+      if(!blob) return;
+      return blobToBase64(blob).then(function(b64){
+        return apiSend('/api/hotel-profile/logo', 'POST', { fileBase64: b64, fileMime: "image/jpeg" });
+      }).then(function(){
+        return loadHotelProfile();
+      }).then(function(){
+        loadHotelProfileSetup();
+        showToast("Logo updated");
+      }).catch(function(){ showToast("Couldn't upload that logo"); });
+    });
+  });
+  nameInput.addEventListener("blur", function(){
+    apiSend('/api/hotel-profile', 'PUT', { name: nameInput.value.trim() }).then(function(){
+      return loadHotelProfile();
+    }).catch(function(){ showToast("Couldn't save the hotel name"); });
+  });
+})();
 
 function setSetupTab(tab){
   Array.prototype.forEach.call(setupTabsEl.children, function(btn){
     btn.classList.toggle("active", btn.getAttribute("data-tab") === tab);
   });
   setupPanelTeam.hidden = tab !== "team";
-  setupPanelDepartments.hidden = tab !== "departments";
   setupPanelAreas.hidden = tab !== "areas";
   setupPanelRooms.hidden = tab !== "rooms";
-  if(tab === "departments") loadDeptSetupList();
   if(tab === "areas") loadFloorList();
   if(tab === "rooms") loadRoomSetupList();
 }
@@ -3057,12 +3363,11 @@ Array.prototype.forEach.call(setupTabsEl.children, function(btn){
 
 function loadSetupChecklist(){
   setupChecklistEl.innerHTML = '<div class="handover-empty">Loading…</div>';
-  Promise.all([apiGet('/api/staff'), apiGet('/api/departments'), apiGet('/api/floors'), apiGet('/api/rooms')]).then(function(results){
-    var staff = results[0].staff, departments = results[1].departments, floors = results[2].floors, rooms = results[3].rooms;
+  Promise.all([apiGet('/api/staff'), apiGet('/api/floors'), apiGet('/api/rooms')]).then(function(results){
+    var staff = results[0].staff, floors = results[1].floors, rooms = results[2].rooms;
     var hasAreas = floors.some(function(f){ return f.zones.length > 0; });
     var items = [
       { label: "Team members added", done: staff.length > 1, tab: "team" },
-      { label: "Departments configured", done: departments.length > 0 && departments.every(function(d){ return !!d.contactName; }), tab: "departments" },
       { label: "Hotel areas mapped for SOS", done: hasAreas, tab: "areas" },
       { label: "Rooms added", done: rooms.length > 0, tab: "rooms" },
     ];
@@ -3086,6 +3391,7 @@ function loadSetupChecklist(){
 }
 
 function loadStaffList(){
+  loadSignupsList();
   staffListEl.innerHTML = '<div style="padding:14px 0;color:var(--text-faint);font-size:12.5px">Loading…</div>';
   apiGet('/api/staff').then(function(res){
     staffListEl.innerHTML = "";
@@ -3093,10 +3399,105 @@ function loadStaffList(){
     loadStaffMeta().then(function(){
       renderList();
       renderHeader();
+      loadDeptHeadsSetupList();
     });
   }).catch(function(){
     staffListEl.innerHTML = '<div style="padding:14px 0;color:var(--urgent);font-size:12.5px">Couldn\'t load staff.</div>';
   });
+}
+
+/* ---------------- Hotel setup: department heads ---------------- */
+function loadDeptHeadsSetupList(){
+  deptHeadsListEl.innerHTML = '<div style="padding:14px 0;color:var(--text-faint);font-size:12.5px">Loading…</div>';
+  loadDepartmentHeads(true).then(function(){
+    deptHeadsListEl.innerHTML = "";
+    DEPT_ORDER.filter(function(id){ return id !== "gm"; }).forEach(function(id){
+      deptHeadsListEl.appendChild(buildDeptHeadRow(id));
+    });
+  });
+}
+
+function refreshAfterDeptHeadsChange(){
+  return loadDepartmentHeads(true).then(function(){
+    loadDeptHeadsSetupList();
+    renderList();
+    renderHeader();
+    renderSwitcher();
+  });
+}
+
+function buildDeptHeadRow(deptId){
+  var headId = "head_" + deptId;
+  var info = DEPT_HEADS[deptId];
+  var row = document.createElement("div");
+  row.className = "staff-row dept-head-row";
+
+  var avatarBtn = document.createElement("button");
+  avatarBtn.type = "button";
+  avatarBtn.className = "t-avatar dept-head-avatar-btn";
+  avatarBtn.setAttribute("style", avatarStyleAttr(headId));
+  avatarBtn.innerHTML = avatarInnerHtml(headId);
+  avatarBtn.title = info ? "Change photo" : "Assign someone first";
+  avatarBtn.disabled = !info;
+
+  var fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.hidden = true;
+
+  var name = document.createElement("div");
+  name.className = "staff-row-name";
+  var nameText = document.createElement("span");
+  nameText.className = "staff-row-name-text";
+  nameText.style.cursor = "default";
+  nameText.style.borderBottom = "none";
+  nameText.textContent = DEPTS[headId].name;
+  name.appendChild(nameText);
+  var sub = document.createElement("span");
+  sub.textContent = info ? info.staffName : "Not assigned";
+  name.appendChild(sub);
+
+  var select = document.createElement("select");
+  var noneOpt = document.createElement("option");
+  noneOpt.value = ""; noneOpt.textContent = "— None —";
+  select.appendChild(noneOpt);
+  (STAFF_BY_DEPT[deptId] || []).forEach(function(s){
+    var opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name;
+    if(info && info.staffId === s.id) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", function(){
+    var staffId = select.value;
+    var req = staffId
+      ? apiSend('/api/department-heads/' + encodeURIComponent(deptId), 'PUT', { staffId: staffId })
+      : apiDelete('/api/department-heads/' + encodeURIComponent(deptId));
+    req.then(refreshAfterDeptHeadsChange).catch(function(){
+      showToast("Couldn't update that department's head");
+      loadDeptHeadsSetupList();
+    });
+  });
+
+  avatarBtn.addEventListener("click", function(){ if(info) fileInput.click(); });
+  fileInput.addEventListener("change", function(){
+    var file = fileInput.files[0];
+    fileInput.value = "";
+    if(!file || !info) return;
+    openPhotoCropper(file).then(function(blob){
+      if(!blob) return;
+      return blobToBase64(blob).then(function(b64){
+        return apiSend('/api/staff/' + encodeURIComponent(info.staffId) + '/photo', 'POST', { fileBase64: b64, fileMime: "image/jpeg" });
+      }).then(refreshAfterDeptHeadsChange).then(function(){
+        showToast("Photo updated");
+      }).catch(function(){ showToast("Couldn't upload that photo"); });
+    });
+  });
+
+  row.appendChild(avatarBtn);
+  row.appendChild(fileInput);
+  row.appendChild(name);
+  row.appendChild(select);
+  return row;
 }
 
 function buildStaffRow(s){
@@ -3163,53 +3564,6 @@ function buildStaffRow(s){
   return row;
 }
 
-/* ---------------- Hotel setup: Departments panel ---------------- */
-function loadDeptSetupList(){
-  deptSetupListEl.innerHTML = '<div class="handover-empty">Loading…</div>';
-  apiGet('/api/departments').then(function(res){
-    deptSetupListEl.innerHTML = "";
-    DEPT_ORDER.forEach(function(id){
-      var d = res.departments.find(function(x){ return x.id === id; }) || { id: id, name: DEPTS[id].name, contactName: "", onDuty: true };
-      deptSetupListEl.appendChild(buildDeptSetupRow(d));
-    });
-  }).catch(function(){ deptSetupListEl.innerHTML = '<div class="handover-empty">Couldn\'t load departments.</div>'; });
-}
-function buildDeptSetupRow(d){
-  var row = document.createElement("div");
-  row.className = "staff-row";
-  var name = document.createElement("div");
-  name.className = "staff-row-name";
-  var nameText = document.createElement("span");
-  nameText.className = "staff-row-name-text";
-  nameText.textContent = DEPTS[d.id] ? DEPTS[d.id].name : d.name;
-  name.appendChild(nameText);
-  var sub = document.createElement("span");
-  sub.textContent = d.onDuty ? "On duty" : "Off duty";
-  name.appendChild(sub);
-
-  var input = document.createElement("input");
-  input.type = "text";
-  input.className = "staff-row-name-input";
-  input.placeholder = "Contact name";
-  input.maxLength = 40;
-  input.value = d.contactName || "";
-  input.addEventListener("blur", function(){
-    var val = input.value.trim();
-    if(val === (d.contactName || "")) return;
-    apiSend('/api/departments/' + encodeURIComponent(d.id), 'PATCH', { contactName: val }).then(function(res2){
-      DEPT_META[d.id] = res2.department;
-      loadSetupChecklist();
-    }).catch(function(){
-      input.value = d.contactName || "";
-      showToast("Couldn't update that contact name");
-    });
-  });
-
-  row.appendChild(name);
-  row.appendChild(input);
-  return row;
-}
-
 /* ---------------- Hotel setup: Hotel areas (floor/zone mapper) ---------------- */
 var CURRENT_FLOORS = [];
 function loadFloorList(){
@@ -3254,6 +3608,7 @@ function buildFloorCard(f){
     apiDelete('/api/floors/' + encodeURIComponent(f.id)).then(loadFloorList).catch(function(){});
   }));
   card.appendChild(head);
+  card.appendChild(buildFloorPlanImageRow(f));
 
   var zoneWrap = document.createElement("div");
   zoneWrap.className = "zone-chip-list";
@@ -3273,10 +3628,47 @@ function buildFloorCard(f){
   card.appendChild(addAreaForm);
   return card;
 }
-function buildZoneGroup(z, f){
-  var wrap = document.createElement("div");
-  wrap.className = "zone-chip-group";
+// A real photo/scan of the floor as a visual reference for whoever's setting
+// up areas - it's not parsed for room names, just shown alongside the area
+// list below so mapping it out is easier to get right and to double-check.
+function buildFloorPlanImageRow(f){
+  var row = document.createElement("div");
+  row.className = "floor-plan-row";
 
+  var preview = document.createElement("button");
+  preview.type = "button";
+  preview.className = "floor-plan-preview" + (f.planImageUrl ? "" : " empty");
+  preview.title = f.planImageUrl ? "Replace floor plan image" : "Upload a floor plan image";
+  preview.innerHTML = f.planImageUrl
+    ? '<img src="' + esc(f.planImageUrl) + '" alt="">'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 5-6 4 5"/></svg><span>Add floor plan</span>';
+
+  var fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = "image/*";
+  fileInput.hidden = true;
+  preview.addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(){
+    var file = fileInput.files[0];
+    fileInput.value = "";
+    if(!file) return;
+    preview.classList.add("uploading");
+    blobToBase64(file).then(function(b64){
+      return apiSend('/api/floors/' + encodeURIComponent(f.id) + '/plan', 'POST', { fileBase64: b64, fileMime: file.type || "image/jpeg" });
+    }).then(function(){
+      loadFloorList();
+      showToast("Floor plan updated");
+    }).catch(function(){
+      showToast("Couldn't upload that floor plan");
+      preview.classList.remove("uploading");
+    });
+  });
+
+  row.appendChild(preview);
+  row.appendChild(fileInput);
+  return row;
+}
+function buildZoneGroup(z, f){
   var chip = document.createElement("div");
   chip.className = "zone-chip";
   var label = document.createElement("span");
@@ -3285,51 +3677,7 @@ function buildZoneGroup(z, f){
   chip.appendChild(buildRemoveBtn(z.name, function(){
     apiDelete('/api/zones/' + encodeURIComponent(z.id)).then(loadFloorList).catch(function(){});
   }));
-  wrap.appendChild(chip);
-
-  var subWrap = document.createElement("div");
-  subWrap.className = "subzone-chip-list";
-  (z.subzones || []).forEach(function(s){
-    var subChip = document.createElement("span");
-    subChip.className = "zone-chip subzone-chip";
-    var subLabel = document.createElement("span");
-    subLabel.textContent = s.name;
-    subChip.appendChild(subLabel);
-    subChip.appendChild(buildRemoveBtn(s.name, function(){
-      apiDelete('/api/zones/' + encodeURIComponent(s.id)).then(loadFloorList).catch(function(){});
-    }));
-    subWrap.appendChild(subChip);
-  });
-
-  var addSubForm = document.createElement("form");
-  addSubForm.className = "subzone-add-form";
-  addSubForm.innerHTML = '<input type="text" placeholder="Sub-area, e.g. Corridor A" maxlength="40">'
-    + '<input type="text" class="range-input" placeholder="or a range, e.g. 101-120" maxlength="20">'
-    + '<button type="submit" aria-label="Add sub-area">+</button>';
-  addSubForm.addEventListener("submit", function(e){
-    e.preventDefault();
-    var nameInput = addSubForm.querySelector("input:not(.range-input)");
-    var rangeInput = addSubForm.querySelector(".range-input");
-    var names = [];
-    if(rangeInput.value.trim()){
-      var m = rangeInput.value.trim().match(/^(\d+)\s*-\s*(\d+)$/);
-      if(!m){ showToast("Range must look like 101-120"); return; }
-      var start = parseInt(m[1], 10), end = parseInt(m[2], 10);
-      if(end < start || end - start > 200){ showToast("Check that range"); return; }
-      var prefix = nameInput.value.trim() || "Room ";
-      for(var n = start; n <= end; n++) names.push(prefix + n);
-    } else if(nameInput.value.trim()){
-      names.push(nameInput.value.trim());
-    } else {
-      return;
-    }
-    Promise.all(names.map(function(nm){
-      return apiSend('/api/zones', 'POST', { floorId: f.id, parentZoneId: z.id, name: nm }).catch(function(){});
-    })).then(loadFloorList);
-  });
-  subWrap.appendChild(addSubForm);
-  wrap.appendChild(subWrap);
-  return wrap;
+  return chip;
 }
 addFloorForm.addEventListener("submit", function(e){
   e.preventDefault();
@@ -4398,6 +4746,11 @@ function helpArmHelp(){
   if(navigator.vibrate) navigator.vibrate(12);
   playChime(false);
   helpSetPhase("armed", HELP_CHECK_SVG + "Armed");
+  // The armed/undo window gives a couple of seconds before the alert
+  // actually sends - fetch the zone list now so it's already in hand and
+  // the "Where are you?" page can render instantly instead of flashing a
+  // loading state first.
+  prefetchWhereAreYouFloors();
   helpArmStart = Date.now();
   helpArmTick();
 }
@@ -4420,28 +4773,12 @@ function helpCancelArmed(){
   setTimeout(helpBackToIdle, 1100);
 }
 
-function captureGeoFix(timeoutMs){
-  return new Promise(function(resolve){
-    if(!navigator.geolocation){ resolve(null); return; }
-    var done = false;
-    var timer = setTimeout(function(){ if(!done){ done = true; resolve(null); } }, timeoutMs);
-    navigator.geolocation.getCurrentPosition(function(pos){
-      if(done) return; done = true; clearTimeout(timer);
-      resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
-    }, function(){
-      if(done) return; done = true; clearTimeout(timer);
-      resolve(null);
-    }, { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 15000 });
-  });
-}
 function helpSendHelpAlert(){
   helpHoldRing.style.background = "none";
-  // A device fix is a nice-to-have, never a reason to delay the alert: give
-  // it a short window, then send with whatever's known (or nothing).
-  captureGeoFix(1500).then(function(coords){
-    var body = coords ? { lat: coords.lat, lng: coords.lng, accuracy: coords.accuracy } : {};
-    return apiSend('/api/help-alerts', 'POST', body);
-  }).then(function(res){
+  // Device GPS isn't used for this yet - the zone picker on the next screen
+  // is how location actually gets reported, so this sends straight away
+  // instead of prompting for (or waiting on) a location permission.
+  apiSend('/api/help-alerts', 'POST', {}).then(function(res){
     if(navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 20]);
     helpSetPhase("sent", HELP_CHECK_SVG + "Sent");
     showToast("Help request sent");
@@ -4464,10 +4801,20 @@ var whereAreYouOverlay = document.getElementById("whereAreYouOverlay");
 var whereAreYouClose = document.getElementById("whereAreYouClose");
 var whereAreYouList = document.getElementById("whereAreYouList");
 var whereAreYouAlertId = null;
+var cachedWhereAreYouFloors = null;
+function prefetchWhereAreYouFloors(){
+  apiGet('/api/floors').then(function(res){
+    cachedWhereAreYouFloors = res.floors || [];
+  }).catch(function(){});
+}
 function openWhereAreYou(alertId){
   whereAreYouAlertId = alertId;
-  whereAreYouList.innerHTML = '<div class="handover-empty">Loading…</div>';
   whereAreYouOverlay.hidden = false;
+  if(cachedWhereAreYouFloors){
+    renderWhereAreYouList(cachedWhereAreYouFloors);
+    return;
+  }
+  whereAreYouList.innerHTML = '<div class="handover-empty">Loading…</div>';
   apiGet('/api/floors').then(function(res){
     renderWhereAreYouList(res.floors || []);
   }).catch(function(){
@@ -4552,12 +4899,14 @@ function renderHelpBanners(alerts){
     }
   }
 
+  var activeForResponder = [];
   if(isResponder){
-    alerts.filter(function(a){
+    activeForResponder = alerts.filter(function(a){
       return !a.respondedAt && !HELP_ALERT_RESPONDER_DEPTS.includes(a.departmentId) && !helpDismissed[a.id];
-    }).forEach(function(a){
+    });
+    activeForResponder.forEach(function(a){
       var banner = document.createElement("div");
-      banner.className = "help-banner";
+      banner.className = "help-banner needs-response";
       banner.innerHTML =
         '<span class="help-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/></svg></span>' +
         '<div class="help-banner-body">' +
@@ -4575,7 +4924,22 @@ function renderHelpBanners(alerts){
       helpBannerStack.appendChild(banner);
     });
   }
+
+  // Keeps gently buzzing the responder's device for as long as a help
+  // request is sitting unanswered - stops the instant it's dismissed or
+  // someone taps "Responding" (activeForResponder becomes empty and the
+  // next render tears this down).
+  if(activeForResponder.length && !helpVibrateTimer){
+    if(navigator.vibrate) navigator.vibrate(15);
+    helpVibrateTimer = setInterval(function(){
+      if(navigator.vibrate) navigator.vibrate(15);
+    }, 4000);
+  } else if(!activeForResponder.length && helpVibrateTimer){
+    clearInterval(helpVibrateTimer);
+    helpVibrateTimer = null;
+  }
 }
+var helpVibrateTimer = null;
 
 function pollHelpAlerts(){
   if(!AUTH.staff) return;
@@ -4793,6 +5157,86 @@ responseBtn.addEventListener("click", function(){
 });
 responseClose.addEventListener("click", function(){ responseOverlay.hidden = true; });
 responseOverlay.addEventListener("click", function(e){ if(e.target === responseOverlay) responseOverlay.hidden = true; });
+
+/* ---------------- Pending signups (admin): accept or deny self-service signup requests, shown at the top of Hotel setup's Team tab ---------------- */
+var signupsList = document.getElementById("signupsList");
+var signupsCountEl = document.getElementById("signupsCount");
+
+function refreshSignupsBadge(){
+  if(!AUTH.staff || !AUTH.staff.isAdmin) return;
+  apiGet('/api/signup-requests').then(function(res){
+    var n = (res.requests || []).length;
+    signupsCountEl.hidden = n === 0;
+    signupsCountEl.textContent = String(n);
+  }).catch(function(){});
+}
+
+function loadSignupsList(){
+  signupsList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/signup-requests').then(function(res){
+    var requests = res.requests || [];
+    if(!requests.length){
+      signupsList.innerHTML = '<div class="handover-empty">No pending signups.</div>';
+      return;
+    }
+    signupsList.innerHTML = "";
+    requests.forEach(function(r){
+      var row = document.createElement("div");
+      row.className = "staff-row";
+      var name = document.createElement("div");
+      name.className = "staff-row-name";
+      var nameText = document.createElement("span");
+      nameText.className = "staff-row-name-text";
+      nameText.style.cursor = "default";
+      nameText.style.borderBottom = "none";
+      nameText.textContent = r.name;
+      name.appendChild(nameText);
+      var sub = document.createElement("span");
+      sub.textContent = (DEPTS[r.departmentId] ? DEPTS[r.departmentId].name : r.departmentId) + " · " + fmtNoteTime(r.createdAt);
+      name.appendChild(sub);
+
+      var actions = document.createElement("div");
+      actions.style.cssText = "display:flex;gap:6px;flex:none";
+      var acceptBtn = document.createElement("button");
+      acceptBtn.type = "button";
+      acceptBtn.className = "admin-add-btn";
+      acceptBtn.textContent = "Accept";
+      var denyBtn = document.createElement("button");
+      denyBtn.type = "button";
+      denyBtn.className = "staff-row-del";
+      denyBtn.setAttribute("aria-label", "Deny");
+      denyBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
+
+      acceptBtn.addEventListener("click", function(){
+        acceptBtn.disabled = true; denyBtn.disabled = true;
+        apiSend('/api/signup-requests/' + encodeURIComponent(r.id) + '/approve', 'POST', {}).then(function(){
+          loadSignupsList();
+          refreshSignupsBadge();
+          showToast(r.name + " can now sign in");
+        }).catch(function(){
+          showToast("Couldn't accept that request");
+          acceptBtn.disabled = false; denyBtn.disabled = false;
+        });
+      });
+      denyBtn.addEventListener("click", function(){
+        acceptBtn.disabled = true; denyBtn.disabled = true;
+        apiSend('/api/signup-requests/' + encodeURIComponent(r.id) + '/deny', 'POST', {}).then(function(){
+          loadSignupsList();
+          refreshSignupsBadge();
+        }).catch(function(){
+          showToast("Couldn't deny that request");
+          acceptBtn.disabled = false; denyBtn.disabled = false;
+        });
+      });
+
+      actions.appendChild(acceptBtn);
+      actions.appendChild(denyBtn);
+      row.appendChild(name);
+      row.appendChild(actions);
+      signupsList.appendChild(row);
+    });
+  }).catch(function(){ signupsList.innerHTML = '<div class="handover-empty">Couldn\'t load pending signups.</div>'; });
+}
 
 /* ---------------- Ops overview (admin): escalations, ownership, blocker chains, exceptions ---------------- */
 var opsOverviewBtn = document.getElementById("opsOverviewBtn");

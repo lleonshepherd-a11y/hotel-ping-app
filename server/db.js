@@ -149,6 +149,9 @@ if (!messageColumns.includes('escalation_level')) {
 if (!messageColumns.includes('affects_guest')) {
   db.exec('ALTER TABLE messages ADD COLUMN affects_guest INTEGER NOT NULL DEFAULT 0');
 }
+if (!messageColumns.includes('room_clean')) {
+  db.exec('ALTER TABLE messages ADD COLUMN room_clean TEXT');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -194,9 +197,10 @@ if (toDeptCol && toDeptCol.notnull) {
       poll_options TEXT,
       poll_votes TEXT,
       escalation_level INTEGER NOT NULL DEFAULT 0,
-      affects_guest INTEGER NOT NULL DEFAULT 0
+      affects_guest INTEGER NOT NULL DEFAULT 0,
+      room_clean TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
@@ -400,6 +404,34 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_rooms_position ON rooms(position);
+
+  CREATE TABLE IF NOT EXISTS department_heads (
+    department_id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS staff_photos (
+    staff_id TEXT PRIMARY KEY,
+    photo_path TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS signup_requests (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TEXT NOT NULL,
+    decided_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS hotel_profile (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    logo_path TEXT,
+    updated_at TEXT NOT NULL
+  );
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

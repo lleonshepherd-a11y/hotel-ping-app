@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS messages (
   poll_votes TEXT,
   escalation_level INTEGER NOT NULL DEFAULT 0,
   affects_guest INTEGER NOT NULL DEFAULT 0,
-  dashboard_conversation_id TEXT
+  dashboard_conversation_id TEXT,
+  room_clean TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
@@ -375,6 +376,47 @@ CREATE TABLE IF NOT EXISTS rooms (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_rooms_position ON rooms(position);
+
+-- Which specific NOIR_DB staff member is the named, directly-reachable
+-- contact for a department (e.g. head_kitchen -> the actual Head Chef).
+-- One row per department, admin-assigned in Hotel Setup.
+CREATE TABLE IF NOT EXISTS department_heads (
+  department_id TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Personal photo for a NOIR_DB staff member. Staff records live in NOIR_DB
+-- (not owned by this codebase), so this is a local companion table, same
+-- pattern as maintenance_ticket_meta.
+CREATE TABLE IF NOT EXISTS staff_photos (
+  staff_id TEXT PRIMARY KEY,
+  photo_path TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Self-service signup: name + department only, sitting here until the GM
+-- accepts or denies it. Approving one creates the real NOIR_DB staff row -
+-- nothing here is itself a usable account.
+CREATE TABLE IF NOT EXISTS signup_requests (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  decided_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_signup_requests_status ON signup_requests(status, created_at);
+
+-- The hotel's own identity shown across the app (Profile page header) -
+-- separate from the Hotel Ping product brand, which only appears in the
+-- "Powered by" footer. Single row, id is always 'default'.
+CREATE TABLE IF NOT EXISTS hotel_profile (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  logo_path TEXT,
+  updated_at TEXT NOT NULL
+);
 
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
