@@ -723,7 +723,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .rec-cancel{color:var(--text-dim)}
 .rec-stop{color:#fff;background:var(--urgent)}
 
-.qv-thread-btn{background:#14140f;color:#4d84f5;margin-left:4px;padding:0}
+.qv-thread-btn{background:#14140f;color:#fff;margin-left:4px;padding:0}
 .qv-thread-btn svg{display:block;margin:0 auto}
 .qv-thread-btn:hover{background:#14140f;opacity:.88}
 .qv-thread-btn:active{transform:scale(.94)}
