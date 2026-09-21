@@ -1843,24 +1843,28 @@ export default {
         if (!ALL_DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const others = Array.from(ALL_DEPT_IDS).filter((id) => id !== self);
-        const conversations = [];
-        for (const other of others) {
-          const last = await env.DB.prepare(
-            `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at DESC LIMIT 1`
-          ).bind(self, other, other, self).first();
-          const unread = await env.DB.prepare(
-            `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read'`
-          ).bind(self, other).first();
-          const urgentUnread = await env.DB.prepare(
-            `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read' AND urgent = 1`
-          ).bind(self, other).first();
-          conversations.push({
+        // These 3 queries per department are all independent reads - run every
+        // department's set in parallel instead of awaiting all ~42 queries one
+        // at a time (was the dominant cost under concurrent load: p95 ~8s).
+        const conversations = await Promise.all(others.map(async (other) => {
+          const [last, unread, urgentUnread] = await Promise.all([
+            env.DB.prepare(
+              `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at DESC LIMIT 1`
+            ).bind(self, other, other, self).first(),
+            env.DB.prepare(
+              `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read'`
+            ).bind(self, other).first(),
+            env.DB.prepare(
+              `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read' AND urgent = 1`
+            ).bind(self, other).first(),
+          ]);
+          return {
             departmentId: other,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: unread.n,
             hasUrgentUnread: urgentUnread.n > 0,
-          });
-        }
+          };
+        }));
         return json({ conversations });
       }
 
