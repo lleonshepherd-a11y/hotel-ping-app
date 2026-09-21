@@ -2684,34 +2684,53 @@ function pendingMessageFromQueueItem(item){
 }
 // Queues ANY message type (text, image, file, or audio - fileBase64 is
 // already a plain string by the time this is called, so it's just as
-// localStorage-safe as text) for automatic resend once back online. Only
-// 1:1 department messages are covered - group-chat sends still require a
-// live connection, since their pending-message rendering is a separate
-// path this doesn't touch.
+// localStorage-safe as text) for automatic resend once back online, for
+// either a 1:1 department thread or a group - routed by payload.groupId,
+// which doSend()/the voice-note sender already set when applicable.
 function queueOfflineMessage(deptId, payload){
   var q = loadOfflineQueue();
   var localId = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
-  var item = { localId: localId, deptId: deptId, payload: payload, queuedAt: Date.now() };
+  var groupId = payload.groupId || null;
+  var item = { localId: localId, deptId: deptId, groupId: groupId, payload: payload, queuedAt: Date.now() };
   q.push(item);
   var saved = saveOfflineQueue(q);
   if(!saved){
     showToast("Couldn't save that for later - it's too large to hold offline. Try again once you're back online.");
     return false;
   }
-  STATE.data[deptId] = STATE.data[deptId] || [];
-  STATE.data[deptId].push(pendingMessageFromQueueItem(item));
+  var pending = pendingMessageFromQueueItem(item);
+  if(groupId){
+    STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+    STATE.groupMessages[groupId].push(pending);
+    if(STATE.activeGroupId === groupId) renderThread();
+  } else {
+    STATE.data[deptId] = STATE.data[deptId] || [];
+    STATE.data[deptId].push(pending);
+    if(STATE.active === deptId) renderThread();
+  }
   renderList();
-  if(STATE.active === deptId) renderThread();
   showToast("No connection. That'll send automatically once you're back online.");
   return true;
 }
 function mergePendingIntoData(data){
   loadOfflineQueue().forEach(function(item){
+    if(item.groupId) return;
     data[item.deptId] = data[item.deptId] || [];
     var exists = data[item.deptId].some(function(x){ return x.id === item.localId; });
     if(!exists) data[item.deptId].push(pendingMessageFromQueueItem(item));
   });
   return data;
+}
+// Same idea as mergePendingIntoData, but for a single group's message
+// array - called wherever a group thread's messages get (re)fetched from
+// the server, so a still-queued offline send isn't wiped off screen by
+// the next poll before it actually flushes.
+function mergePendingGroupMessages(groupId, mapped){
+  loadOfflineQueue().forEach(function(item){
+    if(item.groupId !== groupId) return;
+    if(!mapped.some(function(x){ return x.id === item.localId; })) mapped.push(pendingMessageFromQueueItem(item));
+  });
+  return mapped;
 }
 var offlineFlushInFlight = false;
 function flushOfflineQueue(){
@@ -2724,12 +2743,19 @@ function flushOfflineQueue(){
     var item = q[i];
     return apiSend('/api/messages', 'POST', item.payload).then(function(res){
       saveOfflineQueue(loadOfflineQueue().filter(function(x){ return x.localId !== item.localId; }));
-      var msgs = STATE.data[item.deptId] || [];
-      var idx = msgs.findIndex(function(x){ return x.id === item.localId; });
       var real = mapServerMessage(res.message, STATE.self);
-      if(idx !== -1) msgs[idx] = real; else msgs.push(real);
+      if(item.groupId){
+        var gmsgs = STATE.groupMessages[item.groupId] || [];
+        var gidx = gmsgs.findIndex(function(x){ return x.id === item.localId; });
+        if(gidx !== -1) gmsgs[gidx] = real; else gmsgs.push(real);
+        if(STATE.activeGroupId === item.groupId) renderThread();
+      } else {
+        var msgs = STATE.data[item.deptId] || [];
+        var idx = msgs.findIndex(function(x){ return x.id === item.localId; });
+        if(idx !== -1) msgs[idx] = real; else msgs.push(real);
+        if(STATE.active === item.deptId) renderThread();
+      }
       renderList();
-      if(STATE.active === item.deptId) renderThread();
       return next(i + 1);
     }).catch(function(){
       offlineFlushInFlight = false;
@@ -2824,7 +2850,7 @@ function doSend(){
       if(STATE.active === deptId) renderThread();
     }
   }).catch(function(err){
-    if(!groupId && (err instanceof TypeError || !navigator.onLine)){
+    if(err instanceof TypeError || !navigator.onLine){
       if(queueOfflineMessage(deptId, payload)) return;
     }
     blockForLanguage();
@@ -3023,7 +3049,7 @@ vpSend.addEventListener("click", function(){
       if(STATE.active === deptId) renderThread();
     }
   }).catch(function(err){
-    if(!groupId && voicePayload && (err instanceof TypeError || !navigator.onLine)){
+    if(voicePayload && (err instanceof TypeError || !navigator.onLine)){
       if(queueOfflineMessage(deptId, voicePayload)) return;
     }
     composerHint.textContent = "That voice note didn't send. Check your connection and try again.";
@@ -7720,7 +7746,8 @@ function openGroupThread(groupId){
   }
   threadScroll.innerHTML = '<div class="handover-empty">Loading…</div>';
   apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
-    STATE.groupMessages[groupId] = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+    var mapped = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+    STATE.groupMessages[groupId] = mergePendingGroupMessages(groupId, mapped);
     if(STATE.activeGroupId === groupId){ renderThread(); markGroupRead(groupId); }
   }).catch(function(){
     if(STATE.activeGroupId === groupId) threadScroll.innerHTML = '<div class="handover-empty">Couldn\'t load messages.</div>';
@@ -7734,7 +7761,7 @@ function pollGroupsQuiet(){
     var groupId = STATE.activeGroupId;
     if(!groupId) return;
     apiGet('/api/groups/' + encodeURIComponent(groupId) + '/messages?self=' + encodeURIComponent(STATE.self)).then(function(res){
-      var mapped = res.messages.map(function(row){ return mapServerMessage(row, STATE.self); });
+      var mapped = mergePendingGroupMessages(groupId, res.messages.map(function(row){ return mapServerMessage(row, STATE.self); }));
       var existing = STATE.groupMessages[groupId] || [];
       if(mapped.length !== existing.length || messagesChangeSignature(existing) !== messagesChangeSignature(mapped)){
         STATE.groupMessages[groupId] = mapped;

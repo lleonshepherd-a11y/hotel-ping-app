@@ -976,15 +976,22 @@ function canViewAsSelf(requester, self) {
 // env.DB / env.NOIR_DB / env.UPLOADS / NOIR_HOTEL_ID as before this change
 // - zero behavior change for the live hotel. A new hotel is added here by
 // provisioning its own D1 database + R2 bucket and adding one line.
-function resolveHotel(request, env, url) {
-  const slug = (request.headers.get("x-hotel-slug") || url.searchParams.get("hotel") || "main").trim().toLowerCase();
+// Single source of truth for which hotels exist, used both per-request
+// (resolveHotel, below) and by the cron job (scheduled(), at the bottom of
+// this file) so a newly provisioned hotel's overdue messages/tickets get
+// escalated too, not just the main hotel's.
+function hotelRegistry(env) {
   const registry = {
-    main: { db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID },
+    main: { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID, hasDashboardBridge: true },
   };
   if (env.DB_HOTELB) {
-    registry.hotelb = { db: env.DB_HOTELB, noirDb: env.DB_HOTELB, uploads: env.UPLOADS_HOTELB || env.UPLOADS, hotelId: "hotelb-test-tenant" };
+    registry.hotelb = { slug: "hotelb", db: env.DB_HOTELB, noirDb: env.DB_HOTELB, uploads: env.UPLOADS_HOTELB || env.UPLOADS, hotelId: "hotelb-test-tenant", hasDashboardBridge: false };
   }
-  const hotel = registry[slug];
+  return registry;
+}
+function resolveHotel(request, env, url) {
+  const slug = (request.headers.get("x-hotel-slug") || url.searchParams.get("hotel") || "main").trim().toLowerCase();
+  const hotel = hotelRegistry(env)[slug];
   if (!hotel) return null;
   return {
     slug,
@@ -1843,28 +1850,44 @@ export default {
         if (!ALL_DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
         const others = Array.from(ALL_DEPT_IDS).filter((id) => id !== self);
-        // These 3 queries per department are all independent reads - run every
-        // department's set in parallel instead of awaiting all ~42 queries one
-        // at a time (was the dominant cost under concurrent load: p95 ~8s).
-        const conversations = await Promise.all(others.map(async (other) => {
-          const [last, unread, urgentUnread] = await Promise.all([
-            env.DB.prepare(
-              `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at DESC LIMIT 1`
-            ).bind(self, other, other, self).first(),
-            env.DB.prepare(
-              `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read'`
-            ).bind(self, other).first(),
-            env.DB.prepare(
-              `SELECT COUNT(*) AS n FROM messages WHERE to_dept = ? AND from_dept = ? AND status != 'read' AND urgent = 1`
-            ).bind(self, other).first(),
-          ]);
+        // Was 3 queries x 14 other departments = 42 round-trips per call
+        // (p95 ~8s under load even parallelized, since D1 itself was the
+        // bottleneck, not request scheduling). Batched into 2 queries total:
+        // one window-function query gets every partner's single most-recent
+        // message in one pass, one grouped COUNT gets every partner's
+        // unread + urgent-unread counts in one pass.
+        const [lastRows, unreadRows] = await Promise.all([
+          env.DB.prepare(
+            `SELECT * FROM (
+               SELECT *,
+                 CASE WHEN from_dept = ?1 THEN to_dept ELSE from_dept END AS partner,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY (CASE WHEN from_dept = ?1 THEN to_dept ELSE from_dept END)
+                   ORDER BY created_at DESC
+                 ) AS rn
+               FROM messages
+               WHERE from_dept = ?1 OR to_dept = ?1
+             ) WHERE rn = 1`
+          ).bind(self).all(),
+          env.DB.prepare(
+            `SELECT from_dept AS partner, COUNT(*) AS n, SUM(CASE WHEN urgent = 1 THEN 1 ELSE 0 END) AS urgent_n
+             FROM messages WHERE to_dept = ?1 AND status != 'read' GROUP BY from_dept`
+          ).bind(self).all(),
+        ]);
+        const lastByPartner = {};
+        for (const row of lastRows.results) lastByPartner[row.partner] = row;
+        const unreadByPartner = {};
+        for (const row of unreadRows.results) unreadByPartner[row.partner] = row;
+        const conversations = others.map((other) => {
+          const last = lastByPartner[other];
+          const unread = unreadByPartner[other];
           return {
             departmentId: other,
             lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
-            unreadCount: unread.n,
-            hasUrgentUnread: urgentUnread.n > 0,
+            unreadCount: unread ? unread.n : 0,
+            hasUrgentUnread: !!(unread && unread.urgent_n > 0),
           };
-        }));
+        });
         return json({ conversations });
       }
 
@@ -3529,9 +3552,19 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(checkEscalations(env));
+    // checkEscalations/checkUnnotifiedTickets read and write each hotel's
+    // own messages/tickets, so every provisioned hotel needs its own run -
+    // otherwise a second hotel's overdue urgent messages would just never
+    // escalate. checkDashboardDepartmentDrift/checkPlannerAlerts are about
+    // the external dashboard-bridge integration specifically (not
+    // per-hotel data), which only "main" has configured today, so those
+    // stay single-run against the unscoped env.
+    for (const hotel of Object.values(hotelRegistry(env))) {
+      const hotelEnv = Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads });
+      ctx.waitUntil(checkEscalations(hotelEnv));
+      ctx.waitUntil(checkUnnotifiedTickets(hotelEnv, ctx));
+    }
     ctx.waitUntil(checkDashboardDepartmentDrift(env));
-    ctx.waitUntil(checkUnnotifiedTickets(env, ctx));
     ctx.waitUntil(checkPlannerAlerts(env, ctx));
   },
 };
