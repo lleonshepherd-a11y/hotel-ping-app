@@ -2083,6 +2083,59 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { total, readCount: read.length, read, unread });
     }
 
+    if (req.method === 'POST' && p === '/api/priority-broadcast') {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      const text = String(body.text || '').trim();
+      if (!text) return send(res, 400, { error: 'Alert text is required' });
+      const now = new Date().toISOString();
+      db.prepare('UPDATE priority_broadcasts SET cleared_at = ? WHERE cleared_at IS NULL').run(now);
+      const id = crypto.randomUUID();
+      db.prepare('INSERT INTO priority_broadcasts (id, text, created_by, created_at) VALUES (?, ?, ?, ?)').run(id, text, requester.id, now);
+      return send(res, 201, { broadcast: { id, text, createdAt: now } });
+    }
+
+    if (req.method === 'GET' && p === '/api/priority-broadcast/active') {
+      const requesterActive = staffFromToken(req);
+      if (!requesterActive) return send(res, 401, { error: 'Not signed in' });
+      const row = db.prepare('SELECT * FROM priority_broadcasts WHERE cleared_at IS NULL ORDER BY created_at DESC LIMIT 1').get();
+      if (!row) return send(res, 200, { broadcast: null, acceptedDepts: [] });
+      const acks = db.prepare('SELECT department_id FROM priority_broadcast_acks WHERE broadcast_id = ?').all(row.id);
+      return send(res, 200, {
+        broadcast: { id: row.id, text: row.text, createdAt: row.created_at },
+        acceptedDepts: acks.map((a) => a.department_id),
+      });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/priority-broadcast/') && p.endsWith('/accept')) {
+      const id = decodeURIComponent(p.slice('/api/priority-broadcast/'.length, -'/accept'.length));
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const broadcast = db.prepare('SELECT * FROM priority_broadcasts WHERE id = ? AND cleared_at IS NULL').get(id);
+      if (!broadcast) return send(res, 404, { error: 'That alert is no longer active' });
+      const dept = requester.department_id;
+      const already = db.prepare('SELECT 1 FROM priority_broadcast_acks WHERE broadcast_id = ? AND department_id = ?').get(id, dept);
+      if (!already) {
+        db.prepare('INSERT INTO priority_broadcast_acks (broadcast_id, department_id, accepted_by, accepted_at) VALUES (?, ?, ?, ?)')
+          .run(id, dept, requester.id, new Date().toISOString());
+        if (dept !== 'gm') {
+          insertMessage({ from: dept, to: 'gm', type: 'text', body: '✅ ' + (DEPT_NAMES[dept] || dept) + ' accepted: ' + broadcast.text });
+        }
+      }
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/priority-broadcast/') && p.endsWith('/clear')) {
+      const id = decodeURIComponent(p.slice('/api/priority-broadcast/'.length, -'/clear'.length));
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      db.prepare('UPDATE priority_broadcasts SET cleared_at = ? WHERE id = ? AND cleared_at IS NULL').run(new Date().toISOString(), id);
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && p === '/api/typing') {
       const body = await readJsonBody(req);
       const requester = staffFromToken(req);

@@ -2856,6 +2856,54 @@ export default {
         return json({ total, readCount: read.length, read, unread });
       }
 
+      if (method === "POST" && p === "/api/priority-broadcast") {
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        const body = await readJsonBody(request);
+        const text = String(body.text || "").trim();
+        if (!text) return json({ error: "Alert text is required" }, 400);
+        const now = new Date().toISOString();
+        await env.DB.prepare("UPDATE priority_broadcasts SET cleared_at = ? WHERE cleared_at IS NULL").bind(now).run();
+        const id = crypto.randomUUID();
+        await env.DB.prepare("INSERT INTO priority_broadcasts (id, text, created_by, created_at) VALUES (?, ?, ?, ?)").bind(id, text, requester.id, now).run();
+        return json({ broadcast: { id, text, createdAt: now } }, 201);
+      }
+
+      if (method === "GET" && p === "/api/priority-broadcast/active") {
+        const row = await env.DB.prepare("SELECT * FROM priority_broadcasts WHERE cleared_at IS NULL ORDER BY created_at DESC LIMIT 1").first();
+        if (!row) return json({ broadcast: null, acceptedDepts: [] });
+        const acks = await env.DB.prepare("SELECT department_id FROM priority_broadcast_acks WHERE broadcast_id = ?").bind(row.id).all();
+        return json({
+          broadcast: { id: row.id, text: row.text, createdAt: row.created_at },
+          acceptedDepts: acks.results.map((a) => a.department_id),
+        });
+      }
+
+      if (method === "POST" && p.startsWith("/api/priority-broadcast/") && p.endsWith("/accept")) {
+        const id = decodeURIComponent(p.slice("/api/priority-broadcast/".length, -"/accept".length));
+        const requester = request._staff;
+        const broadcast = await env.DB.prepare("SELECT * FROM priority_broadcasts WHERE id = ? AND cleared_at IS NULL").bind(id).first();
+        if (!broadcast) return json({ error: "That alert is no longer active" }, 404);
+        const dept = requester.department_id;
+        const already = await env.DB.prepare("SELECT 1 FROM priority_broadcast_acks WHERE broadcast_id = ? AND department_id = ?").bind(id, dept).first();
+        if (!already) {
+          await env.DB.prepare("INSERT INTO priority_broadcast_acks (broadcast_id, department_id, accepted_by, accepted_at) VALUES (?, ?, ?, ?)")
+            .bind(id, dept, requester.id, new Date().toISOString()).run();
+          if (dept !== "gm") {
+            await insertMessage(env, ctx, { from: dept, to: "gm", type: "text", body: "✅ " + (DEPT_NAMES[dept] || dept) + " accepted: " + broadcast.text });
+          }
+        }
+        return json({ ok: true });
+      }
+
+      if (method === "POST" && p.startsWith("/api/priority-broadcast/") && p.endsWith("/clear")) {
+        const id = decodeURIComponent(p.slice("/api/priority-broadcast/".length, -"/clear".length));
+        const requester = request._staff;
+        if (!requester.is_admin) return json({ error: "Admin access required" }, 403);
+        await env.DB.prepare("UPDATE priority_broadcasts SET cleared_at = ? WHERE id = ? AND cleared_at IS NULL").bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
+      }
+
       if (method === "POST" && p === "/api/typing") {
         const body = await readJsonBody(request);
         const self = request._staff.department_id;

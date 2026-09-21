@@ -362,6 +362,24 @@ CREATE TABLE IF NOT EXISTS help_alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
 
+-- GM priority broadcast: a single alert pinned across every department's
+-- screen (e.g. "Fire Alarm Test at 10:00 AM") until each department
+-- accepts it, or the GM clears it for everyone.
+CREATE TABLE IF NOT EXISTS priority_broadcasts (
+  id TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  cleared_at TEXT
+);
+CREATE TABLE IF NOT EXISTS priority_broadcast_acks (
+  broadcast_id TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  accepted_by TEXT,
+  accepted_at TEXT NOT NULL,
+  PRIMARY KEY (broadcast_id, department_id)
+);
+
 -- Housekeeping room status board. A standalone list of room labels (not
 -- the SOS zone mapper's rooms - a hotel's real room numbers rarely line up
 -- with how its floors are zoned for locating someone in an emergency), each

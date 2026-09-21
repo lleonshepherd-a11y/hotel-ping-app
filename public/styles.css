@@ -1391,6 +1391,28 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .help-banner-locate{flex:none;width:24px;height:24px;border:none;background:none;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .help-banner-locate svg{width:15px;height:15px}
 
+.priority-banner{
+  pointer-events:auto;display:flex;align-items:center;gap:9px;padding:8px 8px 8px 10px;border-radius:999px;
+  background:rgba(24,24,24,.72);backdrop-filter:blur(22px) saturate(1.8);-webkit-backdrop-filter:blur(22px) saturate(1.8);
+  box-shadow:0 10px 26px -8px rgba(0,0,0,.5),0 2px 6px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.18),inset 0 0 0 1px rgba(255,255,255,.1);
+  color:#fff;animation:helpBannerIn .22s cubic-bezier(.3,1.3,.4,1);
+}
+.priority-banner-icon{flex:none;width:26px;height:26px;border-radius:50%;background:linear-gradient(150deg,var(--urgent),var(--urgent-2));display:flex;align-items:center;justify-content:center;color:#fff;animation:priorityIconPulse 1.8s ease-in-out infinite}
+.priority-banner-icon svg{width:13px;height:13px}
+@keyframes priorityIconPulse{0%,100%{box-shadow:0 0 0 0 rgba(193,104,95,.45)}50%{box-shadow:0 0 0 6px rgba(193,104,95,0)}}
+@media(prefers-reduced-motion:reduce){.priority-banner-icon{animation:none}}
+.priority-banner-body{flex:1;min-width:0}
+.priority-banner-eyebrow{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#e2a29b;line-height:1.1;margin-bottom:1px}
+.priority-banner-title{font-size:12.5px;font-weight:700;line-height:1.25;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.priority-banner-accept{flex:none;display:flex;align-items:center;gap:4px;border:none;background:#fff;color:#14140f;font-size:11.5px;font-weight:700;padding:7px 13px;border-radius:999px}
+.priority-banner-accept:disabled{opacity:.6}
+.priority-banner-accept svg{width:12px;height:12px}
+
+.priority-alert-active{background:var(--surface-2);border-radius:14px;padding:11px 13px;margin-bottom:12px}
+.priority-alert-active-label{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
+.priority-alert-active-text{font-size:13.5px;font-weight:700;color:var(--text);margin-top:3px}
+.priority-alert-clear-btn{margin-top:10px;background:var(--surface-3)!important;color:var(--text)!important}
+
 .toast{
   position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(10px);z-index:60;
   background:var(--surface-3);border:1px solid var(--border);color:var(--text);font-size:13px;font-weight:600;padding:10px 18px;border-radius:20px;

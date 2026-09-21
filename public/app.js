@@ -3145,6 +3145,7 @@ function startPolling(){
     refreshMaintenanceBadge();
     pollMissed();
     pollHelpAlerts();
+    pollPriorityBroadcast();
     flushOfflineQueue();
   }, 1500);
   slowPollTimer = setInterval(function(){
@@ -3205,6 +3206,7 @@ var switcherWrap = document.getElementById("switcherWrap");
 var switcherLabel = document.getElementById("switcherLabel");
 var adminBtn = document.getElementById("adminBtn");
 var broadcastBtn = document.getElementById("broadcastBtn");
+var priorityAlertBtn = document.getElementById("priorityAlertBtn");
 var logoutBtn = document.getElementById("logoutBtn");
 
 var TOKEN_KEY = "mdash_token";
@@ -3222,6 +3224,7 @@ function enterApp(staff){
   switcherLabel.textContent = staff.isAdmin ? "Viewing as" : "Message as";
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
+  priorityAlertBtn.hidden = !staff.isAdmin;
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
@@ -3908,6 +3911,112 @@ broadcastForm.addEventListener("submit", function(e){
     }).finally(function(){ broadcastSendBtn.disabled = false; });
   });
 });
+
+/* ---------------- Priority alert (GM pinned banner) ---------------- */
+var priorityAlertOverlay = document.getElementById("priorityAlertOverlay");
+var priorityAlertClose = document.getElementById("priorityAlertClose");
+var priorityAlertForm = document.getElementById("priorityAlertForm");
+var priorityAlertText = document.getElementById("priorityAlertText");
+var priorityAlertSendBtn = document.getElementById("priorityAlertSendBtn");
+var priorityAlertError = document.getElementById("priorityAlertError");
+var priorityAlertActive = document.getElementById("priorityAlertActive");
+var priorityAlertActiveText = document.getElementById("priorityAlertActiveText");
+var priorityAlertClearBtn = document.getElementById("priorityAlertClearBtn");
+
+function refreshPriorityAlertAdminView(){
+  apiGet('/api/priority-broadcast/active').then(function(res){
+    if(res.broadcast){
+      priorityAlertActive.hidden = false;
+      priorityAlertActiveText.textContent = res.broadcast.text;
+      priorityAlertClearBtn.dataset.id = res.broadcast.id;
+    } else {
+      priorityAlertActive.hidden = true;
+    }
+  }).catch(function(){});
+}
+
+priorityAlertBtn.addEventListener("click", function(){
+  priorityAlertText.value = "";
+  priorityAlertError.textContent = "";
+  priorityAlertOverlay.hidden = false;
+  refreshPriorityAlertAdminView();
+  setTimeout(function(){ priorityAlertText.focus(); }, 30);
+});
+priorityAlertClose.addEventListener("click", function(){ priorityAlertOverlay.hidden = true; });
+priorityAlertOverlay.addEventListener("click", function(e){ if(e.target === priorityAlertOverlay) priorityAlertOverlay.hidden = true; });
+
+priorityAlertForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var text = priorityAlertText.value.trim();
+  if(!text) return;
+  if(containsProfanity(text)){ priorityAlertError.textContent = "Let's keep it professional. That message can't be sent."; return; }
+  showConfirm({
+    title: "Pin this across every department's screen?",
+    confirmLabel: "Pin alert",
+    neutral: true,
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"/></svg>'
+  }).then(function(ok){
+    if(!ok) return;
+    priorityAlertSendBtn.disabled = true;
+    priorityAlertError.textContent = "";
+    apiSend('/api/priority-broadcast', 'POST', { text: text }).then(function(){
+      priorityAlertOverlay.hidden = true;
+      pollPriorityBroadcast();
+    }).catch(function(err){
+      priorityAlertError.textContent = err.message || "Couldn't pin that alert.";
+    }).finally(function(){ priorityAlertSendBtn.disabled = false; });
+  });
+});
+
+priorityAlertClearBtn.addEventListener("click", function(){
+  var id = priorityAlertClearBtn.dataset.id;
+  if(!id) return;
+  priorityAlertClearBtn.disabled = true;
+  apiSend('/api/priority-broadcast/' + encodeURIComponent(id) + '/clear', 'POST', {}).then(function(){
+    priorityAlertActive.hidden = true;
+    pollPriorityBroadcast();
+  }).catch(function(){}).finally(function(){ priorityAlertClearBtn.disabled = false; });
+});
+
+function renderPriorityBanner(broadcast, acceptedDepts){
+  var existing = document.getElementById("priorityBanner");
+  if(!broadcast || STATE.self === "gm" || acceptedDepts.indexOf(STATE.self) !== -1){
+    if(existing) existing.remove();
+    return;
+  }
+  if(existing && existing.dataset.id === broadcast.id) return;
+  if(existing) existing.remove();
+  var banner = document.createElement("div");
+  banner.className = "priority-banner";
+  banner.id = "priorityBanner";
+  banner.dataset.id = broadcast.id;
+  banner.innerHTML =
+    '<span class="priority-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"/></svg></span>' +
+    '<div class="priority-banner-body">' +
+      '<div class="priority-banner-eyebrow">GM Priority</div>' +
+      '<div class="priority-banner-title">' + esc(broadcast.text) + '</div>' +
+    '</div>' +
+    '<button type="button" class="priority-banner-accept"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Accept</button>';
+  banner.querySelector(".priority-banner-accept").addEventListener("click", function(){
+    var btn = banner.querySelector(".priority-banner-accept");
+    btn.disabled = true;
+    apiSend('/api/priority-broadcast/' + encodeURIComponent(broadcast.id) + '/accept', 'POST', {}).then(function(){
+      banner.remove();
+      showToast("Accepted");
+    }).catch(function(){
+      showToast("Couldn't accept that");
+      btn.disabled = false;
+    });
+  });
+  helpBannerStack.insertBefore(banner, helpBannerStack.firstChild);
+}
+
+function pollPriorityBroadcast(){
+  if(!AUTH.staff) return;
+  apiGet('/api/priority-broadcast/active').then(function(res){
+    renderPriorityBanner(res.broadcast, res.acceptedDepts || []);
+  }).catch(function(){});
+}
 
 var handoverBtn = document.getElementById("handoverBtn");
 var handoverOverlay = document.getElementById("handoverOverlay");

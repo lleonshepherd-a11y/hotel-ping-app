@@ -394,6 +394,21 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_help_alerts_created ON help_alerts(created_at);
 
+  CREATE TABLE IF NOT EXISTS priority_broadcasts (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    cleared_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS priority_broadcast_acks (
+    broadcast_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    accepted_by TEXT,
+    accepted_at TEXT NOT NULL,
+    PRIMARY KEY (broadcast_id, department_id)
+  );
+
   CREATE TABLE IF NOT EXISTS rooms (
     id TEXT PRIMARY KEY,
     label TEXT NOT NULL,
