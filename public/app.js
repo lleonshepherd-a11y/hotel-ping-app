@@ -2244,7 +2244,7 @@ var urgentActive = false;
 var affectsGuestActive = false;
 var taskActive = false;
 
-for(var i=0;i<22;i++){
+for(var i=0;i<16;i++){
   var s = document.createElement("span");
   s.style.animationDelay = (i*0.045)+"s";
   recBars.appendChild(s);
