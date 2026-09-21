@@ -406,9 +406,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .bubble.audio-bubble{display:flex;flex-direction:column;gap:9px;padding:14px 16px;min-width:236px;border-radius:20px;background:linear-gradient(135deg,#3b5bfd,#1e2f8c) !important;color:#fff !important}
 .audio-row{display:flex;align-items:center;gap:14px}
-.audio-meta-row{display:flex;align-items:center;justify-content:space-between;padding-left:66px}
-.play-btn{width:52px;height:52px;border-radius:50%;border:none;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;color:#3b5bfd;box-shadow:0 2px 8px rgba(10,15,40,.3)}
-.play-btn svg{width:20px;height:20px}
+.audio-meta-row{display:flex;align-items:center;justify-content:space-between;padding-left:56px}
+.play-btn{width:42px;height:42px;border-radius:50%;border:none;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;color:#3b5bfd;box-shadow:0 2px 8px rgba(10,15,40,.3)}
+.play-btn svg{width:16px;height:16px}
 .wave{flex:1;display:flex;align-items:center;gap:3px;height:26px;position:relative;overflow:visible;cursor:pointer;touch-action:none}
 .wave-bar{width:3px;border-radius:2px;background:currentColor;opacity:.45;flex:none;transition:height .2s ease}
 .wave-progress{position:absolute;inset:0;overflow:hidden;width:0%;display:flex;align-items:center;gap:3px;pointer-events:none}
