@@ -2244,7 +2244,7 @@ var urgentActive = false;
 var affectsGuestActive = false;
 var taskActive = false;
 
-for(var i=0;i<16;i++){
+for(var i=0;i<22;i++){
   var s = document.createElement("span");
   s.style.animationDelay = (i*0.045)+"s";
   recBars.appendChild(s);
@@ -3056,6 +3056,153 @@ vpSend.addEventListener("click", function(){
   });
 });
 
+/* ---- quick voice note (profile page mic -> straight to GM) ---- */
+var quickVoiceBtn = document.getElementById("quickVoiceBtn");
+var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
+var qvClose = document.getElementById("qvClose");
+var qvHint = document.getElementById("qvHint");
+var qvRecRow = document.getElementById("qvRecRow");
+var qvBars = document.getElementById("qvBars");
+var qvCancelBtn = document.getElementById("qvCancelBtn");
+var qvStopBtn = document.getElementById("qvStopBtn");
+var qvPreviewRow = document.getElementById("qvPreviewRow");
+var qvDiscardBtn = document.getElementById("qvDiscardBtn");
+var qvPlayBtn = document.getElementById("qvPlayBtn");
+var qvSendBtn = document.getElementById("qvSendBtn");
+var qvState = { mediaRecorder: null, stream: null, chunks: [], startedAt: 0, voice: null, audioEl: null };
+
+for(var qi=0; qi<22; qi++){
+  var qs = document.createElement("span");
+  qs.style.animationDelay = (qi*0.045)+"s";
+  qvBars.appendChild(qs);
+}
+
+function qvReset(){
+  qvRecRow.hidden = true;
+  qvPreviewRow.hidden = true;
+  qvHint.hidden = false;
+  qvHint.textContent = "Record a quick voice note and send it straight to the General Manager.";
+  qvState.voice = null;
+  if(qvState.audioEl){ try{ qvState.audioEl.pause(); }catch(e){} qvState.audioEl = null; }
+}
+
+function qvCleanupStream(){
+  if(qvState.mediaRecorder && qvState.mediaRecorder.state !== "inactive"){
+    try{ qvState.mediaRecorder.stop(); }catch(e){}
+  }
+  qvState.mediaRecorder = null;
+  if(qvState.stream){ qvState.stream.getTracks().forEach(function(t){ t.stop(); }); qvState.stream = null; }
+}
+
+function qvCloseOverlay(){
+  qvCleanupStream();
+  quickVoiceOverlay.hidden = true;
+  qvReset();
+}
+
+quickVoiceBtn.addEventListener("click", function(){
+  quickVoiceOverlay.hidden = false;
+  qvReset();
+  qvStartRecording();
+});
+qvClose.addEventListener("click", qvCloseOverlay);
+quickVoiceOverlay.addEventListener("click", function(e){ if(e.target === quickVoiceOverlay) qvCloseOverlay(); });
+
+function qvStartRecording(){
+  qvHint.hidden = true;
+  qvRecRow.hidden = false;
+  qvPreviewRow.hidden = true;
+  qvState.chunks = [];
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    qvHint.hidden = false; qvHint.textContent = "Microphone not available on this device.";
+    qvRecRow.hidden = true;
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    qvState.stream = stream;
+    var rec;
+    try{ rec = new MediaRecorder(stream); }catch(e){
+      qvHint.hidden = false; qvHint.textContent = "Couldn't start recording.";
+      qvRecRow.hidden = true;
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      return;
+    }
+    qvState.mediaRecorder = rec;
+    qvState.startedAt = Date.now();
+    rec.ondataavailable = function(e){ if(e.data.size>0) qvState.chunks.push(e.data); };
+    rec.start();
+  }).catch(function(){
+    qvHint.hidden = false; qvHint.textContent = "Microphone permission was blocked.";
+    qvRecRow.hidden = true;
+  });
+}
+
+qvCancelBtn.addEventListener("click", qvCloseOverlay);
+
+qvStopBtn.addEventListener("click", function(){
+  if(!qvState.mediaRecorder){ qvCloseOverlay(); return; }
+  var rec = qvState.mediaRecorder;
+  var duration = Math.max(1, Math.round((Date.now() - qvState.startedAt)/1000));
+  var settled = false;
+  var safetyTimer = setTimeout(function(){ if(!settled){ settled = true; qvCloseOverlay(); } }, 4000);
+  rec.onstop = function(){
+    if(settled) return;
+    settled = true;
+    clearTimeout(safetyTimer);
+    if(qvState.stream){ qvState.stream.getTracks().forEach(function(t){ t.stop(); }); qvState.stream = null; }
+    var blob = new Blob(qvState.chunks, {type: qvState.chunks[0] ? qvState.chunks[0].type : "audio/webm"});
+    var url = URL.createObjectURL(blob);
+    qvState.voice = { url: url, blob: blob, duration: duration };
+    qvRecRow.hidden = true;
+    qvPreviewRow.hidden = false;
+  };
+  rec.onerror = function(){ if(!settled){ settled = true; clearTimeout(safetyTimer); qvCloseOverlay(); } };
+  try{
+    if(rec.state === "inactive"){ clearTimeout(safetyTimer); qvCloseOverlay(); return; }
+    rec.stop();
+  }catch(e){ clearTimeout(safetyTimer); qvCloseOverlay(); }
+});
+
+qvDiscardBtn.addEventListener("click", qvCloseOverlay);
+
+qvPlayBtn.addEventListener("click", function(){
+  if(!qvState.voice) return;
+  if(!qvState.audioEl){ qvState.audioEl = new Audio(qvState.voice.url); }
+  var icPlay = qvPlayBtn.querySelector(".qv-ic-play");
+  var icPause = qvPlayBtn.querySelector(".qv-ic-pause");
+  if(qvState.audioEl.paused){
+    qvState.audioEl.play().catch(function(){});
+    icPlay.style.display = "none"; icPause.style.display = "";
+  } else {
+    qvState.audioEl.pause();
+    icPlay.style.display = ""; icPause.style.display = "none";
+  }
+  qvState.audioEl.onended = function(){ icPlay.style.display = ""; icPause.style.display = "none"; };
+});
+
+qvSendBtn.addEventListener("click", function(){
+  if(!qvState.voice) return;
+  var voice = qvState.voice;
+  qvSendBtn.disabled = true;
+  blobToBase64(voice.blob).then(function(b64){
+    var payload = {
+      from: STATE.self, to: "gm", type: "audio",
+      fileBase64: b64, fileMime: voice.blob.type || "audio/webm",
+      duration: voice.duration
+    };
+    return apiSend('/api/messages', 'POST', payload);
+  }).then(function(res){
+    STATE.data["gm"] = STATE.data["gm"] || [];
+    STATE.data["gm"].push(mapServerMessage(res.message, STATE.self));
+    renderList();
+    if(STATE.active === "gm") renderThread();
+    qvCloseOverlay();
+    showToast("Voice note sent to the GM");
+  }).catch(function(){
+    showToast("Couldn't send that voice note");
+  }).finally(function(){ qvSendBtn.disabled = false; });
+});
+
 /* ---- mobile back ---- */
 document.getElementById("backBtn").addEventListener("click", function(){
   if(history.state && history.state.dashThread){
@@ -3273,6 +3420,7 @@ function enterApp(staff){
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
   priorityAlertBtn.hidden = !staff.isAdmin;
+  quickVoiceBtn.hidden = staff.departmentId === "gm";
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
