@@ -1035,7 +1035,14 @@ export default {
         // Keyed by the hotel prefix baked into the R2 key itself (see
         // hotelKeyPrefix above), not by X-Hotel-Slug - a plain <img>/<audio>
         // src can't carry a custom header, so the key has to be self-describing.
-        const bucket = key.startsWith("hotelb/") ? rawEnv.UPLOADS_HOTELB : rawEnv.UPLOADS;
+        // Resolved against the full hotel registry (not a single hardcoded
+        // prefix) so every synthetic/real hotel's bucket routes correctly.
+        const slashIdx = key.indexOf("/");
+        const keyPrefixSlug = slashIdx === -1 ? "" : key.slice(0, slashIdx);
+        const uploadsRegistry = hotelRegistry(rawEnv);
+        const bucket = (keyPrefixSlug && uploadsRegistry[keyPrefixSlug])
+          ? uploadsRegistry[keyPrefixSlug].uploads
+          : rawEnv.UPLOADS;
         if (!bucket) return json({ error: "Not found" }, 404);
         const obj = await bucket.get(key);
         if (!obj) return json({ error: "Not found" }, 404);

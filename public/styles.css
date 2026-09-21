@@ -723,11 +723,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .rec-cancel{color:var(--text-dim)}
 .rec-stop{color:#fff;background:var(--urgent)}
 
-.sb-quick-voice-btn{flex:none;width:34px;height:34px;border-radius:50%;background:#14140f;color:#fff;border:none;display:flex;align-items:center;justify-content:center;margin-left:2px}
-.sb-quick-voice-btn svg{width:15px;height:15px}
-.sb-quick-voice-btn:active{transform:scale(.94)}
-.qv-modal{max-width:340px;text-align:center}
-.qv-row{background:#14140f;border-radius:999px;padding:6px;gap:8px;width:fit-content;max-width:100%;margin:14px auto 4px;display:flex;align-items:center}
+.qv-thread-btn{background:#14140f;color:#fff;margin-left:4px}
+.qv-thread-btn:hover{background:#14140f;opacity:.88}
+.qv-thread-btn:active{transform:scale(.94)}
+.qv-overlay{padding:20px}
+.qv-stage{display:flex;flex-direction:column;align-items:center;max-width:calc(100vw - 40px)}
+.qv-row{background:#14140f;border-radius:999px;padding:6px;gap:8px;width:fit-content;max-width:100%;display:flex;align-items:center;box-shadow:0 12px 32px rgba(0,0,0,.28)}
+.qv-hint{font-size:12.5px;color:#fff;text-align:center;line-height:1.5;margin:16px 0 0;max-width:260px;text-shadow:0 1px 4px rgba(0,0,0,.3)}
 .qv-bars{width:120px;flex:none;display:flex;align-items:center;justify-content:center;gap:3px;height:22px;overflow:hidden;padding:0 10px}
 .qv-bars span{width:3px;border-radius:2px;background:#f4f1e8;flex:none;animation:recBar .7s ease-in-out infinite}
 .qv-cancel,.qv-stop,.qv-play{flex:none;width:40px;height:40px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;padding:0}
@@ -795,7 +797,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .logout-btn{flex:none;width:32px;height:32px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;margin-left:auto}
 .logout-btn:hover{color:var(--urgent);background:var(--urgent-tint)}
 .duty-row-header{margin-left:auto;flex:none}
-.duty-row-header .duty-caption-label{display:none}
 .duty-caption-label{font-size:11px;font-weight:700;color:var(--text-faint);white-space:nowrap}
 .sb-menu-row-sub{padding-left:20px;background:var(--active-tint)}
 .sb-menu-row-sub .sb-menu-icon{width:22px;height:22px}

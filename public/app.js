@@ -3059,7 +3059,6 @@ vpSend.addEventListener("click", function(){
 /* ---- quick voice note (profile page mic -> straight to GM) ---- */
 var quickVoiceBtn = document.getElementById("quickVoiceBtn");
 var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
-var qvClose = document.getElementById("qvClose");
 var qvHint = document.getElementById("qvHint");
 var qvRecRow = document.getElementById("qvRecRow");
 var qvBars = document.getElementById("qvBars");
@@ -3105,7 +3104,6 @@ quickVoiceBtn.addEventListener("click", function(){
   qvReset();
   qvStartRecording();
 });
-qvClose.addEventListener("click", qvCloseOverlay);
 quickVoiceOverlay.addEventListener("click", function(e){ if(e.target === quickVoiceOverlay) qvCloseOverlay(); });
 
 function qvStartRecording(){
