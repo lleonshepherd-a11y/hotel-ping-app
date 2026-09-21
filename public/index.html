@@ -725,11 +725,14 @@
         </div>
 
         <div id="composerRecording" class="rec-row" hidden>
-          <span class="rec-dot"></span>
-          <span class="rec-timer" id="recTimer">0:00</span>
+          <button class="rec-cancel" id="recCancel" aria-label="Cancel recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
           <div class="rec-bars" id="recBars"></div>
-          <button class="rec-cancel" id="recCancel">Cancel</button>
-          <button class="rec-stop" id="recStop">Stop</button>
+          <span class="rec-timer" id="recTimer">0:00</span>
+          <button class="rec-stop" id="recStop" aria-label="Stop and send recording">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </button>
         </div>
 
         <div id="composerVoicePreview" class="vp-row" hidden>
