@@ -2662,30 +2662,48 @@ function offlineQueueKey(){ return "hp_offline_queue_" + (AUTH.staff ? AUTH.staf
 function loadOfflineQueue(){
   try{ return JSON.parse(localStorage.getItem(offlineQueueKey()) || "[]"); }catch(e){ return []; }
 }
+// Returns true if the queue actually persisted. A large voice note or photo
+// can exceed localStorage's quota - when that happens we must NOT tell the
+// user it'll send automatically, since it won't survive a closed tab.
 function saveOfflineQueue(q){
-  try{ localStorage.setItem(offlineQueueKey(), JSON.stringify(q)); }catch(e){}
+  try{ localStorage.setItem(offlineQueueKey(), JSON.stringify(q)); return true; }catch(e){ return false; }
 }
 function pendingMessageFromQueueItem(item){
+  var p = item.payload;
+  var dataUrl = (p.fileBase64 && p.type === "image") ? "data:" + (p.fileMime || "image/jpeg") + ";base64," + p.fileBase64 : undefined;
   return {
-    id: item.localId, from: "self", to: item.deptId, type: "text",
-    urgent: !!item.payload.urgent, t: item.queuedAt, read: false, status: "pending",
-    replyTo: item.payload.replyToId || undefined, pinned: false, completed: false,
-    deleted: false, pending: true, roomNumber: item.payload.roomNumber || undefined,
-    taskStatus: item.payload.taskStatus || undefined,
-    signoff: item.payload.signoff ? Object.assign({ status: "pending" }, item.payload.signoff) : undefined
+    id: item.localId, from: "self", to: item.deptId, type: p.type || "text",
+    text: p.text || "", fileName: p.fileName || undefined, dataUrl: dataUrl,
+    duration: p.duration || undefined, transcript: p.transcript || undefined,
+    urgent: !!p.urgent, t: item.queuedAt, read: false, status: "pending",
+    replyTo: p.replyToId || undefined, pinned: false, completed: false,
+    deleted: false, pending: true, roomNumber: p.roomNumber || undefined,
+    taskStatus: p.taskStatus || undefined,
+    signoff: p.signoff ? Object.assign({ status: "pending" }, p.signoff) : undefined
   };
 }
+// Queues ANY message type (text, image, file, or audio - fileBase64 is
+// already a plain string by the time this is called, so it's just as
+// localStorage-safe as text) for automatic resend once back online. Only
+// 1:1 department messages are covered - group-chat sends still require a
+// live connection, since their pending-message rendering is a separate
+// path this doesn't touch.
 function queueOfflineMessage(deptId, payload){
   var q = loadOfflineQueue();
   var localId = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   var item = { localId: localId, deptId: deptId, payload: payload, queuedAt: Date.now() };
   q.push(item);
-  saveOfflineQueue(q);
+  var saved = saveOfflineQueue(q);
+  if(!saved){
+    showToast("Couldn't save that for later - it's too large to hold offline. Try again once you're back online.");
+    return false;
+  }
   STATE.data[deptId] = STATE.data[deptId] || [];
   STATE.data[deptId].push(pendingMessageFromQueueItem(item));
   renderList();
   if(STATE.active === deptId) renderThread();
   showToast("No connection. That'll send automatically once you're back online.");
+  return true;
 }
 function mergePendingIntoData(data){
   loadOfflineQueue().forEach(function(item){
@@ -2806,9 +2824,8 @@ function doSend(){
       if(STATE.active === deptId) renderThread();
     }
   }).catch(function(err){
-    if(!attachment && !groupId && (err instanceof TypeError || !navigator.onLine)){
-      queueOfflineMessage(deptId, payload);
-      return;
+    if(!groupId && (err instanceof TypeError || !navigator.onLine)){
+      if(queueOfflineMessage(deptId, payload)) return;
     }
     blockForLanguage();
     composerHint.textContent = "That message didn't send. Check your connection and try again.";
@@ -2981,6 +2998,7 @@ vpSend.addEventListener("click", function(){
   STATE.voice = null;
   setComposerState("idle");
 
+  var voicePayload = null;
   fetch(voice.url).then(function(r){ return r.blob(); }).then(function(blob){
     return blobToBase64(blob).then(function(b64){
       var payload = {
@@ -2990,6 +3008,7 @@ vpSend.addEventListener("click", function(){
       };
       if(groupId) payload.groupId = groupId; else payload.to = deptId;
       if(replyToId) payload.replyToId = replyToId;
+      voicePayload = payload;
       return apiSend('/api/messages', 'POST', payload);
     });
   }).then(function(res){
@@ -3003,7 +3022,10 @@ vpSend.addEventListener("click", function(){
       renderList();
       if(STATE.active === deptId) renderThread();
     }
-  }).catch(function(){
+  }).catch(function(err){
+    if(!groupId && voicePayload && (err instanceof TypeError || !navigator.onLine)){
+      if(queueOfflineMessage(deptId, voicePayload)) return;
+    }
     composerHint.textContent = "That voice note didn't send. Check your connection and try again.";
   });
 });
