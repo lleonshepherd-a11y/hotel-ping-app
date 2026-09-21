@@ -966,6 +966,33 @@ function canViewAsSelf(requester, self) {
   return !!(requester.head_depts && requester.head_depts.includes(self));
 }
 
+// ---- Hotel isolation ----
+// Every hotel gets its own physically separate D1 database (and its own
+// R2 bucket for attachments/voice notes) - not a hotel_id column shared
+// inside one database. A missing WHERE clause in any of the ~300 queries
+// below literally cannot leak another hotel's row, because that row does
+// not exist in the connection this request resolves to. The production
+// hotel (no X-Hotel-Slug header, or "main") is bound to exactly the same
+// env.DB / env.NOIR_DB / env.UPLOADS / NOIR_HOTEL_ID as before this change
+// - zero behavior change for the live hotel. A new hotel is added here by
+// provisioning its own D1 database + R2 bucket and adding one line.
+function resolveHotel(request, env, url) {
+  const slug = (request.headers.get("x-hotel-slug") || url.searchParams.get("hotel") || "main").trim().toLowerCase();
+  const registry = {
+    main: { db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID },
+  };
+  if (env.DB_HOTELB) {
+    registry.hotelb = { db: env.DB_HOTELB, noirDb: env.DB_HOTELB, uploads: env.UPLOADS_HOTELB || env.UPLOADS, hotelId: "hotelb-test-tenant" };
+  }
+  const hotel = registry[slug];
+  if (!hotel) return null;
+  return {
+    slug,
+    hotelId: hotel.hotelId,
+    env: Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads }),
+  };
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -974,11 +1001,26 @@ export default {
 
     if (method === "OPTIONS") return json({}, 204);
 
+    const resolvedHotel = resolveHotel(request, env, url);
+    if (!resolvedHotel) return json({ error: "Unknown hotel" }, 400);
+    const rawEnv = env;
+    env = resolvedHotel.env;
+    const resolvedNoirHotelId = resolvedHotel.hotelId;
+    // R2 keys for a non-main hotel are prefixed so a plain <img>/<audio> src
+    // (which can't carry the X-Hotel-Slug header) still resolves to the
+    // right bucket via the /uploads/:key GET handler below.
+    const hotelKeyPrefix = resolvedHotel.slug === "main" ? "" : resolvedHotel.slug + "/";
+
     try {
       // ---- Uploaded files (R2) ----
       if (method === "GET" && p.startsWith("/uploads/")) {
         const key = decodeURIComponent(p.slice("/uploads/".length));
-        const obj = await env.UPLOADS.get(key);
+        // Keyed by the hotel prefix baked into the R2 key itself (see
+        // hotelKeyPrefix above), not by X-Hotel-Slug - a plain <img>/<audio>
+        // src can't carry a custom header, so the key has to be self-describing.
+        const bucket = key.startsWith("hotelb/") ? rawEnv.UPLOADS_HOTELB : rawEnv.UPLOADS;
+        if (!bucket) return json({ error: "Not found" }, 404);
+        const obj = await bucket.get(key);
         if (!obj) return json({ error: "Not found" }, 404);
         const headers = new Headers();
         obj.writeHttpMetadata(headers);
@@ -1156,7 +1198,7 @@ export default {
 
         const candidates = await env.NOIR_DB.prepare(
           "SELECT id, display_name, role, department_id, pin_hash, pin_salt FROM staff WHERE hotel_id = ? AND active = 1"
-        ).bind(NOIR_HOTEL_ID).all();
+        ).bind(resolvedNoirHotelId).all();
 
         let matched = null;
         if (LOGIN_REQUIRE_PIN) {
@@ -1229,7 +1271,7 @@ export default {
         await env.NOIR_DB.prepare(
           `INSERT INTO staff (id, hotel_id, department_id, display_name, role, pin_hash, pin_salt, active, created_at, updated_at)
            VALUES (?, ?, ?, ?, 'staff', ?, ?, 1, ?, ?)`
-        ).bind(staffId, NOIR_HOTEL_ID, toNoirDept(reqRow.department_id), reqRow.name, await hashPin(throwawayPin, salt), salt, now, now).run();
+        ).bind(staffId, resolvedNoirHotelId, toNoirDept(reqRow.department_id), reqRow.name, await hashPin(throwawayPin, salt), salt, now, now).run();
         await env.DB.prepare("UPDATE signup_requests SET status = 'approved', decided_at = ? WHERE id = ?").bind(now, id).run();
         return json({ ok: true });
       }
@@ -1316,7 +1358,7 @@ export default {
       if (method === "GET" && p === "/api/staff") {
         const rows = await env.NOIR_DB.prepare(
           "SELECT id, display_name, role, department_id FROM staff WHERE hotel_id = ? AND active = 1 ORDER BY display_name"
-        ).bind(NOIR_HOTEL_ID).all();
+        ).bind(resolvedNoirHotelId).all();
         const photoRows = await env.DB.prepare("SELECT staff_id, photo_path FROM staff_photos").all();
         const photoByStaffId = Object.fromEntries(photoRows.results.map((r) => [r.staff_id, "/uploads/" + r.photo_path]));
         return json({ staff: rows.results.map((r) => rowToStaff({ ...noirIdentity(r), photo_url: photoByStaffId[r.id] })) });
@@ -1389,7 +1431,7 @@ export default {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         if (bytes.length > 8 * 1024 * 1024) return json({ error: "Photo is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = "dept-" + id + "-" + crypto.randomUUID() + ext;
+        const safeName = hotelKeyPrefix + "dept-" + id + "-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
         await env.DB.prepare("UPDATE departments SET photo_path = ? WHERE id = ?").bind(safeName, id).run();
         const row = await env.DB.prepare("SELECT * FROM departments WHERE id = ?").bind(id).first();
@@ -1420,7 +1462,7 @@ export default {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         if (bytes.length > 8 * 1024 * 1024) return json({ error: "Photo is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = "staff-" + id + "-" + crypto.randomUUID() + ext;
+        const safeName = hotelKeyPrefix + "staff-" + id + "-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
         await env.DB.prepare(
           "INSERT INTO staff_photos (staff_id, photo_path, updated_at) VALUES (?, ?, ?) ON CONFLICT(staff_id) DO UPDATE SET photo_path = excluded.photo_path, updated_at = excluded.updated_at"
@@ -1463,7 +1505,7 @@ export default {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         if (bytes.length > 8 * 1024 * 1024) return json({ error: "Logo is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = "hotel-logo-" + crypto.randomUUID() + ext;
+        const safeName = hotelKeyPrefix + "hotel-logo-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
         await env.DB.prepare(
           "INSERT INTO hotel_profile (id, logo_path, updated_at) VALUES ('default', ?, ?) ON CONFLICT(id) DO UPDATE SET logo_path = excluded.logo_path, updated_at = excluded.updated_at"
@@ -1611,7 +1653,7 @@ export default {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         if (bytes.length > 8 * 1024 * 1024) return json({ error: "Plan image is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = "floor-" + id + "-" + crypto.randomUUID() + ext;
+        const safeName = hotelKeyPrefix + "floor-" + id + "-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
         await env.DB.prepare("UPDATE floors SET plan_image_path = ? WHERE id = ?").bind(safeName, id).run();
         return json({ planImageUrl: "/uploads/" + safeName });
@@ -1881,7 +1923,7 @@ export default {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare("INSERT INTO groups (id, hotel_id, name, created_by_staff_id, created_at) VALUES (?, ?, ?, ?, ?)")
-          .bind(id, NOIR_HOTEL_ID, name, request._staff.id, now).run();
+          .bind(id, resolvedNoirHotelId, name, request._staff.id, now).run();
         for (const deptId of allMembers) {
           await env.NOIR_DB.prepare("INSERT OR IGNORE INTO group_members (group_id, department_id, joined_at) VALUES (?, ?, ?)").bind(id, toNoirDept(deptId), now).run();
         }
@@ -2605,7 +2647,7 @@ export default {
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
           if (bytes.length > 25 * 1024 * 1024) return json({ error: "File is too large (25MB max)" }, 400);
           const ext = fileMime && fileMime.split("/")[1] ? "." + fileMime.split("/")[1].split(";")[0] : "";
-          const safeName = crypto.randomUUID() + ext;
+          const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: fileMime || "application/octet-stream" } });
           filePathOnDisk = safeName;
           fileSize = bytes.length;
@@ -3017,7 +3059,7 @@ export default {
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         if (bytes.length > 10 * 1024 * 1024) return json({ error: "Photo is too large (10MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = "story-" + crypto.randomUUID() + ext;
+        const safeName = hotelKeyPrefix + "story-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
         const id = crypto.randomUUID();
         const now = new Date();
@@ -3025,7 +3067,7 @@ export default {
         const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
         await env.NOIR_DB.prepare(
           "INSERT INTO stories (id, hotel_id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, NOIR_HOTEL_ID, toNoirDept(requester.department_id), requester.name, safeName, caption, now.toISOString(), expiresAt).run();
+        ).bind(id, resolvedNoirHotelId, toNoirDept(requester.department_id), requester.name, safeName, caption, now.toISOString(), expiresAt).run();
         const row = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
         return json({ story: rowToStory(noirDeptRow(row), true) }, 201);
       }
@@ -3164,7 +3206,7 @@ export default {
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
           if (bytes.length > 60 * 1024 * 1024) return json({ error: "File is too large (60MB max)" }, 400);
           const ext = body.photoMime && body.photoMime.split("/")[1] ? "." + body.photoMime.split("/")[1].split(";")[0] : "";
-          const safeName = crypto.randomUUID() + ext;
+          const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.photoMime || "application/octet-stream" } });
           photoPath = safeName;
         }
@@ -3173,7 +3215,7 @@ export default {
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare(
           "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
-        ).bind(id, NOIR_HOTEL_ID, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
+        ).bind(id, resolvedNoirHotelId, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
         await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(id).run();
         const coreRow = {
           id, room_number: roomNumber, description, photo_path: photoPath, status: "reported", priority,
@@ -3416,7 +3458,7 @@ export default {
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare(
           "INSERT INTO asset_requests (id, hotel_id, item_name, notes, status, requested_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)"
-        ).bind(id, NOIR_HOTEL_ID, itemName, notes, requester.id, now, now).run();
+        ).bind(id, resolvedNoirHotelId, itemName, notes, requester.id, now, now).run();
         const row = { id, item_name: itemName, notes, status: "requested", requester_dept: toNoirDept(requester.department_id), created_at: now, updated_at: now, returned_at: null };
 
         const notifyPromise = Promise.all([...DEPT_IDS].filter((d) => d !== requester.department_id).map((deptId) =>

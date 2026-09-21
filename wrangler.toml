@@ -17,9 +17,21 @@ binding = "NOIR_DB"
 database_name = "noir-house-db"
 database_id = "e20a018c-4228-4343-856f-9c80bf3cc8dd"
 
+# Test hotel used to prove multi-hotel isolation (see resolveHotel() in
+# worker.js). A physically separate database from DB/NOIR_DB above - not a
+# hotel_id column inside them.
+[[d1_databases]]
+binding = "DB_HOTELB"
+database_name = "hotel-ping-db-hotelb"
+database_id = "01aa36df-4555-439e-b0f3-5dfdd97a6625"
+
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "hotel-ping-uploads"
+
+[[r2_buckets]]
+binding = "UPLOADS_HOTELB"
+bucket_name = "hotel-ping-uploads-hotelb"
 
 [vars]
 VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19ZghGh4evavlwqbAzP-CsuJ-xLBkU"
