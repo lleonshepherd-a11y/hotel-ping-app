@@ -3082,6 +3082,8 @@ function qvReset(){
   qvHint.hidden = false;
   qvHint.textContent = "Record a quick voice note and send it straight to this conversation.";
   qvState.voice = null;
+  qvStopBtn.disabled = false;
+  qvSendBtn.disabled = false;
   if(qvState.audioEl){ try{ qvState.audioEl.pause(); }catch(e){} qvState.audioEl = null; }
 }
 
@@ -3111,6 +3113,11 @@ function qvStartRecording(){
   qvRecRow.hidden = false;
   qvPreviewRow.hidden = true;
   qvState.chunks = [];
+  // Stop is disabled until the recorder is actually ready - getUserMedia can
+  // take a moment (permission prompt, hardware init), and a tap on Stop
+  // before qvState.mediaRecorder exists used to fall into the "not
+  // recording" guard below and silently close the whole overlay.
+  qvStopBtn.disabled = true;
   if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
     qvHint.hidden = false; qvHint.textContent = "Microphone not available on this device.";
     qvRecRow.hidden = true;
@@ -3129,6 +3136,7 @@ function qvStartRecording(){
     qvState.startedAt = Date.now();
     rec.ondataavailable = function(e){ if(e.data.size>0) qvState.chunks.push(e.data); };
     rec.start();
+    qvStopBtn.disabled = false;
   }).catch(function(){
     qvHint.hidden = false; qvHint.textContent = "Microphone permission was blocked.";
     qvRecRow.hidden = true;
@@ -3138,7 +3146,9 @@ function qvStartRecording(){
 qvCancelBtn.addEventListener("click", qvCloseOverlay);
 
 qvStopBtn.addEventListener("click", function(){
+  if(qvStopBtn.disabled) return;
   if(!qvState.mediaRecorder){ qvCloseOverlay(); return; }
+  qvStopBtn.disabled = true;
   var rec = qvState.mediaRecorder;
   var duration = Math.max(1, Math.round((Date.now() - qvState.startedAt)/1000));
   var settled = false;
@@ -3179,6 +3189,7 @@ qvPlayBtn.addEventListener("click", function(){
 });
 
 qvSendBtn.addEventListener("click", function(){
+  if(qvSendBtn.disabled) return;
   if(!qvState.voice) return;
   var voice = qvState.voice;
   var deptId = STATE.active;
