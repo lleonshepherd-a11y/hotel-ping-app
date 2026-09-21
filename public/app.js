@@ -3080,7 +3080,7 @@ function qvReset(){
   qvRecRow.hidden = true;
   qvPreviewRow.hidden = true;
   qvHint.hidden = false;
-  qvHint.textContent = "Record a quick voice note and send it straight to the General Manager.";
+  qvHint.textContent = "Record a quick voice note and send it straight to this conversation.";
   qvState.voice = null;
   if(qvState.audioEl){ try{ qvState.audioEl.pause(); }catch(e){} qvState.audioEl = null; }
 }
@@ -3181,21 +3181,33 @@ qvPlayBtn.addEventListener("click", function(){
 qvSendBtn.addEventListener("click", function(){
   if(!qvState.voice) return;
   var voice = qvState.voice;
+  var deptId = STATE.active;
+  var groupId = STATE.activeGroupId;
+  var recipientName = groupId
+    ? (STATE.groups.find(function(g){ return g.id === groupId; }) || {}).name || "the group"
+    : (DEPTS[deptId] ? DEPTS[deptId].name : deptId);
   qvSendBtn.disabled = true;
   blobToBase64(voice.blob).then(function(b64){
     var payload = {
-      from: STATE.self, to: "gm", type: "audio",
+      from: STATE.self, type: "audio",
       fileBase64: b64, fileMime: voice.blob.type || "audio/webm",
       duration: voice.duration
     };
+    if(groupId) payload.groupId = groupId; else payload.to = deptId;
     return apiSend('/api/messages', 'POST', payload);
   }).then(function(res){
-    STATE.data["gm"] = STATE.data["gm"] || [];
-    STATE.data["gm"].push(mapServerMessage(res.message, STATE.self));
-    renderList();
-    if(STATE.active === "gm") renderThread();
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
     qvCloseOverlay();
-    showToast("Voice note sent to the GM");
+    showToast("Voice note sent to " + recipientName);
   }).catch(function(){
     showToast("Couldn't send that voice note");
   }).finally(function(){ qvSendBtn.disabled = false; });
@@ -3418,7 +3430,6 @@ function enterApp(staff){
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
   priorityAlertBtn.hidden = !staff.isAdmin;
-  quickVoiceBtn.hidden = staff.departmentId === "gm";
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
