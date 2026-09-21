@@ -2910,20 +2910,34 @@ function tickTimer(){
 
 function finishRecording(cancel){
   return new Promise(function(resolve){
-    if(!STATE.mediaRecorder){ resolve(null); return; }
-    STATE.mediaRecorder.onstop = function(){
+    if(!STATE.mediaRecorder){ setComposerState("idle"); resolve(null); return; }
+    var rec = STATE.mediaRecorder;
+    var settled = false;
+    var safetyTimer = setTimeout(function(){ cleanupAndResolve(null); }, 4000);
+    function cleanupAndResolve(voice){
+      if(settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
       clearInterval(STATE.recTimerId);
       stopTranscription();
       if(STATE.recStream){ STATE.recStream.getTracks().forEach(function(t){ t.stop(); }); }
       if(STATE.synthCleanup){ STATE.synthCleanup(); STATE.synthCleanup = null; }
-      if(cancel){ setComposerState("idle"); resolve(null); return; }
+      if(!voice){ setComposerState("idle"); }
+      resolve(voice);
+    }
+    rec.onstop = function(){
+      if(cancel){ cleanupAndResolve(null); return; }
       var blob = new Blob(STATE.recChunks, {type: STATE.recChunks[0] ? STATE.recChunks[0].type : "audio/webm"});
       var url = URL.createObjectURL(blob);
       var duration = Math.max(1, Math.round((Date.now() - STATE.recStart)/1000));
       STATE.voice = { url: url, duration: duration, transcript: STATE.recTranscript || null };
-      resolve(STATE.voice);
+      cleanupAndResolve(STATE.voice);
     };
-    try{ STATE.mediaRecorder.stop(); }catch(e){ resolve(null); }
+    rec.onerror = function(){ cleanupAndResolve(null); };
+    try{
+      if(rec.state === "inactive"){ cleanupAndResolve(null); return; }
+      rec.stop();
+    }catch(e){ cleanupAndResolve(null); }
   });
 }
 
