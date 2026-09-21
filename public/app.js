@@ -988,17 +988,21 @@ function buildAudioNode(msg, holderIsOut){
   }
 
   wrap.innerHTML =
-    '<button class="play-btn" aria-label="Play voice message">'+
-      '<svg class="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'+
-      '<svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'+
-    '</button>'+
-    '<div class="wave" role="slider" aria-label="Seek voice message" tabindex="0">'+
-      '<div class="wave-static" style="display:flex;align-items:center;gap:2px;width:100%">'+barsHTML(bars)+'</div>'+
-      '<div class="wave-progress"><div style="display:flex;align-items:center;gap:2px">'+barsHTML(bars)+'</div></div>'+
-      '<span class="wave-thumb"></span>'+
+    '<div class="audio-row">'+
+      '<button class="play-btn" aria-label="Play voice message">'+
+        '<svg class="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'+
+        '<svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'+
+      '</button>'+
+      '<div class="wave" role="slider" aria-label="Seek voice message" tabindex="0">'+
+        '<div class="wave-static" style="display:flex;align-items:center;gap:2px;width:100%">'+barsHTML(bars)+'</div>'+
+        '<div class="wave-progress"><div style="display:flex;align-items:center;gap:2px">'+barsHTML(bars)+'</div></div>'+
+        '<span class="wave-thumb"></span>'+
+      '</div>'+
     '</div>'+
-    '<span class="audio-dur">'+fmtDur(msg.duration||msg.dur||4)+'</span>'+
-    '<button class="speed-btn" type="button" aria-label="Playback speed">1&times;</button>';
+    '<div class="audio-meta-row">'+
+      '<span class="audio-dur">'+fmtDur(msg.duration||msg.dur||4)+'</span>'+
+      '<button class="speed-btn" type="button" aria-label="Playback speed">1&times;</button>'+
+    '</div>';
 
   var audioEl = new Audio();
   audioEl.preload = "none";
@@ -2939,7 +2943,7 @@ function renderVoicePreview(){
   vpAudio.style.alignItems = "stretch";
   var node = buildAudioNode({ url: STATE.voice.url, duration: STATE.voice.duration });
   node.classList.remove("bubble","audio-bubble");
-  node.style.display = "flex"; node.style.alignItems = "center"; node.style.gap = "8px"; node.style.width = "100%";
+  node.style.display = "flex"; node.style.flexDirection = "column"; node.style.gap = "8px"; node.style.width = "100%";
   vpAudio.appendChild(node);
   if(STATE.voice.transcript){
     var t = document.createElement("div");
