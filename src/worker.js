@@ -984,9 +984,19 @@ function hotelRegistry(env) {
   const registry = {
     main: { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID, hasDashboardBridge: true },
   };
-  if (env.DB_HOTELB) {
-    registry.hotelb = { slug: "hotelb", db: env.DB_HOTELB, noirDb: env.DB_HOTELB, uploads: env.UPLOADS_HOTELB || env.UPLOADS, hotelId: "hotelb-test-tenant", hasDashboardBridge: false };
-  }
+  // Synthetic test tenants (b-f) used for multi-hotel stress testing -
+  // each its own DB + bucket, listed here so both resolveHotel() and the
+  // cron job automatically pick up every one that's provisioned.
+  ["b", "c", "d", "e", "f"].forEach((letter) => {
+    const dbBinding = env["DB_HOTEL" + letter.toUpperCase()];
+    if (!dbBinding) return;
+    const slug = "hotel" + letter;
+    registry[slug] = {
+      slug, db: dbBinding, noirDb: dbBinding,
+      uploads: env["UPLOADS_HOTEL" + letter.toUpperCase()] || env.UPLOADS,
+      hotelId: slug + "-test-tenant", hasDashboardBridge: false,
+    };
+  });
   return registry;
 }
 function resolveHotel(request, env, url) {
