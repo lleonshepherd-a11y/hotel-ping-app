@@ -603,8 +603,8 @@ async function insertMessage(env, ctx, opts) {
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -621,7 +621,8 @@ async function insertMessage(env, ctx, opts) {
     opts.poll ? "{}" : null,
     opts.affectsGuest ? 1 : 0,
     opts.dashboardConversationId || null,
-    opts.roomClean || null
+    opts.roomClean || null,
+    opts.fromStaffName || null
   ).run();
 
   const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
@@ -920,6 +921,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     } : undefined,
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
+    staffName: hide ? null : (row.from_staff_name || undefined),
   };
 }
 function rowToStaff(row) {
@@ -2710,6 +2712,7 @@ export default {
           mentions: validMentions,
           signoff: signoffData,
           poll: pollData,
+          fromStaffName: request._staff.name || null,
         });
 
         if (to === "dashboard" && row.body) {
@@ -2910,6 +2913,7 @@ export default {
           from: requester.department_id, to, type: existing.type,
           body: existing.body, fileName: existing.file_name, filePath: existing.file_path, fileSize: existing.file_size,
           duration: existing.duration, transcript: existing.transcript, urgent: false,
+          fromStaffName: requester.name || null,
         });
         return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
       }
@@ -2925,7 +2929,7 @@ export default {
         const broadcastId = crypto.randomUUID();
         const rows = [];
         for (const to of targets) {
-          const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent, broadcastId });
+          const row = await insertMessage(env, ctx, { from, to, type: "text", body: text, urgent: !!body.urgent, broadcastId, fromStaffName: requester.name || null });
           rows.push(row);
         }
         return json({ messages: rows.map((r) => rowToMessage(r, from, false)) }, 201);

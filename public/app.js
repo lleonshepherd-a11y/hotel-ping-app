@@ -200,7 +200,8 @@ function mapServerMessage(row, self){
     signoff: row.signoff || undefined,
     poll: row.poll || undefined,
     escalationLevel: row.escalationLevel || 0,
-    affectsGuest: !!row.affectsGuest
+    affectsGuest: !!row.affectsGuest,
+    staffName: row.staffName || undefined
   };
 }
 
@@ -1828,13 +1829,20 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var wrap = document.createElement("div");
   wrap.className = "bubble-wrap";
 
-  if(STATE.activeGroupId && !out && groupStart){
-    var senderLabel = document.createElement("div");
-    senderLabel.className = "group-sender-name";
-    var senderDept = DEPTS[m.from];
-    if(senderDept) senderLabel.style.color = senderDept.color;
-    senderLabel.textContent = senderDept ? senderDept.name : m.from;
-    wrap.appendChild(senderLabel);
+  if(groupStart){
+    // Every message is attributed to a department (e.g. "General Manager"),
+    // never to the individual staff member who sent it - m.staffName carries
+    // that personal name when the server captured it, so people can tell who
+    // specifically sent something instead of just which department it's from.
+    var labelText = m.staffName || (STATE.activeGroupId && !out ? (DEPTS[m.from] ? DEPTS[m.from].name : m.from) : null);
+    if(labelText){
+      var senderLabel = document.createElement("div");
+      senderLabel.className = "group-sender-name";
+      var senderDept = DEPTS[m.from];
+      if(senderDept) senderLabel.style.color = senderDept.color;
+      senderLabel.textContent = labelText;
+      wrap.appendChild(senderLabel);
+    }
   }
 
   var revealedDeleted = m.deleted && (m.text || m.url || m.transcript || m.dataUrl);

@@ -241,6 +241,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     } : undefined,
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
+    staffName: hide ? null : (row.from_staff_name || undefined),
   };
 }
 function rowToGroup(row, members) {
@@ -337,8 +338,8 @@ function insertMessage(opts) {
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
   db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, opts.from, opts.to || null, opts.type,
     opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -355,7 +356,8 @@ function insertMessage(opts) {
     opts.poll ? '{}' : null,
     opts.affectsGuest ? 1 : 0,
     opts.dashboardConversationId || null,
-    opts.roomClean || null
+    opts.roomClean || null,
+    opts.fromStaffName || null
   );
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId && !opts.silent) {
@@ -1887,6 +1889,7 @@ const server = http.createServer(async (req, res) => {
         mentions: validMentions,
         signoff: signoffData,
         poll: pollData,
+        fromStaffName: sendRequester.name || null,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
@@ -2055,6 +2058,7 @@ const server = http.createServer(async (req, res) => {
         from: requester.department_id, to, type: existing.type,
         body: existing.body, fileName: existing.file_name, filePath: existing.file_path, fileSize: existing.file_size,
         duration: existing.duration, transcript: existing.transcript, urgent: false,
+        fromStaffName: requester.name || null,
       });
       return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
     }
@@ -2068,7 +2072,7 @@ const server = http.createServer(async (req, res) => {
       const from = requester.department_id;
       const targets = [...DEPT_IDS].filter((id) => id !== from);
       const broadcastId = crypto.randomUUID();
-      const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent, broadcastId }));
+      const rows = targets.map((to) => insertMessage({ from, to, type: 'text', body: text, urgent: !!body.urgent, broadcastId, fromStaffName: requester.name || null }));
       return send(res, 201, { messages: rows.map((r) => rowToMessage(r, from, false)) });
     }
 

@@ -152,6 +152,9 @@ if (!messageColumns.includes('affects_guest')) {
 if (!messageColumns.includes('room_clean')) {
   db.exec('ALTER TABLE messages ADD COLUMN room_clean TEXT');
 }
+if (!messageColumns.includes('from_staff_name')) {
+  db.exec('ALTER TABLE messages ADD COLUMN from_staff_name TEXT');
+}
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
@@ -198,9 +201,10 @@ if (toDeptCol && toDeptCol.notnull) {
       poll_votes TEXT,
       escalation_level INTEGER NOT NULL DEFAULT 0,
       affects_guest INTEGER NOT NULL DEFAULT 0,
-      room_clean TEXT
+      room_clean TEXT,
+      from_staff_name TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean, from_staff_name FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);

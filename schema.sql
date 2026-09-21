@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS messages (
   escalation_level INTEGER NOT NULL DEFAULT 0,
   affects_guest INTEGER NOT NULL DEFAULT 0,
   dashboard_conversation_id TEXT,
-  room_clean TEXT
+  room_clean TEXT,
+  from_staff_name TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
