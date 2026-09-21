@@ -950,43 +950,103 @@ function sameDay(a,b){
   return da.toDateString() === db.toDateString();
 }
 
+var waveformCache = {};
+function decodeWaveform(url, count){
+  if(waveformCache[url]) return Promise.resolve(waveformCache[url]);
+  var Ctx = window.AudioContext || window.webkitAudioContext;
+  if(!Ctx) return Promise.resolve(null);
+  return fetch(url).then(function(r){ return r.arrayBuffer(); }).then(function(buf){
+    var ctx = new Ctx();
+    return ctx.decodeAudioData(buf).then(function(audioBuf){
+      var data = audioBuf.getChannelData(0);
+      var blockSize = Math.max(1, Math.floor(data.length / count));
+      var peaks = [];
+      for(var i=0;i<count;i++){
+        var start = i*blockSize;
+        var end = Math.min(data.length, start+blockSize);
+        var sum = 0, n = 0, step = Math.max(1, Math.floor((end-start)/40));
+        for(var j=start;j<end;j+=step){ sum += Math.abs(data[j]); n++; }
+        peaks.push(n ? sum/n : 0);
+      }
+      var max = Math.max.apply(null, peaks) || 1;
+      var norm = peaks.map(function(p){ return Math.max(0.12, p/max); });
+      waveformCache[url] = norm;
+      if(ctx.close) ctx.close();
+      return norm;
+    });
+  }).catch(function(){ return null; });
+}
+
 function buildAudioNode(msg, holderIsOut){
   var wrap = document.createElement("div");
   wrap.className = "bubble audio-bubble";
+  var BAR_COUNT = 26;
   var bars = [];
-  for(var i=0;i<20;i++){ bars.push(6 + Math.round(14*Math.abs(Math.sin(i*1.7+ (msg.freq||3)))));}
-  var barsHTML = bars.map(function(h){ return '<span class="wave-bar" style="height:'+h+'px"></span>'; }).join("");
+  for(var i=0;i<BAR_COUNT;i++){ bars.push(0.3 + 0.55*Math.abs(Math.sin(i*1.7+ (msg.freq||3)))); }
+  function barsHTML(arr){
+    return arr.map(function(h){ return '<span class="wave-bar" style="height:'+Math.round(4+18*h)+'px"></span>'; }).join("");
+  }
 
   wrap.innerHTML =
     '<button class="play-btn" aria-label="Play voice message">'+
       '<svg class="ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>'+
       '<svg class="ic-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>'+
     '</button>'+
-    '<div class="wave"><div class="wave-static" style="display:flex;align-items:center;gap:2px;width:100%">'+barsHTML+'</div>'+
-      '<div class="wave-progress"><div style="display:flex;align-items:center;gap:2px">'+barsHTML+'</div></div>'+
+    '<div class="wave" role="slider" aria-label="Seek voice message" tabindex="0">'+
+      '<div class="wave-static" style="display:flex;align-items:center;gap:2px;width:100%">'+barsHTML(bars)+'</div>'+
+      '<div class="wave-progress"><div style="display:flex;align-items:center;gap:2px">'+barsHTML(bars)+'</div></div>'+
+      '<span class="wave-thumb"></span>'+
     '</div>'+
-    '<span class="audio-dur">'+fmtDur(msg.duration||msg.dur||4)+'</span>';
+    '<span class="audio-dur">'+fmtDur(msg.duration||msg.dur||4)+'</span>'+
+    '<button class="speed-btn" type="button" aria-label="Playback speed">1&times;</button>';
 
   var audioEl = new Audio();
   audioEl.preload = "none";
   var playBtn = wrap.querySelector(".play-btn");
   var icPlay = wrap.querySelector(".ic-play");
   var icPause = wrap.querySelector(".ic-pause");
+  var waveEl = wrap.querySelector(".wave");
   var progress = wrap.querySelector(".wave-progress");
+  var thumb = wrap.querySelector(".wave-thumb");
   var durLabel = wrap.querySelector(".audio-dur");
+  var speedBtn = wrap.querySelector(".speed-btn");
   var totalDur = msg.duration || msg.dur || 4;
   var ready = false;
+  var speeds = [1, 1.5, 2, 0.5];
+  var speedIdx = 0;
+
+  function setProgressPct(pct){
+    pct = Math.max(0, Math.min(100, pct));
+    progress.style.width = pct + "%";
+    thumb.style.left = pct + "%";
+  }
+
+  function refreshWaveform(){
+    if(!msg.url) return;
+    decodeWaveform(msg.url, BAR_COUNT).then(function(norm){
+      if(!norm || !wrap.isConnected) return;
+      var els1 = wrap.querySelectorAll(".wave-static .wave-bar");
+      var els2 = wrap.querySelectorAll(".wave-progress .wave-bar");
+      norm.forEach(function(h, i){
+        var px = Math.round(4 + 18*h);
+        if(els1[i]) els1[i].style.height = px + "px";
+        if(els2[i]) els2[i].style.height = px + "px";
+      });
+    });
+  }
 
   function ensureSrc(){
-    if(msg.url){ audioEl.src = msg.url; ready = true; return Promise.resolve(); }
+    if(ready) return Promise.resolve();
+    if(msg.url){ audioEl.src = msg.url; ready = true; refreshWaveform(); return Promise.resolve(); }
     return makeToneVoiceNote(msg.dur, msg.freq).then(function(res){
-      if(res){ msg.url = res.url; audioEl.src = res.url; ready = true; }
+      if(res){ msg.url = res.url; audioEl.src = res.url; ready = true; refreshWaveform(); }
     });
   }
 
   playBtn.addEventListener("click", function(){
     if(audioEl.paused){
       var startPlayback = function(){
+        audioEl.playbackRate = speeds[speedIdx];
         audioEl.play().catch(function(){});
       };
       if(!ready){ ensureSrc().then(startPlayback); } else { startPlayback(); }
@@ -996,16 +1056,60 @@ function buildAudioNode(msg, holderIsOut){
       icPlay.style.display = ""; icPause.style.display = "none";
     }
   });
+  audioEl.addEventListener("loadedmetadata", function(){
+    if(isFinite(audioEl.duration) && audioEl.duration > 0){ totalDur = audioEl.duration; }
+  });
   audioEl.addEventListener("timeupdate", function(){
     var pct = audioEl.duration ? (audioEl.currentTime/audioEl.duration*100) : 0;
-    progress.style.width = pct + "%";
+    setProgressPct(pct);
     durLabel.textContent = fmtDur(Math.max(0, totalDur - audioEl.currentTime));
   });
   audioEl.addEventListener("ended", function(){
     icPlay.style.display = ""; icPause.style.display = "none";
-    progress.style.width = "0%";
+    setProgressPct(0);
     durLabel.textContent = fmtDur(totalDur);
   });
+
+  speedBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    speedIdx = (speedIdx + 1) % speeds.length;
+    audioEl.playbackRate = speeds[speedIdx];
+    speedBtn.innerHTML = speeds[speedIdx] + "&times;";
+  });
+
+  var dragging = false;
+  function seekFromEvent(clientX){
+    var rect = waveEl.getBoundingClientRect();
+    var pct = rect.width ? (clientX - rect.left) / rect.width : 0;
+    pct = Math.max(0, Math.min(1, pct));
+    setProgressPct(pct*100);
+    if(ready && audioEl.duration){
+      audioEl.currentTime = pct * audioEl.duration;
+      durLabel.textContent = fmtDur(Math.max(0, totalDur - audioEl.currentTime));
+    }
+  }
+  waveEl.addEventListener("pointerdown", function(e){
+    e.stopPropagation();
+    dragging = true;
+    try{ waveEl.setPointerCapture(e.pointerId); }catch(err){}
+    var x = e.clientX;
+    var go = function(){ seekFromEvent(x); };
+    if(!ready){ ensureSrc().then(go); } else { go(); }
+  });
+  waveEl.addEventListener("pointermove", function(e){
+    if(!dragging) return;
+    seekFromEvent(e.clientX);
+  });
+  function endDrag(e){
+    if(!dragging) return;
+    dragging = false;
+    try{ waveEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  waveEl.addEventListener("pointerup", endDrag);
+  waveEl.addEventListener("pointercancel", endDrag);
+
+  refreshWaveform();
+
   return wrap;
 }
 function fmtDur(s){
