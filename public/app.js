@@ -2238,25 +2238,9 @@ var cameraInput = document.getElementById("cameraInput");
 var attachPreviewHost = document.getElementById("attachPreview");
 var composer = document.getElementById("composer");
 var composerLocked = document.getElementById("composerLocked");
-var composerIdle = document.getElementById("composerIdle");
-var composerRecording = document.getElementById("composerRecording");
-var composerVoicePreview = document.getElementById("composerVoicePreview");
-var recTimer = document.getElementById("recTimer");
-var recBars = document.getElementById("recBars");
-var recCancel = document.getElementById("recCancel");
-var recStop = document.getElementById("recStop");
-var vpTrash = document.getElementById("vpTrash");
-var vpSend = document.getElementById("vpSend");
-var vpAudio = document.getElementById("vpAudio");
 var urgentActive = false;
 var affectsGuestActive = false;
 var taskActive = false;
-
-for(var i=0;i<22;i++){
-  var s = document.createElement("span");
-  s.style.animationDelay = (i*0.045)+"s";
-  recBars.appendChild(s);
-}
 
 function focusInput(){ setTimeout(function(){ try{ msgInput.focus(); }catch(e){} }, 30); }
 
@@ -2494,7 +2478,6 @@ document.addEventListener("click", function(e){
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
 optPdf.addEventListener("click", function(){ closePlusMenu(); pdfInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
-micQuickBtn.addEventListener("click", function(){ startRecording(); });
 urgentToggleBtn.addEventListener("click", function(){
   urgentActive = !urgentActive;
   urgentToggleBtn.classList.toggle("active", urgentActive);
@@ -2867,47 +2850,52 @@ function doSend(){
 }
 sendBtn.addEventListener("click", doSend);
 
-/* ---- voice recording ---- */
-function setComposerState(s){
-  STATE.composer = s;
-  composerIdle.hidden = s !== "idle";
-  composerRecording.hidden = s !== "recording";
-  composerVoicePreview.hidden = s !== "voice-preview";
+
+/* ---- quick voice note: hold the mic, release to send, slide away to cancel ---- */
+var quickVoiceBtn = document.getElementById("quickVoiceBtn");
+var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
+var qvHint = document.getElementById("qvHint");
+var qvRecRow = document.getElementById("qvRecRow");
+var qvBars = document.getElementById("qvBars");
+var qvTimer = document.getElementById("qvTimer");
+var QV_CANCEL_DISTANCE = 70;
+var QV_MIN_HOLD_MS = 350;
+var qvState = {
+  mediaRecorder: null, stream: null, chunks: [],
+  holding: false, armed: false, pointerId: null,
+  startX: 0, startY: 0, pressStartedAt: 0, recordStartedAt: 0,
+  released: false, releaseCancel: false,
+  recognition: null, transcript: "",
+  timerId: null
+};
+
+for(var qi=0; qi<22; qi++){
+  var qs = document.createElement("span");
+  qs.style.animationDelay = (qi*0.045)+"s";
+  qvBars.appendChild(qs);
 }
 
-
-function startRecording(){
-  STATE.recChunks = [];
-  STATE.recTranscript = "";
-  var onStream = function(stream, isSynth, cleanup){
-    STATE.recStream = stream;
-    STATE.synthCleanup = cleanup || null;
-    try{
-      STATE.mediaRecorder = new MediaRecorder(stream);
-    }catch(e){
-      setComposerState("idle");
-      return;
-    }
-    STATE.mediaRecorder.ondataavailable = function(e){ if(e.data.size>0) STATE.recChunks.push(e.data); };
-    STATE.mediaRecorder.start();
-    STATE.recStart = Date.now();
-    setComposerState("recording");
-    tickTimer();
-    if(!isSynth) startTranscription();
-  };
-
-  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-      onStream(stream, false, null);
-    }).catch(function(){
-      synthFallback(onStream);
-    });
-  } else {
-    synthFallback(onStream);
-  }
+function qvSetHint(text, armed){
+  qvHint.textContent = text;
+  qvHint.classList.toggle("armed", !!armed);
+  qvRecRow.classList.toggle("armed", !!armed);
 }
 
-function startTranscription(){
+function qvOpenOverlay(){
+  quickVoiceOverlay.hidden = false;
+  qvRecRow.hidden = false;
+  qvSetHint("Slide away to cancel", false);
+  qvTimer.textContent = "0:00";
+}
+
+function qvTimerTick(){
+  if(!qvState.recordStartedAt) return;
+  var s = Math.floor((Date.now() - qvState.recordStartedAt)/1000);
+  var m = Math.floor(s/60), r = s%60;
+  qvTimer.textContent = m+":"+(r<10?"0":"")+r;
+}
+
+function qvStartTranscription(){
   var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!Recognition) return;
   try{
@@ -2918,184 +2906,23 @@ function startTranscription(){
     rec.onresult = function(e){
       var text = "";
       for(var i=0;i<e.results.length;i++) text += e.results[i][0].transcript;
-      STATE.recTranscript = text.trim();
+      qvState.transcript = text.trim();
     };
     rec.onerror = function(){};
     rec.start();
-    STATE.recRecognition = rec;
-  }catch(e){ STATE.recRecognition = null; }
+    qvState.recognition = rec;
+  }catch(e){ qvState.recognition = null; }
 }
-
-function stopTranscription(){
-  if(STATE.recRecognition){
-    try{ STATE.recRecognition.stop(); }catch(e){}
-    STATE.recRecognition = null;
+function qvStopTranscription(){
+  if(qvState.recognition){
+    try{ qvState.recognition.stop(); }catch(e){}
+    qvState.recognition = null;
   }
-}
-
-function synthFallback(onStream){
-  try{
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    var ctx = new Ctx();
-    var dest = ctx.createMediaStreamDestination();
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.type = "sine"; osc.frequency.value = 180;
-    gain.gain.value = 0.0018;
-    osc.connect(gain).connect(dest);
-    osc.start();
-    onStream(dest.stream, true, function(){ try{osc.stop(); ctx.close();}catch(e){} });
-  }catch(e){
-    setComposerState("idle");
-  }
-}
-
-function tickTimer(){
-  clearInterval(STATE.recTimerId);
-  STATE.recTimerId = setInterval(function(){
-    var s = Math.floor((Date.now() - STATE.recStart)/1000);
-    var m = Math.floor(s/60), r = s%60;
-    recTimer.textContent = m+":"+(r<10?"0":"")+r;
-  }, 200);
-}
-
-function finishRecording(cancel){
-  return new Promise(function(resolve){
-    if(!STATE.mediaRecorder){ setComposerState("idle"); resolve(null); return; }
-    var rec = STATE.mediaRecorder;
-    var settled = false;
-    var safetyTimer = setTimeout(function(){ cleanupAndResolve(null); }, 4000);
-    function cleanupAndResolve(voice){
-      if(settled) return;
-      settled = true;
-      clearTimeout(safetyTimer);
-      clearInterval(STATE.recTimerId);
-      stopTranscription();
-      if(STATE.recStream){ STATE.recStream.getTracks().forEach(function(t){ t.stop(); }); }
-      if(STATE.synthCleanup){ STATE.synthCleanup(); STATE.synthCleanup = null; }
-      if(!voice){ setComposerState("idle"); }
-      resolve(voice);
-    }
-    rec.onstop = function(){
-      if(cancel){ cleanupAndResolve(null); return; }
-      var blob = new Blob(STATE.recChunks, {type: STATE.recChunks[0] ? STATE.recChunks[0].type : "audio/webm"});
-      var url = URL.createObjectURL(blob);
-      var duration = Math.max(1, Math.round((Date.now() - STATE.recStart)/1000));
-      STATE.voice = { url: url, duration: duration, transcript: STATE.recTranscript || null };
-      cleanupAndResolve(STATE.voice);
-    };
-    rec.onerror = function(){ cleanupAndResolve(null); };
-    try{
-      if(rec.state === "inactive"){ cleanupAndResolve(null); return; }
-      rec.stop();
-    }catch(e){ cleanupAndResolve(null); }
-  });
-}
-
-recCancel.addEventListener("click", function(){ finishRecording(true); });
-recStop.addEventListener("click", function(){
-  finishRecording(false).then(function(v){
-    if(v){
-      setComposerState("voice-preview");
-      renderVoicePreview();
-    }
-  });
-});
-
-function renderVoicePreview(){
-  vpAudio.innerHTML = "";
-  vpAudio.style.flexDirection = "column";
-  vpAudio.style.alignItems = "stretch";
-  var node = buildAudioNode({ url: STATE.voice.url, duration: STATE.voice.duration });
-  node.classList.remove("bubble","audio-bubble");
-  node.style.display = "flex"; node.style.flexDirection = "column"; node.style.gap = "8px"; node.style.width = "100%";
-  vpAudio.appendChild(node);
-  if(STATE.voice.transcript){
-    var t = document.createElement("div");
-    t.className = "vp-transcript-preview";
-    t.textContent = STATE.voice.transcript;
-    vpAudio.appendChild(t);
-  }
-}
-
-vpTrash.addEventListener("click", function(){
-  STATE.voice = null;
-  setComposerState("idle");
-});
-vpSend.addEventListener("click", function(){
-  if(!STATE.voice) return;
-  var deptId = STATE.active;
-  var groupId = STATE.activeGroupId;
-  var voice = STATE.voice;
-  var replyToId = STATE.replyingTo ? STATE.replyingTo.id : null;
-  clearReplyBar();
-  STATE.voice = null;
-  setComposerState("idle");
-
-  var voicePayload = null;
-  fetch(voice.url).then(function(r){ return r.blob(); }).then(function(blob){
-    return blobToBase64(blob).then(function(b64){
-      var payload = {
-        from: STATE.self, type: "audio",
-        fileBase64: b64, fileMime: blob.type || "audio/webm",
-        duration: voice.duration, transcript: voice.transcript || null
-      };
-      if(groupId) payload.groupId = groupId; else payload.to = deptId;
-      if(replyToId) payload.replyToId = replyToId;
-      voicePayload = payload;
-      return apiSend('/api/messages', 'POST', payload);
-    });
-  }).then(function(res){
-    if(groupId){
-      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
-      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
-      if(STATE.activeGroupId === groupId) renderThread();
-    } else {
-      STATE.data[deptId] = STATE.data[deptId] || [];
-      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
-      renderList();
-      if(STATE.active === deptId) renderThread();
-    }
-  }).catch(function(err){
-    if(voicePayload && (err instanceof TypeError || !navigator.onLine)){
-      if(queueOfflineMessage(deptId, voicePayload)) return;
-    }
-    composerHint.textContent = "That voice note didn't send. Check your connection and try again.";
-  });
-});
-
-/* ---- quick voice note (profile page mic -> straight to GM) ---- */
-var quickVoiceBtn = document.getElementById("quickVoiceBtn");
-var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
-var qvHint = document.getElementById("qvHint");
-var qvRecRow = document.getElementById("qvRecRow");
-var qvBars = document.getElementById("qvBars");
-var qvCancelBtn = document.getElementById("qvCancelBtn");
-var qvStopBtn = document.getElementById("qvStopBtn");
-var qvPreviewRow = document.getElementById("qvPreviewRow");
-var qvDiscardBtn = document.getElementById("qvDiscardBtn");
-var qvPlayBtn = document.getElementById("qvPlayBtn");
-var qvSendBtn = document.getElementById("qvSendBtn");
-var qvState = { mediaRecorder: null, stream: null, chunks: [], startedAt: 0, voice: null, audioEl: null };
-
-for(var qi=0; qi<22; qi++){
-  var qs = document.createElement("span");
-  qs.style.animationDelay = (qi*0.045)+"s";
-  qvBars.appendChild(qs);
-}
-
-function qvReset(){
-  qvRecRow.hidden = true;
-  qvPreviewRow.hidden = true;
-  qvHint.hidden = false;
-  qvHint.textContent = "Record a quick voice note and send it straight to this conversation.";
-  qvState.voice = null;
-  qvStopBtn.disabled = false;
-  qvSendBtn.disabled = false;
-  if(qvState.audioEl){ try{ qvState.audioEl.pause(); }catch(e){} qvState.audioEl = null; }
 }
 
 function qvCleanupStream(){
+  clearInterval(qvState.timerId);
+  qvStopTranscription();
   if(qvState.mediaRecorder && qvState.mediaRecorder.state !== "inactive"){
     try{ qvState.mediaRecorder.stop(); }catch(e){}
   }
@@ -3106,131 +2933,184 @@ function qvCleanupStream(){
 function qvCloseOverlay(){
   qvCleanupStream();
   quickVoiceOverlay.hidden = true;
-  qvReset();
+  qvRecRow.hidden = true;
+  qvRecRow.classList.remove("armed");
+  qvHint.classList.remove("armed");
+  qvState.holding = false;
+  qvState.armed = false;
+  qvState.released = false;
+  qvState.chunks = [];
+  qvState.recordStartedAt = 0;
 }
 
-quickVoiceBtn.addEventListener("click", function(){
-  quickVoiceOverlay.hidden = false;
-  qvReset();
-  qvStartRecording();
-});
-quickVoiceOverlay.addEventListener("click", function(e){ if(e.target === quickVoiceOverlay) qvCloseOverlay(); });
+function qvShowError(text){
+  qvCloseOverlay();
+  showToast(text);
+}
 
-function qvStartRecording(){
-  qvHint.hidden = true;
-  qvRecRow.hidden = false;
-  qvPreviewRow.hidden = true;
+function qvBeginRecording(){
   qvState.chunks = [];
-  // Stop is disabled until the recorder is actually ready - getUserMedia can
-  // take a moment (permission prompt, hardware init), and a tap on Stop
-  // before qvState.mediaRecorder exists used to fall into the "not
-  // recording" guard below and silently close the whole overlay.
-  qvStopBtn.disabled = true;
+  qvState.transcript = "";
   if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
-    qvHint.hidden = false; qvHint.textContent = "Microphone not available on this device.";
-    qvRecRow.hidden = true;
+    qvShowError("Microphone not available on this device.");
     return;
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-    qvState.stream = stream;
-    var rec;
-    try{ rec = new MediaRecorder(stream); }catch(e){
-      qvHint.hidden = false; qvHint.textContent = "Couldn't start recording.";
-      qvRecRow.hidden = true;
+    if(!qvState.holding && !qvState.released){
       stream.getTracks().forEach(function(t){ t.stop(); });
       return;
     }
+    qvState.stream = stream;
+    var rec;
+    try{ rec = new MediaRecorder(stream); }catch(e){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      qvShowError("Couldn't start recording.");
+      return;
+    }
     qvState.mediaRecorder = rec;
-    qvState.startedAt = Date.now();
+    qvState.recordStartedAt = Date.now();
+    qvState.timerId = setInterval(qvTimerTick, 200);
     rec.ondataavailable = function(e){ if(e.data.size>0) qvState.chunks.push(e.data); };
     rec.start();
-    qvStopBtn.disabled = false;
+    qvStartTranscription();
+    if(qvState.released){ qvFinish(qvState.releaseCancel); }
   }).catch(function(){
-    qvHint.hidden = false; qvHint.textContent = "Microphone permission was blocked.";
-    qvRecRow.hidden = true;
+    qvShowError("Microphone permission was blocked.");
   });
 }
 
-qvCancelBtn.addEventListener("click", qvCloseOverlay);
-
-qvStopBtn.addEventListener("click", function(){
-  if(qvStopBtn.disabled) return;
+function qvFinish(cancel){
   if(!qvState.mediaRecorder){ qvCloseOverlay(); return; }
-  qvStopBtn.disabled = true;
   var rec = qvState.mediaRecorder;
-  var duration = Math.max(1, Math.round((Date.now() - qvState.startedAt)/1000));
+  var duration = Math.max(1, Math.round((Date.now() - qvState.recordStartedAt)/1000));
+  var transcript = qvState.transcript;
   var settled = false;
   var safetyTimer = setTimeout(function(){ if(!settled){ settled = true; qvCloseOverlay(); } }, 4000);
   rec.onstop = function(){
     if(settled) return;
     settled = true;
     clearTimeout(safetyTimer);
+    clearInterval(qvState.timerId);
+    qvStopTranscription();
     if(qvState.stream){ qvState.stream.getTracks().forEach(function(t){ t.stop(); }); qvState.stream = null; }
-    var blob = new Blob(qvState.chunks, {type: qvState.chunks[0] ? qvState.chunks[0].type : "audio/webm"});
-    var url = URL.createObjectURL(blob);
-    qvState.voice = { url: url, blob: blob, duration: duration };
+    quickVoiceOverlay.hidden = true;
     qvRecRow.hidden = true;
-    qvPreviewRow.hidden = false;
+    qvRecRow.classList.remove("armed");
+    qvHint.classList.remove("armed");
+    qvState.mediaRecorder = null;
+    if(cancel){
+      qvState.chunks = [];
+      return;
+    }
+    var blob = new Blob(qvState.chunks, {type: qvState.chunks[0] ? qvState.chunks[0].type : "audio/webm"});
+    qvState.chunks = [];
+    qvSend(blob, duration, transcript);
   };
   rec.onerror = function(){ if(!settled){ settled = true; clearTimeout(safetyTimer); qvCloseOverlay(); } };
   try{
     if(rec.state === "inactive"){ clearTimeout(safetyTimer); qvCloseOverlay(); return; }
     rec.stop();
   }catch(e){ clearTimeout(safetyTimer); qvCloseOverlay(); }
-});
+}
 
-qvDiscardBtn.addEventListener("click", qvCloseOverlay);
-
-qvPlayBtn.addEventListener("click", function(){
-  if(!qvState.voice) return;
-  if(!qvState.audioEl){ qvState.audioEl = new Audio(qvState.voice.url); }
-  var icPlay = qvPlayBtn.querySelector(".qv-ic-play");
-  var icPause = qvPlayBtn.querySelector(".qv-ic-pause");
-  if(qvState.audioEl.paused){
-    qvState.audioEl.play().catch(function(){});
-    icPlay.style.display = "none"; icPause.style.display = "";
-  } else {
-    qvState.audioEl.pause();
-    icPlay.style.display = ""; icPause.style.display = "none";
-  }
-  qvState.audioEl.onended = function(){ icPlay.style.display = ""; icPause.style.display = "none"; };
-});
-
-qvSendBtn.addEventListener("click", function(){
-  if(qvSendBtn.disabled) return;
-  if(!qvState.voice) return;
-  var voice = qvState.voice;
+function qvSend(blob, duration, transcript){
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
+  var replyToId = STATE.replyingTo ? STATE.replyingTo.id : null;
+  clearReplyBar();
   var recipientName = groupId
     ? (STATE.groups.find(function(g){ return g.id === groupId; }) || {}).name || "the group"
     : (DEPTS[deptId] ? DEPTS[deptId].name : deptId);
-  qvSendBtn.disabled = true;
-  blobToBase64(voice.blob).then(function(b64){
+  blobToBase64(blob).then(function(b64){
     var payload = {
       from: STATE.self, type: "audio",
-      fileBase64: b64, fileMime: voice.blob.type || "audio/webm",
-      duration: voice.duration
+      fileBase64: b64, fileMime: blob.type || "audio/webm",
+      duration: duration, transcript: transcript || null
     };
     if(groupId) payload.groupId = groupId; else payload.to = deptId;
-    return apiSend('/api/messages', 'POST', payload);
-  }).then(function(res){
+    if(replyToId) payload.replyToId = replyToId;
+    return apiSend('/api/messages', 'POST', payload).then(function(res){ return { res: res, payload: payload }; });
+  }).then(function(r){
     if(groupId){
       STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
-      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      STATE.groupMessages[groupId].push(mapServerMessage(r.res.message, STATE.self));
       if(STATE.activeGroupId === groupId) renderThread();
     } else {
       STATE.data[deptId] = STATE.data[deptId] || [];
-      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      STATE.data[deptId].push(mapServerMessage(r.res.message, STATE.self));
       renderList();
       if(STATE.active === deptId) renderThread();
     }
-    qvCloseOverlay();
     showToast("Voice note sent to " + recipientName);
-  }).catch(function(){
+  }).catch(function(err){
+    if(err instanceof TypeError || !navigator.onLine){
+      blobToBase64(blob).then(function(b64){
+        var payload = {
+          from: STATE.self, type: "audio",
+          fileBase64: b64, fileMime: blob.type || "audio/webm",
+          duration: duration, transcript: transcript || null
+        };
+        if(groupId) payload.groupId = groupId; else payload.to = deptId;
+        queueOfflineMessage(deptId, payload);
+      });
+      return;
+    }
     showToast("Couldn't send that voice note");
-  }).finally(function(){ qvSendBtn.disabled = false; });
-});
+  });
+}
+
+function qvPointerMove(e){
+  if(!qvState.holding || e.pointerId !== qvState.pointerId) return;
+  var dx = e.clientX - qvState.startX, dy = e.clientY - qvState.startY;
+  var dist = Math.sqrt(dx*dx + dy*dy);
+  var nowArmed = dist > QV_CANCEL_DISTANCE;
+  if(nowArmed !== qvState.armed){
+    qvState.armed = nowArmed;
+    qvSetHint(nowArmed ? "Release to cancel" : "Slide away to cancel", nowArmed);
+  }
+}
+
+function qvEndHold(e, forceCancel){
+  if(!qvState.holding) return;
+  if(e && qvState.pointerId != null && e.pointerId !== qvState.pointerId) return;
+  qvState.holding = false;
+  document.removeEventListener("pointermove", qvPointerMove);
+  document.removeEventListener("pointerup", qvPointerUp);
+  document.removeEventListener("pointercancel", qvPointerCancel);
+  var heldMs = Date.now() - qvState.pressStartedAt;
+  var shouldCancel = !!forceCancel || qvState.armed || heldMs < QV_MIN_HOLD_MS;
+  if(qvState.mediaRecorder){
+    qvFinish(shouldCancel);
+  } else {
+    qvState.released = true;
+    qvState.releaseCancel = shouldCancel;
+  }
+}
+function qvPointerUp(e){ qvEndHold(e, false); }
+function qvPointerCancel(e){ qvEndHold(e, true); }
+
+function qvBindHoldButton(btn){
+  btn.addEventListener("pointerdown", function(e){
+    if(qvState.holding) return;
+    if(e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    qvState.holding = true;
+    qvState.armed = false;
+    qvState.released = false;
+    qvState.releaseCancel = false;
+    qvState.pointerId = e.pointerId;
+    qvState.startX = e.clientX; qvState.startY = e.clientY;
+    qvState.pressStartedAt = Date.now();
+    document.addEventListener("pointermove", qvPointerMove);
+    document.addEventListener("pointerup", qvPointerUp);
+    document.addEventListener("pointercancel", qvPointerCancel);
+    qvOpenOverlay();
+    qvBeginRecording();
+  });
+}
+
+qvBindHoldButton(quickVoiceBtn);
+qvBindHoldButton(micQuickBtn);
 
 /* ---- mobile back ---- */
 document.getElementById("backBtn").addEventListener("click", function(){

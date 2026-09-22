@@ -718,29 +718,11 @@
             </div>
           <div class="composer-pill">
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
-            <button class="mic-inline" id="micQuickBtn" aria-label="Record a voice note">
+            <button class="mic-inline" id="micQuickBtn" aria-label="Hold to record a voice note" title="Hold to record">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg>
             </button>
           </div>
           <button class="send-btn" id="sendBtn" aria-label="Send message">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
-          </button>
-        </div>
-
-        <div id="composerRecording" class="rec-row" hidden>
-          <span class="rec-dot"></span>
-          <span class="rec-timer" id="recTimer">0:00</span>
-          <div class="rec-bars" id="recBars"></div>
-          <button class="rec-cancel" id="recCancel">Cancel</button>
-          <button class="rec-stop" id="recStop">Stop</button>
-        </div>
-
-        <div id="composerVoicePreview" class="vp-row" hidden>
-          <button class="vp-trash" id="vpTrash" aria-label="Discard voice note">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
-          </button>
-          <div class="vp-audio" id="vpAudio"></div>
-          <button class="send-btn ready" id="vpSend" aria-label="Send voice note">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
           </button>
         </div>
@@ -853,27 +835,11 @@
 <div class="admin-overlay qv-overlay" id="quickVoiceOverlay" hidden>
   <div class="qv-stage">
     <div class="qv-row" id="qvRecRow" hidden>
-      <button class="qv-cancel" id="qvCancelBtn" type="button" aria-label="Cancel recording">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
+      <span class="qv-dot"></span>
       <div class="qv-bars" id="qvBars"></div>
-      <button class="qv-stop" id="qvStopBtn" type="button" aria-label="Stop recording">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      </button>
+      <span class="qv-timer" id="qvTimer">0:00</span>
     </div>
-    <div class="qv-row" id="qvPreviewRow" hidden>
-      <button class="qv-cancel" id="qvDiscardBtn" type="button" aria-label="Discard recording">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
-      </button>
-      <button class="qv-play" id="qvPlayBtn" type="button" aria-label="Preview recording">
-        <svg class="qv-ic-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        <svg class="qv-ic-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
-      </button>
-      <button class="qv-stop" id="qvSendBtn" type="button" aria-label="Send voice note">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-      </button>
-    </div>
-    <p class="qv-hint" id="qvHint">Record a quick voice note and send it straight to this conversation.</p>
+    <p class="qv-hint" id="qvHint">Slide away to cancel</p>
   </div>
 </div>
 
