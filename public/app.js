@@ -2851,20 +2851,17 @@ function doSend(){
 sendBtn.addEventListener("click", doSend);
 
 
-/* ---- quick voice note: hold the mic, release to send, slide away to cancel ---- */
+/* ---- quick voice note: tap the mic to start, tap again to stop and send ---- */
 var quickVoiceBtn = document.getElementById("quickVoiceBtn");
 var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
 var qvHint = document.getElementById("qvHint");
 var qvRecRow = document.getElementById("qvRecRow");
 var qvBars = document.getElementById("qvBars");
 var qvTimer = document.getElementById("qvTimer");
-var QV_CANCEL_DISTANCE = 70;
-var QV_MIN_HOLD_MS = 350;
+var qvCancelBtn = document.getElementById("qvCancelBtn");
 var qvState = {
   mediaRecorder: null, stream: null, chunks: [],
-  holding: false, armed: false, pointerId: null,
-  startX: 0, startY: 0, pressStartedAt: 0, recordStartedAt: 0,
-  released: false, releaseCancel: false,
+  recording: false, recordStartedAt: 0,
   recognition: null, transcript: "",
   timerId: null
 };
@@ -2875,16 +2872,10 @@ for(var qi=0; qi<22; qi++){
   qvBars.appendChild(qs);
 }
 
-function qvSetHint(text, armed){
-  qvHint.textContent = text;
-  qvHint.classList.toggle("armed", !!armed);
-  qvRecRow.classList.toggle("armed", !!armed);
-}
-
 function qvOpenOverlay(){
   quickVoiceOverlay.hidden = false;
   qvRecRow.hidden = false;
-  qvSetHint("Slide away to cancel", false);
+  qvHint.textContent = "Tap the mic again to send";
   qvTimer.textContent = "0:00";
 }
 
@@ -2934,11 +2925,7 @@ function qvCloseOverlay(){
   qvCleanupStream();
   quickVoiceOverlay.hidden = true;
   qvRecRow.hidden = true;
-  qvRecRow.classList.remove("armed");
-  qvHint.classList.remove("armed");
-  qvState.holding = false;
-  qvState.armed = false;
-  qvState.released = false;
+  qvState.recording = false;
   qvState.chunks = [];
   qvState.recordStartedAt = 0;
 }
@@ -2956,7 +2943,7 @@ function qvBeginRecording(){
     return;
   }
   navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
-    if(!qvState.holding && !qvState.released){
+    if(!qvState.recording){
       stream.getTracks().forEach(function(t){ t.stop(); });
       return;
     }
@@ -2973,7 +2960,6 @@ function qvBeginRecording(){
     rec.ondataavailable = function(e){ if(e.data.size>0) qvState.chunks.push(e.data); };
     rec.start();
     qvStartTranscription();
-    if(qvState.released){ qvFinish(qvState.releaseCancel); }
   }).catch(function(){
     qvShowError("Microphone permission was blocked.");
   });
@@ -2995,8 +2981,7 @@ function qvFinish(cancel){
     if(qvState.stream){ qvState.stream.getTracks().forEach(function(t){ t.stop(); }); qvState.stream = null; }
     quickVoiceOverlay.hidden = true;
     qvRecRow.hidden = true;
-    qvRecRow.classList.remove("armed");
-    qvHint.classList.remove("armed");
+    qvState.recording = false;
     qvState.mediaRecorder = null;
     if(cancel){
       qvState.chunks = [];
@@ -3059,65 +3044,19 @@ function qvSend(blob, duration, transcript){
   });
 }
 
-function qvPointerMove(e){
-  if(!qvState.holding || e.pointerId !== qvState.pointerId) return;
-  var dx = e.clientX - qvState.startX, dy = e.clientY - qvState.startY;
-  var dist = Math.sqrt(dx*dx + dy*dy);
-  var nowArmed = dist > QV_CANCEL_DISTANCE;
-  if(nowArmed !== qvState.armed){
-    qvState.armed = nowArmed;
-    qvSetHint(nowArmed ? "Release to cancel" : "Slide away to cancel", nowArmed);
+function qvToggle(){
+  if(qvState.recording){
+    qvFinish(false);
+    return;
   }
+  qvState.recording = true;
+  qvOpenOverlay();
+  qvBeginRecording();
 }
 
-function qvEndHold(e, forceCancel){
-  if(!qvState.holding) return;
-  if(e && qvState.pointerId != null && e.pointerId !== qvState.pointerId) return;
-  qvState.holding = false;
-  document.removeEventListener("pointermove", qvPointerMove);
-  document.removeEventListener("pointerup", qvPointerUp);
-  document.removeEventListener("pointercancel", qvPointerCancel);
-  var heldMs = Date.now() - qvState.pressStartedAt;
-  var shouldCancel = !!forceCancel || qvState.armed || heldMs < QV_MIN_HOLD_MS;
-  if(qvState.mediaRecorder){
-    qvFinish(shouldCancel);
-  } else {
-    qvState.released = true;
-    qvState.releaseCancel = shouldCancel;
-  }
-}
-function qvPointerUp(e){ qvEndHold(e, false); }
-function qvPointerCancel(e){ qvEndHold(e, true); }
-
-function qvBindHoldButton(btn){
-  btn.addEventListener("pointerdown", function(e){
-    if(qvState.holding) return;
-    if(e.button !== undefined && e.button !== 0) return;
-    e.preventDefault();
-    // The full-screen recording overlay appears on top of this button while
-    // the finger is still down - without pointer capture, that DOM change
-    // under an active touch can make the browser lose/cancel the gesture
-    // early (looked like the recording randomly cutting off after ~1s).
-    // Capture pins all of this touch's later events to this element
-    // regardless of what's rendered on top of it.
-    try{ btn.setPointerCapture(e.pointerId); }catch(err){}
-    qvState.holding = true;
-    qvState.armed = false;
-    qvState.released = false;
-    qvState.releaseCancel = false;
-    qvState.pointerId = e.pointerId;
-    qvState.startX = e.clientX; qvState.startY = e.clientY;
-    qvState.pressStartedAt = Date.now();
-    document.addEventListener("pointermove", qvPointerMove);
-    document.addEventListener("pointerup", qvPointerUp);
-    document.addEventListener("pointercancel", qvPointerCancel);
-    qvOpenOverlay();
-    qvBeginRecording();
-  });
-}
-
-qvBindHoldButton(quickVoiceBtn);
-qvBindHoldButton(micQuickBtn);
+quickVoiceBtn.addEventListener("click", qvToggle);
+micQuickBtn.addEventListener("click", qvToggle);
+qvCancelBtn.addEventListener("click", function(){ qvFinish(true); });
 
 /* ---- mobile back ---- */
 document.getElementById("backBtn").addEventListener("click", function(){
