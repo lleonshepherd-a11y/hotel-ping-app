@@ -3094,6 +3094,13 @@ function qvBindHoldButton(btn){
     if(qvState.holding) return;
     if(e.button !== undefined && e.button !== 0) return;
     e.preventDefault();
+    // The full-screen recording overlay appears on top of this button while
+    // the finger is still down - without pointer capture, that DOM change
+    // under an active touch can make the browser lose/cancel the gesture
+    // early (looked like the recording randomly cutting off after ~1s).
+    // Capture pins all of this touch's later events to this element
+    // regardless of what's rendered on top of it.
+    try{ btn.setPointerCapture(e.pointerId); }catch(err){}
     qvState.holding = true;
     qvState.armed = false;
     qvState.released = false;
