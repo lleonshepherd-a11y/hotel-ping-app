@@ -2226,7 +2226,6 @@ var plusMenu = document.getElementById("plusMenu");
 var optPhoto = document.getElementById("optPhoto");
 var optPdf = document.getElementById("optPdf");
 var optCamera = document.getElementById("optCamera");
-var micQuickBtn = document.getElementById("micQuickBtn");
 var urgentToggleBtn = document.getElementById("urgentToggleBtn");
 var optAffectsGuest = document.getElementById("optAffectsGuest");
 var optRoom = document.getElementById("optRoom");
@@ -2314,7 +2313,6 @@ function refreshSendState(){
   var ready = msgInput.value.trim().length > 0 || !!STATE.attachment;
   sendBtn.classList.toggle("ready", ready);
   sendBtn.classList.toggle("urgent", ready && urgentActive);
-  micQuickBtn.classList.toggle("hide", ready);
 }
 
 function closePlusMenu(){
@@ -2869,7 +2867,8 @@ var qvState = {
   recording: false, recordStartedAt: 0,
   recognition: null, transcript: "",
   timerId: null,
-  stoppedBlob: null, stoppedDuration: 0, stoppedTranscript: ""
+  stoppedBlob: null, stoppedDuration: 0, stoppedTranscript: "",
+  mode: "message"
 };
 
 for(var qi=0; qi<22; qi++){
@@ -2937,6 +2936,7 @@ function qvCloseOverlay(){
   qvState.chunks = [];
   qvState.recordStartedAt = 0;
   qvState.stoppedBlob = null;
+  qvState.mode = "message";
 }
 
 function qvShowError(text){
@@ -3023,6 +3023,10 @@ function qvSendNow(){
 }
 
 function qvSend(blob, duration, transcript){
+  if(qvState.mode === "note"){
+    qvSendNote(blob, duration, transcript);
+    return;
+  }
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
   var replyToId = STATE.replyingTo ? STATE.replyingTo.id : null;
@@ -3068,18 +3072,32 @@ function qvSend(blob, duration, transcript){
   });
 }
 
-function qvStart(){
+function qvStart(mode){
   // Ignore extra taps on the external mic button once something's already
   // in progress - stop and send happen via the buttons inside the pill,
   // which stay reliably reachable regardless of what's rendered elsewhere.
   if(qvState.recording || qvState.stoppedBlob) return;
+  qvState.mode = mode || "message";
   qvState.recording = true;
   qvOpenOverlay();
   qvBeginRecording();
 }
 
-quickVoiceBtn.addEventListener("click", qvStart);
-micQuickBtn.addEventListener("click", qvStart);
+function qvSendNote(blob, duration, transcript){
+  blobToBase64(blob).then(function(b64){
+    return apiSend('/api/notes', 'POST', {
+      fileBase64: b64, fileMime: blob.type || "audio/webm",
+      duration: duration, transcript: transcript || null
+    });
+  }).then(function(){
+    showToast("Note saved");
+    if(typeof loadNotes === "function") loadNotes();
+  }).catch(function(){
+    showToast("Couldn't save that note");
+  });
+}
+
+quickVoiceBtn.addEventListener("click", function(){ qvStart("message"); });
 qvStopBtn.addEventListener("click", function(){ qvStopRecording(false); });
 qvCancelBtn.addEventListener("click", function(){ qvStopRecording(true); });
 qvDiscardBtn.addEventListener("click", qvCloseOverlay);
@@ -5685,6 +5703,88 @@ blockersBtn.addEventListener("click", function(){
 });
 blockersClose.addEventListener("click", function(){ blockersOverlay.hidden = true; });
 blockersOverlay.addEventListener("click", function(e){ if(e.target === blockersOverlay) blockersOverlay.hidden = true; });
+
+/* ---------------- My Notes (private voice/text notes to self) ---------------- */
+var notesBtn = document.getElementById("notesBtn");
+var notesOverlay = document.getElementById("notesOverlay");
+var notesClose = document.getElementById("notesClose");
+var notesRecordBtn = document.getElementById("notesRecordBtn");
+var notesList = document.getElementById("notesList");
+
+function renderNotesList(notes){
+  if(!notes.length){
+    notesList.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.clock, "No notes yet", "Record one whenever you need to remember something - like through a meeting.");
+    return;
+  }
+  notesList.innerHTML = "";
+  notes.forEach(function(n){
+    var row = document.createElement("div");
+    row.className = "note-row";
+    var when = new Date(n.createdAt).toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
+    var head = document.createElement("div");
+    head.className = "note-row-head";
+    head.innerHTML = '<span class="note-row-time">'+esc(when)+'</span>';
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "note-delete-btn";
+    delBtn.setAttribute("aria-label", "Delete note");
+    delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
+    delBtn.addEventListener("click", function(){
+      apiSend('/api/notes/' + encodeURIComponent(n.id), 'DELETE', {}).then(function(){
+        loadNotes();
+      }).catch(function(){ showToast("Couldn't delete that note"); });
+    });
+    head.appendChild(delBtn);
+    row.appendChild(head);
+    if(n.fileUrl){
+      var audioNode = buildAudioNode({ url: n.fileUrl, duration: n.duration });
+      row.appendChild(audioNode);
+    }
+    if(n.body){
+      var bodyEl = document.createElement("div");
+      bodyEl.className = "note-row-body";
+      bodyEl.textContent = n.body;
+      row.appendChild(bodyEl);
+    }
+    if(n.transcript){
+      var tWrap = document.createElement("div");
+      tWrap.className = "voice-transcript-wrap";
+      var tToggle = document.createElement("button");
+      tToggle.type = "button";
+      tToggle.className = "voice-transcript-toggle";
+      tToggle.textContent = "Show transcript";
+      var tText = document.createElement("div");
+      tText.className = "voice-transcript-text";
+      tText.textContent = n.transcript;
+      tText.hidden = true;
+      tToggle.addEventListener("click", function(){
+        tText.hidden = !tText.hidden;
+        tToggle.textContent = tText.hidden ? "Show transcript" : "Hide transcript";
+      });
+      tWrap.appendChild(tToggle);
+      tWrap.appendChild(tText);
+      row.appendChild(tWrap);
+    }
+    notesList.appendChild(row);
+  });
+}
+
+function loadNotes(){
+  apiGet('/api/notes').then(function(res){
+    renderNotesList(res.notes);
+  }).catch(function(){
+    notesList.innerHTML = '<div class="handover-empty">Couldn\'t load your notes.</div>';
+  });
+}
+
+notesBtn.addEventListener("click", function(){
+  notesList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  notesOverlay.hidden = false;
+  loadNotes();
+});
+notesClose.addEventListener("click", function(){ notesOverlay.hidden = true; });
+notesOverlay.addEventListener("click", function(e){ if(e.target === notesOverlay) notesOverlay.hidden = true; });
+notesRecordBtn.addEventListener("click", function(){ qvStart("note"); });
 
 blockerAddForm.addEventListener("submit", function(e){
   e.preventDefault();

@@ -2072,6 +2072,56 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
     }
 
+    if (req.method === 'GET' && p === '/api/notes') {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const rows = db.prepare(
+        'SELECT * FROM personal_notes WHERE staff_id = ? AND deleted_at IS NULL ORDER BY created_at DESC'
+      ).all(requester.id);
+      return send(res, 200, { notes: rows.map(rowToNote) });
+    }
+
+    if (req.method === 'POST' && p === '/api/notes') {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const body = await readJsonBody(req);
+      const title = body.title ? String(body.title).trim().slice(0, 120) : null;
+      const text = body.body ? String(body.body).trim() : null;
+      const duration = body.duration || null;
+      const transcript = body.transcript ? String(body.transcript).trim() : null;
+      let filePathOnDisk = null;
+      let fileSize = null;
+      if (body.fileBase64) {
+        const buf = Buffer.from(body.fileBase64, 'base64');
+        if (buf.length > 25 * 1024 * 1024) return send(res, 400, { error: 'File is too large (25MB max)' });
+        const ext = (body.fileMime && body.fileMime.split('/')[1]) ? '.' + body.fileMime.split('/')[1].split(';')[0] : '';
+        const safeName = 'note-' + crypto.randomUUID() + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
+        filePathOnDisk = safeName;
+        fileSize = buf.length;
+      }
+      if (!text && !filePathOnDisk) return send(res, 400, { error: "A note needs either text or a recording" });
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT INTO personal_notes (id, staff_id, staff_name, title, body, file_path, file_size, duration, transcript, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, requester.id, requester.name || null, title, text, filePathOnDisk, fileSize, duration, transcript, now);
+      const row = db.prepare('SELECT * FROM personal_notes WHERE id = ?').get(id);
+      return send(res, 201, { note: rowToNote(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/notes/')) {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const id = decodeURIComponent(p.slice('/api/notes/'.length));
+      const existing = db.prepare('SELECT * FROM personal_notes WHERE id = ?').get(id);
+      if (!existing || existing.deleted_at) return send(res, 404, { error: 'Note not found' });
+      if (existing.staff_id !== requester.id) return send(res, 403, { error: 'Not your note' });
+      db.prepare('UPDATE personal_notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && p === '/api/broadcast') {
       const requester = staffFromToken(req);
       if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });

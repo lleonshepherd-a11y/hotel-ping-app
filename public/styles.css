@@ -375,8 +375,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-status{font-size:10.5px;color:var(--text-faint);margin-top:3px;padding:0 4px;display:flex;align-items:center;gap:3px}
 .deleted-bubble{background:var(--surface-2) !important;color:var(--text-faint) !important;font-style:italic;font-size:13.5px}
 .audit-deleted-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--urgent);margin-bottom:3px}
-.msg-status .ticks{display:inline-flex;color:var(--text-faint)}
-.msg-status.read .ticks{color:var(--accent)}
+.msg-status .ticks{display:inline-flex;color:#4d84f5}
+.msg-status.read .ticks{color:#4d84f5}
 .msg-status .ticks svg{width:15px;height:10px}
 .bubble-meta-inline{float:right;display:inline-flex;align-items:center;gap:3px;margin:4px 0 0 8px;padding:0;line-height:1;white-space:nowrap;font-size:10.5px}
 .msg-row.out .bubble-meta-inline{color:rgba(255,255,255,.75)}
@@ -722,6 +722,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .qv-thread-btn:hover{background:#14140f;opacity:.88}
 .qv-thread-btn:active{transform:scale(.94)}
 .qv-overlay{padding:20px;pointer-events:none}
+#quickVoiceOverlay{z-index:50}
 .qv-stage{display:flex;flex-direction:column;align-items:center;max-width:calc(100vw - 40px)}
 .qv-row{background:#14140f;border-radius:999px;padding:8px 10px 8px 8px;gap:8px;width:fit-content;max-width:100%;display:flex;align-items:center;box-shadow:0 12px 32px rgba(0,0,0,.28);pointer-events:auto}
 .qv-cancel{flex:none;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;padding:0}
@@ -1327,6 +1328,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .handover-note-body{font-size:13.5px;line-height:1.48;white-space:pre-wrap;color:var(--text)}
 .handover-note-del{border:none;background:none;color:var(--text-faint);padding:3px;display:inline-flex;border-radius:6px;opacity:.6}
 .handover-note-del:hover{color:var(--urgent);opacity:1;background:var(--urgent-tint)}
+.notes-record-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:14px;background:#14140f;color:#fff;font-weight:700;font-size:13.5px;padding:12px;margin-bottom:14px}
+.notes-record-btn svg{width:18px;height:18px}
+.notes-record-btn:active{transform:scale(.98)}
+.notes-list{display:flex;flex-direction:column;gap:10px}
+.note-row{padding:13px 14px;border-radius:14px;background:var(--surface-2);box-shadow:var(--shadow-soft)}
+.note-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.note-row-time{font-size:11px;color:var(--text-faint);font-weight:600}
+.note-delete-btn{border:none;background:none;color:var(--text-faint);padding:3px;display:inline-flex;border-radius:6px;opacity:.6}
+.note-delete-btn svg{width:14px;height:14px}
+.note-delete-btn:hover{color:var(--urgent);opacity:1;background:var(--urgent-tint)}
+.note-row-body{font-size:13.5px;line-height:1.48;white-space:pre-wrap;color:var(--text)}
+.note-row .bubble.audio-bubble{box-shadow:none;margin-bottom:2px}
 .handover-note-del svg{width:12px;height:12px}
 .handover-empty{font-size:13px;color:var(--text-faint);padding:20px 0;text-align:center}
 .thread-empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:5px;padding:20px}
