@@ -932,6 +932,15 @@ function rowToStaff(row) {
   };
 }
 
+function rowToNote(row) {
+  return {
+    id: row.id, title: row.title || undefined, body: row.body || undefined,
+    fileUrl: row.file_path ? "/uploads/" + row.file_path : undefined,
+    fileSize: row.file_size || undefined, duration: row.duration || undefined,
+    transcript: row.transcript || undefined, createdAt: row.created_at,
+  };
+}
+
 async function readJsonBody(request) {
   try {
     const text = await request.text();
@@ -2916,6 +2925,59 @@ export default {
           fromStaffName: requester.name || null,
         });
         return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
+      }
+
+      // ---- Personal notes: private per-staff voice/text notes, never
+      // shared with anyone else - e.g. recording through a meeting so
+      // nothing gets forgotten by the time it ends. Scoped by staff_id
+      // from the session, same as every other requester-scoped endpoint.
+      if (method === "GET" && p === "/api/notes") {
+        const requester = request._staff;
+        const rows = await env.DB.prepare(
+          "SELECT * FROM personal_notes WHERE staff_id = ? AND deleted_at IS NULL ORDER BY created_at DESC"
+        ).bind(requester.id).all();
+        return json({ notes: rows.results.map(rowToNote) });
+      }
+
+      if (method === "POST" && p === "/api/notes") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const title = body.title ? String(body.title).trim().slice(0, 120) : null;
+        const text = body.body ? String(body.body).trim() : null;
+        const duration = body.duration || null;
+        const transcript = body.transcript ? String(body.transcript).trim() : null;
+        let filePathOnDisk = null;
+        let fileSize = null;
+        if (body.fileBase64) {
+          const binary = atob(body.fileBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          if (bytes.length > 25 * 1024 * 1024) return json({ error: "File is too large (25MB max)" }, 400);
+          const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
+          const safeName = hotelKeyPrefix + "note-" + crypto.randomUUID() + ext;
+          await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
+          filePathOnDisk = safeName;
+          fileSize = bytes.length;
+        }
+        if (!text && !filePathOnDisk) return json({ error: "A note needs either text or a recording" }, 400);
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO personal_notes (id, staff_id, staff_name, title, body, file_path, file_size, duration, transcript, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, requester.id, requester.name || null, title, text, filePathOnDisk, fileSize, duration, transcript, now).run();
+        const row = await env.DB.prepare("SELECT * FROM personal_notes WHERE id = ?").bind(id).first();
+        return json({ note: rowToNote(row) }, 201);
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/notes/")) {
+        const requester = request._staff;
+        const id = decodeURIComponent(p.slice("/api/notes/".length));
+        const existing = await env.DB.prepare("SELECT * FROM personal_notes WHERE id = ?").bind(id).first();
+        if (!existing || existing.deleted_at) return json({ error: "Note not found" }, 404);
+        if (existing.staff_id !== requester.id) return json({ error: "Not your note" }, 403);
+        await env.DB.prepare("UPDATE personal_notes SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
       }
 
       if (method === "POST" && p === "/api/broadcast") {

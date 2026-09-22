@@ -841,8 +841,20 @@
       <span class="qv-dot"></span>
       <div class="qv-bars" id="qvBars"></div>
       <span class="qv-timer" id="qvTimer">0:00</span>
+      <button class="qv-stop" id="qvStopBtn" type="button" aria-label="Stop recording">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      </button>
     </div>
-    <p class="qv-hint" id="qvHint">Tap the mic again to send</p>
+    <div class="qv-row" id="qvPreviewRow" hidden>
+      <button class="qv-cancel" id="qvDiscardBtn" type="button" aria-label="Discard recording">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="qv-timer" id="qvPreviewTimer">0:00</span>
+      <button class="qv-stop qv-send" id="qvSendBtn" type="button" aria-label="Send voice note">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
+      </button>
+    </div>
+    <p class="qv-hint" id="qvHint">Tap stop, then send</p>
   </div>
 </div>
 

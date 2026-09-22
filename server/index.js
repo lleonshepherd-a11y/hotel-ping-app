@@ -413,6 +413,15 @@ function rowToStaff(row) {
   };
 }
 
+function rowToNote(row) {
+  return {
+    id: row.id, title: row.title || undefined, body: row.body || undefined,
+    fileUrl: row.file_path ? '/uploads/' + row.file_path : undefined,
+    fileSize: row.file_size || undefined, duration: row.duration || undefined,
+    transcript: row.transcript || undefined, createdAt: row.created_at,
+  };
+}
+
 function hashPin(pin, salt) {
   return crypto.scryptSync(String(pin), salt, 64).toString('hex');
 }

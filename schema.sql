@@ -437,6 +437,27 @@ CREATE TABLE IF NOT EXISTS hotel_profile (
   updated_at TEXT NOT NULL
 );
 
+-- Private voice/text notes a staff member records for themselves - e.g.
+-- recording through a meeting so they don't have to remember a list by
+-- heart. Never shared with anyone else; scoped by staff_id (the NOIR_DB
+-- session identity) rather than joined against the staff table, matching
+-- how messages.from_staff_name is captured at write time rather than
+-- joined at read time.
+CREATE TABLE IF NOT EXISTS personal_notes (
+  id TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL,
+  staff_name TEXT,
+  title TEXT,
+  body TEXT,
+  file_path TEXT,
+  file_size INTEGER,
+  duration REAL,
+  transcript TEXT,
+  created_at TEXT NOT NULL,
+  deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_personal_notes_staff ON personal_notes(staff_id, created_at);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Reception', NULL, 1),

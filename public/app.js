@@ -2851,7 +2851,7 @@ function doSend(){
 sendBtn.addEventListener("click", doSend);
 
 
-/* ---- quick voice note: tap the mic to start, tap again to stop and send ---- */
+/* ---- quick voice note: tap to record, tap to stop, tap to send ---- */
 var quickVoiceBtn = document.getElementById("quickVoiceBtn");
 var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
 var qvHint = document.getElementById("qvHint");
@@ -2859,11 +2859,17 @@ var qvRecRow = document.getElementById("qvRecRow");
 var qvBars = document.getElementById("qvBars");
 var qvTimer = document.getElementById("qvTimer");
 var qvCancelBtn = document.getElementById("qvCancelBtn");
+var qvStopBtn = document.getElementById("qvStopBtn");
+var qvPreviewRow = document.getElementById("qvPreviewRow");
+var qvPreviewTimer = document.getElementById("qvPreviewTimer");
+var qvDiscardBtn = document.getElementById("qvDiscardBtn");
+var qvSendBtn = document.getElementById("qvSendBtn");
 var qvState = {
   mediaRecorder: null, stream: null, chunks: [],
   recording: false, recordStartedAt: 0,
   recognition: null, transcript: "",
-  timerId: null
+  timerId: null,
+  stoppedBlob: null, stoppedDuration: 0, stoppedTranscript: ""
 };
 
 for(var qi=0; qi<22; qi++){
@@ -2875,7 +2881,8 @@ for(var qi=0; qi<22; qi++){
 function qvOpenOverlay(){
   quickVoiceOverlay.hidden = false;
   qvRecRow.hidden = false;
-  qvHint.textContent = "Tap the mic again to send";
+  qvPreviewRow.hidden = true;
+  qvHint.textContent = "Tap stop, then send";
   qvTimer.textContent = "0:00";
 }
 
@@ -2925,9 +2932,11 @@ function qvCloseOverlay(){
   qvCleanupStream();
   quickVoiceOverlay.hidden = true;
   qvRecRow.hidden = true;
+  qvPreviewRow.hidden = true;
   qvState.recording = false;
   qvState.chunks = [];
   qvState.recordStartedAt = 0;
+  qvState.stoppedBlob = null;
 }
 
 function qvShowError(text){
@@ -2965,7 +2974,7 @@ function qvBeginRecording(){
   });
 }
 
-function qvFinish(cancel){
+function qvStopRecording(discard){
   if(!qvState.mediaRecorder){ qvCloseOverlay(); return; }
   var rec = qvState.mediaRecorder;
   var duration = Math.max(1, Math.round((Date.now() - qvState.recordStartedAt)/1000));
@@ -2979,23 +2988,38 @@ function qvFinish(cancel){
     clearInterval(qvState.timerId);
     qvStopTranscription();
     if(qvState.stream){ qvState.stream.getTracks().forEach(function(t){ t.stop(); }); qvState.stream = null; }
-    quickVoiceOverlay.hidden = true;
-    qvRecRow.hidden = true;
-    qvState.recording = false;
     qvState.mediaRecorder = null;
-    if(cancel){
+    qvState.recording = false;
+    if(discard){
       qvState.chunks = [];
+      qvCloseOverlay();
       return;
     }
     var blob = new Blob(qvState.chunks, {type: qvState.chunks[0] ? qvState.chunks[0].type : "audio/webm"});
     qvState.chunks = [];
-    qvSend(blob, duration, transcript);
+    qvState.stoppedBlob = blob;
+    qvState.stoppedDuration = duration;
+    qvState.stoppedTranscript = transcript;
+    var m = Math.floor(duration/60), s = duration%60;
+    qvPreviewTimer.textContent = m+":"+(s<10?"0":"")+s;
+    qvRecRow.hidden = true;
+    qvPreviewRow.hidden = false;
+    qvHint.textContent = "Tap send";
   };
   rec.onerror = function(){ if(!settled){ settled = true; clearTimeout(safetyTimer); qvCloseOverlay(); } };
   try{
     if(rec.state === "inactive"){ clearTimeout(safetyTimer); qvCloseOverlay(); return; }
     rec.stop();
   }catch(e){ clearTimeout(safetyTimer); qvCloseOverlay(); }
+}
+
+function qvSendNow(){
+  if(!qvState.stoppedBlob) return;
+  var blob = qvState.stoppedBlob, duration = qvState.stoppedDuration, transcript = qvState.stoppedTranscript;
+  qvState.stoppedBlob = null;
+  quickVoiceOverlay.hidden = true;
+  qvPreviewRow.hidden = true;
+  qvSend(blob, duration, transcript);
 }
 
 function qvSend(blob, duration, transcript){
@@ -3044,19 +3068,22 @@ function qvSend(blob, duration, transcript){
   });
 }
 
-function qvToggle(){
-  if(qvState.recording){
-    qvFinish(false);
-    return;
-  }
+function qvStart(){
+  // Ignore extra taps on the external mic button once something's already
+  // in progress - stop and send happen via the buttons inside the pill,
+  // which stay reliably reachable regardless of what's rendered elsewhere.
+  if(qvState.recording || qvState.stoppedBlob) return;
   qvState.recording = true;
   qvOpenOverlay();
   qvBeginRecording();
 }
 
-quickVoiceBtn.addEventListener("click", qvToggle);
-micQuickBtn.addEventListener("click", qvToggle);
-qvCancelBtn.addEventListener("click", function(){ qvFinish(true); });
+quickVoiceBtn.addEventListener("click", qvStart);
+micQuickBtn.addEventListener("click", qvStart);
+qvStopBtn.addEventListener("click", function(){ qvStopRecording(false); });
+qvCancelBtn.addEventListener("click", function(){ qvStopRecording(true); });
+qvDiscardBtn.addEventListener("click", qvCloseOverlay);
+qvSendBtn.addEventListener("click", qvSendNow);
 
 /* ---- mobile back ---- */
 document.getElementById("backBtn").addEventListener("click", function(){

@@ -451,6 +451,21 @@ db.exec(`
     logo_path TEXT,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS personal_notes (
+    id TEXT PRIMARY KEY,
+    staff_id TEXT NOT NULL,
+    staff_name TEXT,
+    title TEXT,
+    body TEXT,
+    file_path TEXT,
+    file_size INTEGER,
+    duration REAL,
+    transcript TEXT,
+    created_at TEXT NOT NULL,
+    deleted_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_personal_notes_staff ON personal_notes(staff_id, created_at);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);
