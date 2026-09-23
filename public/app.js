@@ -4551,7 +4551,14 @@ function loadStories(){
   return apiGet('/api/stories').then(function(res){
     STATE.stories = res.stories || [];
     renderStoriesRow();
-  }).catch(function(){});
+  }).catch(function(err){
+    // A failed load used to leave storiesRow with whatever it last had -
+    // nothing, on first load - so the whole feature silently looked gone.
+    // Render anyway so "Your story" (always in the row regardless of data)
+    // still shows up even when the fetch itself failed.
+    console.error("loadStories failed:", err);
+    renderStoriesRow();
+  });
 }
 function renderStoriesRow(){
   var grouped = storiesByDept();
