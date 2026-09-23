@@ -989,7 +989,7 @@ const server = http.createServer(async (req, res) => {
           guestCount: g.guest_count === null || g.guest_count === undefined ? undefined : g.guest_count,
           location: g.location || undefined,
           members, isMember,
-          lastMessage: last ? rowToMessage(last, self, requester.is_admin) : null,
+          lastMessage: last && (isMember || requester.is_admin) ? rowToMessage(last, self, requester.is_admin) : null,
           unreadCount: isMember ? unread.n : 0,
         };
       }).filter(Boolean);

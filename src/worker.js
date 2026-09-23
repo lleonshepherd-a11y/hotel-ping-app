@@ -44,7 +44,11 @@ function noirIdentity(staffRow) {
     id: staffRow.id,
     name: staffRow.display_name,
     department_id: NOIR_DEPT_ID_REVERSE[staffRow.department_id] || staffRow.department_id,
-    is_admin: (staffRow.role === "general_manager" || staffRow.role === "admin") ? 1 : 0,
+    // Blanket cross-department visibility is reserved for the actual GM,
+    // not for anyone the dashboard happens to also mark role "admin" - a
+    // duty_manager or admin is a normal, membership-scoped participant
+    // like everyone else, same as any staff department account.
+    is_admin: staffRow.role === "general_manager" ? 1 : 0,
     created_at: new Date().toISOString(),
     profile_complete: 1,
     status_line: null,
@@ -1960,7 +1964,11 @@ export default {
             guestCount: merged.guest_count === null || merged.guest_count === undefined ? undefined : merged.guest_count,
             location: merged.location || undefined,
             members, isMember,
-            lastMessage: last ? rowToMessage(last, self, request._staff.is_admin) : null,
+            // A department that isn't a member of this group gets the group's
+            // existence and roster (so it can see what it's not part of) but
+            // never the content of its messages - only a member, or the GM,
+            // may read what was actually said.
+            lastMessage: last && (isMember || request._staff.is_admin) ? rowToMessage(last, self, request._staff.is_admin) : null,
             unreadCount: isMember ? unread.n : 0,
           });
         }
