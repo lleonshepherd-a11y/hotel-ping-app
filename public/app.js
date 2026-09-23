@@ -2845,7 +2845,15 @@ function doSend(){
       if(queueOfflineMessage(deptId, payload)) return;
     }
     blockForLanguage();
-    composerHint.textContent = "That message didn't send. Check your connection and try again.";
+    // A TypeError here really is a network failure (fetch couldn't even
+    // reach the server). Anything else is the server actively rejecting
+    // the request (permissions, validation, etc.) - showing "check your
+    // connection" for that hides the real reason, so surface the actual
+    // message instead.
+    var isNetworkError = err instanceof TypeError;
+    composerHint.textContent = isNetworkError
+      ? "That message didn't send. Check your connection and try again."
+      : "That message didn't send: " + (err && err.message ? err.message : "unknown error");
   });
 }
 sendBtn.addEventListener("click", doSend);
