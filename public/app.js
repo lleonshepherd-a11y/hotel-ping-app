@@ -8429,4 +8429,46 @@ if(installDismissBtn){
   });
 }
 
+/* ---- Push-to-talk preview button - look/feel only, not wired to
+   recording, sending or ticket creation yet. Press-and-hold just
+   animates the waveform so the interaction can be judged in place. ---- */
+(function setupPttPreview(){
+  var pttFloat = document.getElementById('pttFloatBtn');
+  var waveRow = document.getElementById('pttWaveRow');
+  if(!pttFloat || !waveRow) return;
+  var BAR_COUNT = 5, REST_HEIGHTS = [6, 12, 18, 12, 6];
+  var bars = [];
+  for(var i = 0; i < BAR_COUNT; i++){
+    var b = document.createElement('div');
+    b.className = 'ptt-wave-bar';
+    waveRow.appendChild(b);
+    bars.push(b);
+  }
+  function setIdleBars(){ bars.forEach(function(b, idx){ b.style.height = REST_HEIGHTS[idx] + 'px'; }); }
+  setIdleBars();
+  var waveTimer = null;
+  function startLive(){
+    pttFloat.classList.add('live');
+    if(navigator.vibrate) navigator.vibrate(12);
+    waveTimer = setInterval(function(){
+      bars.forEach(function(b, idx){
+        var center = (BAR_COUNT - 1) / 2;
+        var falloff = 1 - Math.abs(idx - center) / (center + 0.5) * 0.5;
+        var h = (5 + Math.random() * 15) * falloff;
+        b.style.height = Math.max(4, h) + 'px';
+      });
+    }, 100);
+  }
+  function stopLive(){
+    pttFloat.classList.remove('live');
+    clearInterval(waveTimer);
+    setIdleBars();
+    if(navigator.vibrate) navigator.vibrate(8);
+  }
+  var pressing = false;
+  pttFloat.addEventListener('pointerdown', function(e){ e.preventDefault(); pressing = true; startLive(); });
+  window.addEventListener('pointerup', function(){ if(pressing){ pressing = false; stopLive(); } });
+  window.addEventListener('pointercancel', function(){ if(pressing){ pressing = false; stopLive(); } });
+})();
+
 })();
