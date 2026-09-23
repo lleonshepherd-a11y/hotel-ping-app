@@ -1573,8 +1573,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .toast.above-modal{bottom:auto;top:24px;transform:translateX(-50%) translateY(-10px)}
 .toast.above-modal.show{transform:translateX(-50%) translateY(0)}
 
-.pin-indicator{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;color:#2f5fe0;background:rgba(47,95,224,.13);border:1px solid rgba(47,95,224,.28);padding:3px 9px 3px 7px;border-radius:999px;margin-bottom:4px}
-.pin-indicator svg{width:14px;height:14px}
+.pin-indicator{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;color:#2f5fe0;background:rgba(47,95,224,.13);border:1px solid rgba(47,95,224,.28);border-radius:50%;margin-bottom:4px}
+.pin-indicator svg{width:12px;height:12px}
 .done-indicator{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#2f9a5c;margin-bottom:2px}
 .done-indicator svg{width:10px;height:10px}
 .broadcast-status-tag{font-size:10.5px;font-weight:700;color:var(--text-dim);margin-bottom:2px}

@@ -1950,7 +1950,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   if(m.pinned){
     var pinTag = document.createElement("div");
     pinTag.className = "pin-indicator";
-    pinTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> Pinned';
+    pinTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>';
     wrap.appendChild(pinTag);
   }
 
