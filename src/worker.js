@@ -910,6 +910,23 @@ function rowToRunsheetItem(row) {
     createdByName: row.created_by_name || undefined,
   };
 }
+async function reactionsMap(env, messageIds) {
+  const ids = [...new Set(messageIds)];
+  if (!ids.length) return {};
+  const rows = await env.DB.prepare(
+    `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${ids.map(() => "?").join(",")})`
+  ).bind(...ids).all();
+  const byMessage = {};
+  rows.results.forEach((r) => {
+    byMessage[r.message_id] = byMessage[r.message_id] || [];
+    byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
+  });
+  return byMessage;
+}
+function attachReactions(messages, map) {
+  messages.forEach((m) => { m.reactions = map[m.id] || []; });
+  return messages;
+}
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
   if (deleted && !isAdmin && viewerDeptId !== row.from_dept) {
@@ -2022,7 +2039,9 @@ export default {
         const rows = await env.DB.prepare(
           `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
         ).bind(self, other, other, self).all();
-        return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
+        const messages = rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
+        const rMap = await reactionsMap(env, messages.map((m) => m.id));
+        return json({ messages: attachReactions(messages, rMap) });
       }
 
       // ---- Groups ----
@@ -2414,7 +2433,9 @@ export default {
           }
         }
         const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
-        return json({ messages: rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean) });
+        const messages = rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
+        const rMap = await reactionsMap(env, messages.map((m) => m.id));
+        return json({ messages: attachReactions(messages, rMap) });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/read")) {
@@ -2907,6 +2928,34 @@ export default {
         await env.DB.prepare("UPDATE messages SET pinned_at = ? WHERE id = ?").bind(nextPinned ? new Date().toISOString() : null, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/reactions")) {
+        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/reactions".length));
+        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Message not found" }, 404);
+        const requester = request._staff;
+        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
+        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
+        const body = await readJsonBody(request);
+        const emoji = String(body.emoji || "").trim().slice(0, 8);
+        if (!emoji) return json({ error: "An emoji is required" }, 400);
+        const current = await env.DB.prepare(
+          "SELECT emoji FROM message_reactions WHERE message_id = ? AND department_id = ?"
+        ).bind(id, requester.department_id).first();
+        // Tapping the same reaction again removes it - a real toggle, not a
+        // one-way stamp, same as tapping a like a second time anywhere else.
+        if (current && current.emoji === emoji) {
+          await env.DB.prepare("DELETE FROM message_reactions WHERE message_id = ? AND department_id = ?").bind(id, requester.department_id).run();
+        } else {
+          await env.DB.prepare(
+            `INSERT INTO message_reactions (id, message_id, department_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(message_id, department_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at`
+          ).bind(crypto.randomUUID(), id, requester.department_id, emoji, new Date().toISOString()).run();
+        }
+        const rMap = await reactionsMap(env, [id]);
+        return json({ reactions: rMap[id] || [] });
       }
 
       if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/affects-guest")) {

@@ -201,7 +201,8 @@ function mapServerMessage(row, self){
     poll: row.poll || undefined,
     escalationLevel: row.escalationLevel || 0,
     affectsGuest: !!row.affectsGuest,
-    staffName: row.staffName || undefined
+    staffName: row.staffName || undefined,
+    reactions: (row.reactions || []).map(function(r){ return { emoji: r.emoji, from: r.from === self ? "self" : r.from }; })
   };
 }
 
@@ -420,10 +421,30 @@ function makeToneVoiceNote(durationSec, baseFreq){
     return { url: URL.createObjectURL(blob), duration: durationSec };
   }).catch(function(){ return null; });
 }
+// A fresh AudioContext created with no prior user gesture (e.g. from inside
+// a setInterval poll callback, which is how this used to work) starts
+// "suspended" on iOS Safari/PWA and never makes a sound - silently, with no
+// error. One context is created and unlocked on the very first tap the
+// person makes anywhere in the app, then reused and re-resumed (backgrounding
+// re-suspends it) for every chime after that, so it's actually audible on
+// the phones this app is built for.
+var chimeCtx = null;
+function unlockChime(){
+  var Ctx = window.AudioContext || window.webkitAudioContext;
+  if(!Ctx) return;
+  if(!chimeCtx){
+    try{ chimeCtx = new Ctx(); }catch(e){ return; }
+  }
+  if(chimeCtx.state === "suspended"){
+    chimeCtx.resume().catch(function(){});
+  }
+}
+document.addEventListener("pointerdown", unlockChime);
 function playChime(urgent){
   try{
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    var ctx = new Ctx();
+    unlockChime();
+    var ctx = chimeCtx;
+    if(!ctx || ctx.state !== "running") return;
     var now0 = ctx.currentTime;
     var notes = urgent ? [880,1108,1318] : [740];
     notes.forEach(function(f,i){
@@ -436,7 +457,6 @@ function playChime(urgent){
       osc.connect(gain).connect(ctx.destination);
       osc.start(t); osc.stop(t+0.4);
     });
-    setTimeout(function(){ ctx.close(); }, 900);
   }catch(e){}
 }
 
@@ -1427,6 +1447,7 @@ function hideMessageActionMenu(){
   setTimeout(function(){ msgActionMenu.hidden = true; }, 140);
 }
 
+var QUICK_REACTIONS = ["👍","✅","🔥","👀","❤️","😂"];
 function showMessageActionMenu(m, x, y){
   var canDelete = !m.deleted && (m.from === "self" || (AUTH.staff && AUTH.staff.isAdmin));
   var rows = [];
@@ -1437,6 +1458,11 @@ function showMessageActionMenu(m, x, y){
   rows.push({ key:"pin", label: m.pinned ? "Unpin" : "Pin", icon:ACTION_ICONS.pin });
   if(!m.deleted) rows.push({ key:"complete", label: m.completed ? "Mark as not done" : "Mark as done", icon:ACTION_ICONS.check });
 
+  var myReaction = (m.reactions || []).filter(function(r){ return r.from === "self"; })[0];
+  var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' + QUICK_REACTIONS.map(function(e){
+    return '<button type="button" class="msg-action-react-btn'+(myReaction && myReaction.emoji===e ? ' active' : '')+'" data-emoji="'+e+'">'+e+'</button>';
+  }).join("") + '</div>' : '';
+
   var html = rows.map(function(r){
     return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
   }).join("");
@@ -1444,7 +1470,15 @@ function showMessageActionMenu(m, x, y){
     html += '<div class="msg-action-divider"></div>' +
       '<button type="button" class="msg-action-row danger" data-action="delete">'+ACTION_ICONS.trash+'<span>Delete</span></button>';
   }
-  msgActionMenu.innerHTML = html;
+  msgActionMenu.innerHTML = reactHtml + html;
+  if(!m.deleted){
+    msgActionMenu.querySelectorAll(".msg-action-react-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        hideMessageActionMenu();
+        toggleReaction(m, btn.getAttribute("data-emoji"));
+      });
+    });
+  }
 
   msgActionMenu.hidden = false;
   msgActionBackdrop.hidden = false;
@@ -1486,6 +1520,18 @@ function currentMessagesArray(){
   }
   STATE.data[STATE.active] = STATE.data[STATE.active] || [];
   return STATE.data[STATE.active];
+}
+
+function toggleReaction(m, emoji){
+  if(navigator.vibrate) navigator.vibrate(10);
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/reactions', 'POST', { emoji: emoji }).then(function(res){
+    var msgs = currentMessagesArray();
+    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
+    if(idx !== -1){
+      msgs[idx].reactions = (res.reactions || []).map(function(r){ return { emoji: r.emoji, from: r.from === STATE.self ? "self" : r.from }; });
+    }
+    renderThread();
+  }).catch(function(){ showToast("Couldn't react to that"); });
 }
 
 function togglePinMessage(m){
@@ -2045,6 +2091,25 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   }
   if(m.poll) wrap.appendChild(buildPollCard(m));
   if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
+
+  if(m.reactions && m.reactions.length){
+    var counts = {};
+    var order = [];
+    m.reactions.forEach(function(r){
+      if(!counts[r.emoji]){ counts[r.emoji] = 0; order.push(r.emoji); }
+      counts[r.emoji]++;
+    });
+    var mine = m.reactions.filter(function(r){ return r.from === "self"; })[0];
+    var pills = document.createElement("div");
+    pills.className = "msg-reactions-row" + (out ? " out" : "");
+    pills.innerHTML = order.map(function(e){
+      return '<button type="button" class="msg-reaction-pill'+(mine && mine.emoji===e ? ' mine' : '')+'" data-emoji="'+e+'">'+e+(counts[e]>1 ? ' <span>'+counts[e]+'</span>' : '')+'</button>';
+    }).join("");
+    pills.querySelectorAll(".msg-reaction-pill").forEach(function(btn){
+      btn.addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(m, btn.getAttribute("data-emoji")); });
+    });
+    wrap.appendChild(pills);
+  }
 
   var canInlineMeta = m.type === "text" && !hideTextBubble;
   var meta = document.createElement("div");

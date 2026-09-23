@@ -55,6 +55,18 @@ CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 
 CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
 
+-- One reaction per department per message - tapping the same emoji again
+-- (in the worker's toggle handler) removes the row rather than stacking.
+CREATE TABLE IF NOT EXISTS message_reactions (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL,
+  department_id TEXT NOT NULL,
+  emoji TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(message_id, department_id)
+);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
+
 CREATE TABLE IF NOT EXISTS staff (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
