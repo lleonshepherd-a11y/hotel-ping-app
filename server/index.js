@@ -125,7 +125,7 @@ function rowToHandoverNote(row) {
   return { id: row.id, departmentId: row.department_id, staffId: row.staff_id, staffName: row.staff_name, body: row.body, createdAt: row.created_at };
 }
 function rowToDepartment(row) {
-  return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty, photoUrl: row.photo_path ? '/uploads/' + row.photo_path : undefined };
+  return { id: row.id, name: row.name, contactName: row.contact_name, onDuty: !!row.on_duty };
 }
 function rowToTicket(row) {
   return {
@@ -603,6 +603,8 @@ const server = http.createServer(async (req, res) => {
 
       const token = crypto.randomUUID() + crypto.randomUUID();
       db.prepare('INSERT INTO sessions (token, staff_id, created_at) VALUES (?, ?, ?)').run(token, staff.id, new Date().toISOString());
+      const photoRow = db.prepare('SELECT photo_path FROM staff_photos WHERE staff_id = ?').get(staff.id);
+      if (photoRow) staff.photo_url = '/uploads/' + photoRow.photo_path;
       return send(res, 200, { token: token, staff: rowToStaff(staff) });
     }
 
@@ -793,36 +795,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { department: rowToDepartment(row) });
     }
 
-    if (req.method === 'POST' && p.startsWith('/api/departments/') && p.endsWith('/photo')) {
-      const id = decodeURIComponent(p.slice('/api/departments/'.length, -'/photo'.length));
-      if (!DEPT_IDS.has(id)) return send(res, 404, { error: 'Unknown department' });
-      const requester = staffFromToken(req);
-      if (requester.department_id !== id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only change your own department's photo" });
-      }
-      const body = await readJsonBody(req);
-      if (!body.fileBase64) return send(res, 400, { error: 'Photo is required' });
-      const buf = Buffer.from(body.fileBase64, 'base64');
-      if (buf.length > 8 * 1024 * 1024) return send(res, 400, { error: 'Photo is too large (8MB max)' });
-      const ext = (body.fileMime && body.fileMime.split('/')[1]) ? '.' + body.fileMime.split('/')[1].split(';')[0] : '';
-      const safeName = 'dept-' + id + '-' + crypto.randomUUID() + ext;
-      fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
-      db.prepare('UPDATE departments SET photo_path = ? WHERE id = ?').run(safeName, id);
-      const row = db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
-      return send(res, 200, { department: rowToDepartment(row) });
-    }
-
-    if (req.method === 'DELETE' && p.startsWith('/api/departments/') && p.endsWith('/photo')) {
-      const id = decodeURIComponent(p.slice('/api/departments/'.length, -'/photo'.length));
-      if (!DEPT_IDS.has(id)) return send(res, 404, { error: 'Unknown department' });
-      const requester = staffFromToken(req);
-      if (requester.department_id !== id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only change your own department's photo" });
-      }
-      db.prepare('UPDATE departments SET photo_path = NULL WHERE id = ?').run(id);
-      const row = db.prepare('SELECT * FROM departments WHERE id = ?').get(id);
-      return send(res, 200, { department: rowToDepartment(row) });
-    }
+    // Departments are icon-only - the self-service "department photo"
+    // endpoints that used to live here are gone. Individual people (see
+    // /api/staff/:id/photo) are the only ones who get a photo.
 
     // ---- Staff photos (personal, not the department's shared photo) ----
     // Used for head-of-department contacts, where the point is a real,

@@ -4268,7 +4268,10 @@ changePinForm.addEventListener("submit", function(e){
   }).finally(function(){ changePinSubmitBtn.disabled = false; });
 });
 
-var deptPhotoBtn = document.getElementById("deptPhotoBtn");
+// These elements still carry the "deptPhoto" id prefix from when this
+// overlay uploaded the department's shared photo - it's now rewired below
+// to upload the signed-in staff member's own personal photo instead
+// (departments are icon-only; see /api/staff/:id/photo on the backend).
 var deptPhotoOverlay = document.getElementById("deptPhotoOverlay");
 var deptPhotoClose = document.getElementById("deptPhotoClose");
 var deptPhotoPreview = document.getElementById("deptPhotoPreview");
@@ -4287,9 +4290,10 @@ var myProfileStatusInput = document.getElementById("myProfileStatusInput");
 var myProfilePhoneInput = document.getElementById("myProfilePhoneInput");
 var myProfileNameSaveBtn = document.getElementById("myProfileNameSaveBtn");
 function renderDeptPhotoPreview(){
-  var meta = DEPT_META[STATE.self];
-  if(meta && meta.photoUrl){
-    deptPhotoPreview.style.backgroundImage = "url('"+meta.photoUrl+"')";
+  // Personal photo, not the department's - a department never has one.
+  var photoUrl = AUTH.staff && AUTH.staff.photoUrl;
+  if(photoUrl){
+    deptPhotoPreview.style.backgroundImage = "url('"+photoUrl+"')";
     deptPhotoPreview.innerHTML = "";
     deptPhotoRemoveBtn.hidden = false;
   } else {
@@ -4301,7 +4305,12 @@ function renderDeptPhotoPreview(){
 function renderMyProfileCard(){
   if(!AUTH.staff) return;
   myProfileAvatar.setAttribute("style", avatarStyleAttr(STATE.self));
-  myProfileAvatar.innerHTML = avatarInnerHtml(STATE.self);
+  // Prefer the signed-in person's own photo over the department icon here -
+  // this card represents them personally, not the department they're
+  // logged into.
+  myProfileAvatar.innerHTML = AUTH.staff.photoUrl
+    ? iconSvg(STATE.self) + '<img src="'+esc(AUTH.staff.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
+    : avatarInnerHtml(STATE.self);
   myProfileName.textContent = AUTH.staff.name;
   myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
   myProfileStatus.hidden = !AUTH.staff.statusLine;
@@ -4322,7 +4331,6 @@ function openMyProfileOverlay(){
   deptPhotoOverlay.hidden = false;
 }
 myProfileBtn.addEventListener("click", openMyProfileOverlay);
-deptPhotoBtn.addEventListener("click", openMyProfileOverlay);
 deptPhotoClose.addEventListener("click", function(){ deptPhotoOverlay.hidden = true; });
 deptPhotoOverlay.addEventListener("click", function(e){ if(e.target === deptPhotoOverlay) deptPhotoOverlay.hidden = true; });
 deptPhotoPreviewWrap.addEventListener("click", function(){ deptPhotoFileInput.click(); });
@@ -4487,9 +4495,10 @@ deptPhotoFileInput.addEventListener("change", function(){
     deptPhotoError.textContent = "";
     deptPhotoPreviewWrap.classList.add("uploading");
     return blobToBase64(blob).then(function(b64){
-      return apiSend('/api/departments/' + encodeURIComponent(STATE.self) + '/photo', 'POST', { fileBase64: b64, fileMime: "image/jpeg" });
+      // This person's own photo, not the department's - a department can't have one.
+      return apiSend('/api/staff/' + encodeURIComponent(AUTH.staff.id) + '/photo', 'POST', { fileBase64: b64, fileMime: "image/jpeg" });
     }).then(function(res){
-      DEPT_META[STATE.self] = res.department;
+      AUTH.staff.photoUrl = res.photoUrl;
       renderDeptPhotoPreview();
       renderMyProfileCard();
       renderList();
@@ -4504,8 +4513,8 @@ deptPhotoFileInput.addEventListener("change", function(){
 deptPhotoRemoveBtn.addEventListener("click", function(){
   deptPhotoError.textContent = "";
   deptPhotoRemoveBtn.disabled = true;
-  apiDelete('/api/departments/' + encodeURIComponent(STATE.self) + '/photo').then(function(res){
-    DEPT_META[STATE.self] = res.department;
+  apiDelete('/api/staff/' + encodeURIComponent(AUTH.staff.id) + '/photo').then(function(res){
+    AUTH.staff.photoUrl = null;
     renderDeptPhotoPreview();
     renderMyProfileCard();
     renderList();
