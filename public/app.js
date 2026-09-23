@@ -446,16 +446,19 @@ function playChime(urgent){
     var ctx = chimeCtx;
     if(!ctx || ctx.state !== "running") return;
     var now0 = ctx.currentTime;
-    var notes = urgent ? [880,1108,1318] : [740];
-    notes.forEach(function(f,i){
+    // A short, single, percussive "ping" - fast attack, fast decay - not a
+    // soft multi-note bell chime. Urgent repeats the same ping twice, fast,
+    // rather than an ascending melody.
+    var pings = urgent ? [0, 0.16] : [0];
+    pings.forEach(function(offset){
       var osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = "sine"; osc.frequency.value = f;
-      var t = now0 + i*0.11;
+      osc.type = "sine"; osc.frequency.value = 1040;
+      var t = now0 + offset;
       gain.gain.setValueAtTime(0,t);
-      gain.gain.linearRampToValueAtTime(urgent?0.13:0.08, t+0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t+0.35);
+      gain.gain.linearRampToValueAtTime(urgent?0.16:0.11, t+0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t+0.15);
       osc.connect(gain).connect(ctx.destination);
-      osc.start(t); osc.stop(t+0.4);
+      osc.start(t); osc.stop(t+0.16);
     });
   }catch(e){}
 }
@@ -1447,7 +1450,8 @@ function hideMessageActionMenu(){
   setTimeout(function(){ msgActionMenu.hidden = true; }, 140);
 }
 
-var QUICK_REACTIONS = ["👍","✅","🔥","👀","❤️","😂"];
+var THUMB_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22V11l5-9a2.5 2.5 0 0 1 2.5 3l-1 5h5.5a2 2 0 0 1 2 2.4l-1.7 7A2 2 0 0 1 17.4 22H7z"/><path d="M7 22H4a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1h3"/></svg>';
+var THUMB_REACTION = "thumbsup";
 function showMessageActionMenu(m, x, y){
   var canDelete = !m.deleted && (m.from === "self" || (AUTH.staff && AUTH.staff.isAdmin));
   var rows = [];
@@ -1459,9 +1463,9 @@ function showMessageActionMenu(m, x, y){
   if(!m.deleted) rows.push({ key:"complete", label: m.completed ? "Mark as not done" : "Mark as done", icon:ACTION_ICONS.check });
 
   var myReaction = (m.reactions || []).filter(function(r){ return r.from === "self"; })[0];
-  var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' + QUICK_REACTIONS.map(function(e){
-    return '<button type="button" class="msg-action-react-btn'+(myReaction && myReaction.emoji===e ? ' active' : '')+'" data-emoji="'+e+'">'+e+'</button>';
-  }).join("") + '</div>' : '';
+  var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' +
+    '<button type="button" class="msg-action-react-btn'+(myReaction ? ' active' : '')+'" data-emoji="'+THUMB_REACTION+'">'+THUMB_ICON+'</button>' +
+    '</div>' : '';
 
   var html = rows.map(function(r){
     return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
@@ -2093,21 +2097,12 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
 
   if(m.reactions && m.reactions.length){
-    var counts = {};
-    var order = [];
-    m.reactions.forEach(function(r){
-      if(!counts[r.emoji]){ counts[r.emoji] = 0; order.push(r.emoji); }
-      counts[r.emoji]++;
-    });
     var mine = m.reactions.filter(function(r){ return r.from === "self"; })[0];
     var pills = document.createElement("div");
     pills.className = "msg-reactions-row" + (out ? " out" : "");
-    pills.innerHTML = order.map(function(e){
-      return '<button type="button" class="msg-reaction-pill'+(mine && mine.emoji===e ? ' mine' : '')+'" data-emoji="'+e+'">'+e+(counts[e]>1 ? ' <span>'+counts[e]+'</span>' : '')+'</button>';
-    }).join("");
-    pills.querySelectorAll(".msg-reaction-pill").forEach(function(btn){
-      btn.addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(m, btn.getAttribute("data-emoji")); });
-    });
+    pills.innerHTML =
+      '<button type="button" class="msg-reaction-pill'+(mine ? ' mine' : '')+'">'+THUMB_ICON+(m.reactions.length>1 ? ' <span>'+m.reactions.length+'</span>' : '')+'</button>';
+    pills.querySelector(".msg-reaction-pill").addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(m, THUMB_REACTION); });
     wrap.appendChild(pills);
   }
 
