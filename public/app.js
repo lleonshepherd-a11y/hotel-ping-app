@@ -447,9 +447,9 @@ function playChime(urgent){
     if(!ctx || ctx.state !== "running") return;
     var now0 = ctx.currentTime;
     // A short, single, percussive "ping" - fast attack, fast decay - not a
-    // soft multi-note bell chime. Urgent repeats the same ping twice, fast,
-    // rather than an ascending melody.
-    var pings = urgent ? [0, 0.16] : [0];
+    // soft multi-note bell chime - three short pings every time, not a
+    // one-note blip or a melodic run.
+    var pings = [0, 0.16, 0.32];
     pings.forEach(function(offset){
       var osc = ctx.createOscillator(), gain = ctx.createGain();
       osc.type = "sine"; osc.frequency.value = 1040;
