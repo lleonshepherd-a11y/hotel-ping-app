@@ -604,12 +604,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .flash-highlight .bubble{animation:flashHighlight 1.2s ease}
 @keyframes flashHighlight{0%,100%{filter:none}30%{filter:brightness(1.25) saturate(1.3)}}
 .composer-pill{
-  flex:1;display:flex;align-items:center;min-width:0;gap:6px;
+  flex:1;display:flex;align-items:center;min-width:0;gap:4px;position:relative;
   background:#fff;
   border:1.5px solid #14140f;
-  border-radius:24px;padding:0 6px 0 16px;
+  border-radius:26px;padding:3px 3px 3px 6px;
   transition:background .15s ease,border-color .15s ease;
 }
+.composer-pill .icon-btn.in-pill{width:36px;height:36px;flex:none}
+.composer-pill .icon-btn.in-pill svg{width:18px;height:18px}
+.composer-pill #msgInput{padding-left:4px}
 .qr-wrap{position:relative;flex:none}
 .qr-btn.open{background:rgba(20,20,22,.16);color:var(--accent)}
 .qr-menu{
@@ -697,12 +700,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .send-btn.hide{width:0;opacity:0;transform:scale(.4);margin-left:-6px}
 .send-btn.ready.urgent{background:linear-gradient(150deg,var(--urgent),var(--urgent-2))}
 .mic-inline{
-  flex:none;width:32px;height:32px;border-radius:50%;border:none;background:none;
-  color:var(--text-faint);display:flex;align-items:center;justify-content:center;
-  opacity:1;transform:scale(1);transition:opacity .16s ease,transform .16s ease,color .15s ease;
+  flex:none;width:44px;height:44px;border-radius:50%;border:none;
+  background:#14140f;color:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  opacity:1;transform:scale(1);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 8px 18px -4px rgba(20,20,22,.4);
+  transition:background .15s ease,transform .16s ease,width .16s ease,opacity .16s ease;
   touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
-.mic-inline:hover{color:var(--accent)}
+.mic-inline:hover{background:#14140f;opacity:.88}
 .mic-inline.hide{width:0;opacity:0;transform:scale(.4)}
 .send-btn svg{width:18px;height:18px}
 .mic-inline svg{width:18px;height:18px}
