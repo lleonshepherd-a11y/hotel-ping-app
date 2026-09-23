@@ -5088,7 +5088,7 @@ function helpBackToIdle(){
 function helpHoldTick(){
   var elapsed = Date.now() - helpHoldStart;
   var pct = Math.min(100, (elapsed / HELP_HOLD_MS) * 100);
-  helpHoldRing.style.background = "linear-gradient(to right, rgba(193,104,95,.55) " + pct + "%, transparent " + pct + "%)";
+  helpHoldRing.style.background = "linear-gradient(to right, rgba(163,34,26,.55) " + pct + "%, transparent " + pct + "%)";
   if(elapsed >= HELP_HOLD_MS){
     helpHoldRAF = null;
     helpArmHelp();
