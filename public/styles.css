@@ -691,7 +691,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #msgInput::placeholder{color:var(--text-faint)}
 .send-btn{
   flex:none;width:44px;height:44px;border-radius:50%;border:none;
-  background:#14140f;color:#fff;
+  background:#3a3a36;color:#fff;
   display:flex;align-items:center;justify-content:center;overflow:hidden;
   opacity:1;transform:scale(1);margin-left:0;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 8px 18px -4px rgba(20,20,22,.4);
@@ -701,14 +701,14 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .send-btn.ready.urgent{background:linear-gradient(150deg,var(--urgent),var(--urgent-2))}
 .mic-inline{
   flex:none;width:44px;height:44px;border-radius:50%;border:none;
-  background:#14140f;color:#fff;
+  background:#3a3a36;color:#fff;
   display:flex;align-items:center;justify-content:center;overflow:hidden;
   opacity:1;transform:scale(1);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 8px 18px -4px rgba(20,20,22,.4);
   transition:background .15s ease,transform .16s ease,width .16s ease,opacity .16s ease;
   touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
-.mic-inline:hover{background:#14140f;opacity:.88}
+.mic-inline:hover{background:#3a3a36;opacity:.88}
 .mic-inline.hide{width:0;opacity:0;transform:scale(.4)}
 .send-btn svg{width:18px;height:18px}
 .mic-inline svg{width:18px;height:18px}
