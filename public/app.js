@@ -1716,7 +1716,7 @@ function buildSignoffCard(m){
   head.className = "signoff-head";
   head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> HOD SIGN-OFF REQUEST' +
     (s.code ? ' <span class="signoff-code">'+esc(s.code)+'</span>' : '') + '</span>' +
-    (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '');
+    (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '<span class="signoff-amount no-amount">No amount given</span>');
   card.appendChild(head);
 
   if(s.category){
@@ -5148,7 +5148,7 @@ function buildMissedApprovalCard(item){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
     '<div class="missed-msg-body">' +
-      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '') +
+      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '<div class="request-amount-hero no-amount">No amount given</div>') +
       '<div class="missed-msg-top">' +
         (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
         '<span class="missed-msg-from">' + esc(dept.name) + '</span>' +
@@ -8186,7 +8186,7 @@ function buildRequestCard(m){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
     '<div class="missed-msg-body">' +
-      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '') +
+      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '<div class="request-amount-hero no-amount">No amount given</div>') +
       '<div class="missed-msg-top">' +
         (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
         '<span class="missed-msg-from">' + (mine ? "To " + esc(otherName) : "From " + esc(otherName)) + '</span>' +
