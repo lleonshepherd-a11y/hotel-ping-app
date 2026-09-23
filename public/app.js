@@ -1823,7 +1823,7 @@ function buildPollCard(m){
 function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var row = document.createElement("div");
   var out = m.from === "self";
-  row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "") + (m.pending ? " pending" : "");
+  row.className = "msg-row " + (out?"out":"in") + (m.urgent ? " urgent" : "") + (groupEnd ? " group-end" : "") + (m.pending ? " pending" : "") + (m.failed ? " failed" : "");
   row.setAttribute("data-msg-id", m.id);
 
   var wrap = document.createElement("div");
@@ -1834,11 +1834,17 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     // never to the individual staff member who sent it - m.staffName carries
     // that personal name when the server captured it, so people can tell who
     // specifically sent something instead of just which department it's from.
-    var labelText = m.staffName || (STATE.activeGroupId && !out ? (DEPTS[m.from] ? DEPTS[m.from].name : m.from) : null);
+    // A head-of-department contact (m.from like "head_kitchen") always shows
+    // both its title ("Head Chef") and the specific person's name together,
+    // since a head is a named, photographed individual, not a shared queue.
+    var senderDept = DEPTS[m.from];
+    var isHeadContact = typeof m.from === "string" && m.from.indexOf("head_") === 0;
+    var labelText = isHeadContact
+      ? (senderDept ? senderDept.name : m.from) + (m.staffName ? " · " + m.staffName : "")
+      : (m.staffName || (STATE.activeGroupId && !out ? (senderDept ? senderDept.name : m.from) : null));
     if(labelText){
       var senderLabel = document.createElement("div");
       senderLabel.className = "group-sender-name";
-      var senderDept = DEPTS[m.from];
       if(senderDept) senderLabel.style.color = senderDept.color;
       senderLabel.textContent = labelText;
       wrap.appendChild(senderLabel);
@@ -2002,7 +2008,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
   var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text") || (m.roomClean && m.type === "text");
   if(!hideTextBubble){
-    if(!m.deleted && !m.pending) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
+    if(!m.deleted && !m.pending && !m.failed) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(bubble);
   }
   if(m.type === "audio" && m.transcript){
@@ -2034,7 +2040,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
 
   if(m.signoff){
     var signoffCard = buildSignoffCard(m);
-    if(!m.deleted && !m.pending) attachLongPress(signoffCard, function(x, y){ showMessageActionMenu(m, x, y); });
+    if(!m.deleted && !m.pending && !m.failed) attachLongPress(signoffCard, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(signoffCard);
   }
   if(m.poll) wrap.appendChild(buildPollCard(m));
@@ -2044,7 +2050,13 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   var meta = document.createElement("div");
   if(out){
     meta.className = "msg-status" + (canInlineMeta ? " bubble-meta-inline" : "") + (m.status === "read" ? " read" : "");
-    if(m.pending){
+    if(m.failed){
+      var failedLabel = document.createElement("span");
+      failedLabel.className = "failed-label";
+      failedLabel.textContent = "Not delivered · Tap to retry";
+      failedLabel.addEventListener("click", function(ev){ ev.stopPropagation(); retryFailedMessage(m); });
+      meta.appendChild(failedLabel);
+    } else if(m.pending){
       var pendingLabel = document.createElement("span");
       pendingLabel.className = "pending-label";
       pendingLabel.textContent = "Sending…";
@@ -2844,19 +2856,78 @@ function doSend(){
     if(err instanceof TypeError || !navigator.onLine){
       if(queueOfflineMessage(deptId, payload)) return;
     }
-    blockForLanguage();
     // A TypeError here really is a network failure (fetch couldn't even
     // reach the server). Anything else is the server actively rejecting
-    // the request (permissions, validation, etc.) - showing "check your
-    // connection" for that hides the real reason, so surface the actual
-    // message instead.
+    // the request (permissions, validation, etc.). Either way, a message
+    // service doesn't get to just swallow what someone typed - it stays
+    // visible in the thread, marked as not delivered, so nothing is ever
+    // silently lost.
     var isNetworkError = err instanceof TypeError;
-    composerHint.textContent = isNetworkError
-      ? "That message didn't send. Check your connection and try again."
-      : "That message didn't send: " + (err && err.message ? err.message : "unknown error");
+    addFailedMessage(deptId, groupId, payload, isNetworkError
+      ? "Check your connection and try again."
+      : (err && err.message ? err.message : "Server error"));
   });
 }
 sendBtn.addEventListener("click", doSend);
+
+// Keeps a send that the server actively rejected (as opposed to a true
+// offline/network failure, which goes through queueOfflineMessage's
+// auto-retry-on-reconnect path instead) visible in the thread as "Not
+// delivered" rather than discarding the typed message - see doSend()'s
+// catch handler.
+function addFailedMessage(deptId, groupId, payload, reason){
+  var localId = "failed-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  var failedMsg = {
+    id: localId, from: "self", to: groupId ? undefined : deptId, type: payload.type,
+    text: payload.text || "", fileName: payload.fileName || undefined,
+    urgent: !!payload.urgent, t: Date.now(), read: false, status: "failed",
+    replyTo: payload.replyToId || undefined, pinned: false, completed: false,
+    deleted: false, pending: false, failed: true, failReason: reason,
+    retryDeptId: deptId, retryGroupId: groupId || null, retryPayload: payload,
+    roomNumber: payload.roomNumber || undefined, taskStatus: payload.taskStatus || undefined,
+    signoff: payload.signoff ? Object.assign({ status: "pending" }, payload.signoff) : undefined
+  };
+  if(groupId){
+    STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+    STATE.groupMessages[groupId].push(failedMsg);
+    if(STATE.activeGroupId === groupId) renderThread();
+  } else {
+    STATE.data[deptId] = STATE.data[deptId] || [];
+    STATE.data[deptId].push(failedMsg);
+    if(STATE.active === deptId) renderThread();
+  }
+  renderList();
+  showToast("Not delivered: " + reason);
+}
+function retryFailedMessage(m){
+  var arr = m.retryGroupId ? (STATE.groupMessages[m.retryGroupId] || []) : (STATE.data[m.retryDeptId] || []);
+  var idx = arr.findIndex(function(x){ return x.id === m.id; });
+  if(idx !== -1) arr.splice(idx, 1);
+  if(m.retryGroupId){ if(STATE.activeGroupId === m.retryGroupId) renderThread(); }
+  else { if(STATE.active === m.retryDeptId) renderThread(); }
+  renderList();
+  apiSend('/api/messages', 'POST', m.retryPayload).then(function(res){
+    var real = mapServerMessage(res.message, STATE.self);
+    if(m.retryGroupId){
+      STATE.groupMessages[m.retryGroupId] = STATE.groupMessages[m.retryGroupId] || [];
+      STATE.groupMessages[m.retryGroupId].push(real);
+      if(STATE.activeGroupId === m.retryGroupId) renderThread();
+    } else {
+      STATE.data[m.retryDeptId] = STATE.data[m.retryDeptId] || [];
+      STATE.data[m.retryDeptId].push(real);
+      if(STATE.active === m.retryDeptId) renderThread();
+    }
+    renderList();
+  }).catch(function(err){
+    if(err instanceof TypeError || !navigator.onLine){
+      if(queueOfflineMessage(m.retryDeptId, m.retryPayload)) return;
+    }
+    var isNetworkError = err instanceof TypeError;
+    addFailedMessage(m.retryDeptId, m.retryGroupId, m.retryPayload, isNetworkError
+      ? "Check your connection and try again."
+      : (err && err.message ? err.message : "Server error"));
+  });
+}
 
 
 /* ---- quick voice note: tap to record, tap to stop, tap to send ---- */
@@ -3704,8 +3775,8 @@ function buildDeptHeadRow(deptId){
     var req = staffId
       ? apiSend('/api/department-heads/' + encodeURIComponent(deptId), 'PUT', { staffId: staffId })
       : apiDelete('/api/department-heads/' + encodeURIComponent(deptId));
-    req.then(refreshAfterDeptHeadsChange).catch(function(){
-      showToast("Couldn't update that department's head");
+    req.then(refreshAfterDeptHeadsChange).catch(function(err){
+      showToast("Couldn't update that department's head: " + (err && err.message ? err.message : "unknown error"));
       loadDeptHeadsSetupList();
     });
   });
@@ -4592,8 +4663,15 @@ function renderStoriesRow(){
     btn.type = "button";
     btn.className = "story-item" + (isMine ? " mine" : "") + (hasUnseen ? " unseen" : "");
     var d = DEPTS[id];
+    // The ring should preview the actual story photo (like WhatsApp/IG
+    // status), not the flat department icon - reel is oldest-first, so the
+    // last entry is the most recent story to show as the thumbnail.
+    var latestStory = reel.length ? reel[reel.length - 1] : null;
+    var avatarInner = latestStory && latestStory.photoUrl
+      ? iconSvg(id) + '<img src="'+esc(latestStory.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
+      : avatarInnerHtml(id);
     btn.innerHTML =
-      '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInner+'</span>'+
         (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
       '</span>' +
       '<span class="story-item-label">'+(isMine ? "Your story" : esc(d ? d.name : id))+'</span>';
@@ -4638,9 +4716,55 @@ storyPhotoInput.addEventListener("change", function(){
   };
   reader.readAsDataURL(file);
 });
-postStoryClose.addEventListener("click", function(){ storyEditor.hidden = true; storyPendingFile = null; });
+postStoryClose.addEventListener("click", function(){ storyEditor.hidden = true; storyPendingFile = null; storyMentionPopover.hidden = true; });
 storyRetakeBtn.addEventListener("click", function(){ storyPhotoInput.click(); });
-storyCaptionInput.addEventListener("input", autoGrowStoryCaption);
+storyCaptionInput.addEventListener("input", function(){ autoGrowStoryCaption(); updateStoryMentionPopover(); });
+storyCaptionInput.addEventListener("click", updateStoryMentionPopover);
+storyCaptionInput.addEventListener("blur", function(){ setTimeout(function(){ storyMentionPopover.hidden = true; }, 150); });
+
+// Story captions can @mention management (the GM and any assigned
+// head-of-department contacts) - a plain department queue isn't a
+// specific person to call out by name, so it's excluded from candidates.
+var storyMentionPopover = document.getElementById("storyMentionPopover");
+function storyMentionCandidates(){
+  var ids = ["gm"].concat(HEAD_DEPT_IDS.filter(function(id){
+    var realId = headRealDeptId(id);
+    return DEPT_HEADS[realId];
+  }));
+  return ids.filter(function(id){ return id !== STATE.self; }).map(function(id){
+    return { id: id, name: DEPTS[id] ? DEPTS[id].name : id };
+  });
+}
+function updateStoryMentionPopover(){
+  var val = storyCaptionInput.value;
+  var caret = storyCaptionInput.selectionStart;
+  var uptoCaret = val.slice(0, caret);
+  var match = uptoCaret.match(/@([a-zA-Z ]*)$/);
+  if(!match){ storyMentionPopover.hidden = true; return; }
+  var term = match[1].toLowerCase();
+  var candidates = storyMentionCandidates().filter(function(c){ return c.name.toLowerCase().indexOf(term) !== -1; });
+  if(!candidates.length){ storyMentionPopover.hidden = true; return; }
+  storyMentionPopover.innerHTML = candidates.map(function(c){
+    return '<button type="button" class="story-mention-opt" data-dept="'+c.id+'">'+
+      '<span class="fwd-avatar" style="'+avatarStyleAttr(c.id)+'">'+avatarInnerHtml(c.id)+'</span>'+esc(c.name)+'</button>';
+  }).join("");
+  storyMentionPopover.hidden = false;
+  storyMentionPopover.querySelectorAll(".story-mention-opt").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var deptId = btn.getAttribute("data-dept");
+      var name = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+      var before = val.slice(0, caret - match[0].length);
+      var after = val.slice(caret);
+      var inserted = "@" + name + " ";
+      storyCaptionInput.value = before + inserted + after;
+      var newCaret = before.length + inserted.length;
+      storyCaptionInput.focus();
+      storyCaptionInput.setSelectionRange(newCaret, newCaret);
+      autoGrowStoryCaption();
+      storyMentionPopover.hidden = true;
+    });
+  });
+}
 function postStoryNow(){
   if(!storyPendingFile || storyPostBtn.disabled) return;
   storyPostError.textContent = "";
@@ -6333,7 +6457,7 @@ function renderEventDetailBody(){
         '<div class="station-assigned-chip" data-dept-id="'+assignedDept+'">'+
           '<div class="station-assigned-avatar" style="'+avatarStyleAttr(assignedDept)+'">'+avatarInnerHtml(assignedDept)+'</div>'+
           '<span class="station-assigned-label">'+esc(DEPTS[assignedDept] ? DEPTS[assignedDept].initials : assignedDept)+'</span>'+
-          (s.confirmedAt ? '<span class="station-confirmed-badge" title="Confirmed">'+ACTION_ICONS.check+'</span>' :
+          (s.confirmedAt ? '<span class="station-confirmed-badge" title="'+esc((s.confirmedByName ? "Confirmed by " + s.confirmedByName : "Confirmed") + " · " + fmtNoteTime(s.confirmedAt))+'">'+ACTION_ICONS.check+'</span>' :
             (canConfirm ? '<button type="button" class="station-confirm-btn" data-station-id="'+s.id+'">Confirm</button>' : '<span class="station-pending-badge">Pending</span>')) +
           (canManage ? '<button type="button" class="station-unassign-btn" data-station-id="'+s.id+'" aria-label="Unassign">×</button>' : '') +
         '</div>';
@@ -6345,6 +6469,7 @@ function renderEventDetailBody(){
       '<div class="station-body">'+
         '<div class="station-title">'+esc(s.title)+'</div>'+
         (s.category ? '<div class="station-category">'+esc(s.category)+'</div>' : '')+
+        (s.createdByName ? '<div class="station-meta">Added by '+esc(s.createdByName)+'</div>' : '')+
       '</div>'+
       '<div class="station-assign">'+assignHtml+'</div>'+
       (canManage ? '<button type="button" class="station-remove-btn" data-station-id="'+s.id+'" aria-label="Remove station">'+ACTION_ICONS.trash+'</button>' : '')+
@@ -6361,6 +6486,7 @@ function renderEventDetailBody(){
       '<div class="runsheet-body-text">'+
         '<div class="runsheet-title">'+esc(item.title)+'</div>'+
         (item.description ? '<div class="runsheet-desc">'+esc(item.description)+'</div>' : '')+
+        (item.createdByName ? '<div class="runsheet-meta">Added by '+esc(item.createdByName)+'</div>' : '')+
       '</div>'+
       (item.teamLabel ? '<div class="runsheet-team">'+esc(item.teamLabel)+'</div>' : '')+
       (canManage ? '<button type="button" class="runsheet-remove-btn" data-item-id="'+item.id+'" aria-label="Remove row">×</button>' : '')+
@@ -6826,9 +6952,9 @@ function reorderTickets(ids){
     showToast("Couldn't save that order");
   });
 }
-var MAINT_DRAG_HOLD_MS = 380;
-var MAINT_DRAG_MOVE_CANCEL = 9;
-function enableTicketDrag(card){
+var MAINT_DRAG_HOLD_MS = 260;
+var MAINT_DRAG_MOVE_CANCEL = 24;
+function enableTicketDrag(card, handle){
   var holdTimer = null, dragging = false, pointerId = null;
   var startX = 0, startY = 0;
   var cardEls = [], itemHeight = 0, draggedIndex = -1, targetIndex = -1;
@@ -6894,23 +7020,23 @@ function enableTicketDrag(card){
     }
     dragging = false;
     cleanupTimer();
-    if(pointerId !== null){ try{ card.releasePointerCapture(pointerId); }catch(e){} }
+    if(pointerId !== null){ try{ handle.releasePointerCapture(pointerId); }catch(e){} }
     pointerId = null;
-    card.removeEventListener("pointermove", onPointerMove);
-    card.removeEventListener("pointerup", finishDrag);
-    card.removeEventListener("pointercancel", finishDrag);
+    handle.removeEventListener("pointermove", onPointerMove);
+    handle.removeEventListener("pointerup", finishDrag);
+    handle.removeEventListener("pointercancel", finishDrag);
   }
 
-  card.addEventListener("contextmenu", function(e){ e.preventDefault(); });
-  card.addEventListener("pointerdown", function(e){
+  handle.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  handle.addEventListener("pointerdown", function(e){
     if(e.button !== undefined && e.button !== 0) return;
-    if(e.target.closest("button")) return;
+    e.stopPropagation();
     startX = e.clientX; startY = e.clientY;
     pointerId = e.pointerId;
-    card.setPointerCapture(pointerId);
-    card.addEventListener("pointermove", onPointerMove);
-    card.addEventListener("pointerup", finishDrag);
-    card.addEventListener("pointercancel", finishDrag);
+    handle.setPointerCapture(pointerId);
+    handle.addEventListener("pointermove", onPointerMove);
+    handle.addEventListener("pointerup", finishDrag);
+    handle.addEventListener("pointercancel", finishDrag);
     holdTimer = setTimeout(beginDrag, MAINT_DRAG_HOLD_MS);
   });
 }
@@ -6941,17 +7067,27 @@ function buildMaintCard(t){
   if(t.guestPresent) tagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
   if(t.deadline) tagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
   if(tagsHtml) infoHtml += '<div class="maint-card-tags">' + tagsHtml + '</div>';
-  infoHtml += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
+  infoHtml += '<div class="maint-card-meta">' + (t.ticketNumber ? '#' + t.ticketNumber + ' · ' : '') + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + (t.voiceUrl ? ' · 🎤' : '') + '</div>';
   info.innerHTML = infoHtml;
   top.appendChild(info);
   card.appendChild(top);
   card.appendChild(buildPinButton(t));
   card.appendChild(buildStatusActions(t));
+  // A dedicated grab handle, not the whole card, owns the drag gesture.
+  // The card itself keeps normal scrolling (touch-action isn't blocked),
+  // so the list still scrolls anywhere except this handle - only the
+  // handle blocks the browser's own touch handling, which is what makes
+  // press-and-drag reliable instead of racing the page's own scroll.
+  var handle = document.createElement("div");
+  handle.className = "maint-card-handle";
+  handle.setAttribute("aria-label", "Drag to reorder");
+  handle.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+  card.appendChild(handle);
   card.addEventListener("click", function(){
     if(card._wasDragged) return;
     openTicketDetail(t.id);
   });
-  enableTicketDrag(card);
+  enableTicketDrag(card, handle);
   return card;
 }
 
@@ -6985,7 +7121,8 @@ function renderTicketDetail(){
   var t = id && STATE.tickets.find(function(x){ return x.id === id; });
   if(!t){ closeTicketDetail(); return; }
 
-  var html = '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
+  var html = (t.ticketNumber ? '<div class="ticket-detail-number">Ticket #' + t.ticketNumber + '</div>' : '')
+    + '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
   var detailTagsHtml = "";
   if(t.priority === "safety") detailTagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
   else if(t.priority === "guest") detailTagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';
@@ -7002,6 +7139,9 @@ function renderTicketDetail(){
     html += '<video class="ticket-detail-media" src="' + t.photoUrl + '" controls playsinline></video>';
   } else if(t.photoUrl){
     html += '<img class="ticket-detail-media" src="' + t.photoUrl + '" alt="Issue photo">';
+  }
+  if(t.voiceUrl){
+    html += '<audio class="ticket-detail-voice" src="' + t.voiceUrl + '" controls preload="none"></audio>';
   }
   html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   ticketDetailBody.innerHTML = html;
@@ -7025,6 +7165,12 @@ function renderTicketDetail(){
     ticketDetailBody.appendChild(delBtn);
   }
 
+  var historyWrap = document.createElement("div");
+  historyWrap.className = "ticket-history";
+  historyWrap.innerHTML = '<div class="ticket-history-label">History</div><div class="ticket-history-list" id="ticketHistoryList"><div class="ticket-replies-loading">Loading…</div></div>';
+  ticketDetailBody.appendChild(historyWrap);
+  loadAndRenderTicketHistory(t.id);
+
   var repliesWrap = document.createElement("div");
   repliesWrap.className = "ticket-replies";
   repliesWrap.innerHTML = '<div class="ticket-replies-list" id="ticketRepliesList"><div class="ticket-replies-loading">Loading…</div></div>' +
@@ -7047,6 +7193,27 @@ function renderTicketReplies(list){
     return '<div class="ticket-reply"><div class="ticket-reply-head"><b>'+esc(name)+'</b><span>'+fmtClock(new Date(r.createdAt).getTime())+'</span></div><div class="ticket-reply-text">'+esc(r.text)+'</div></div>';
   }).join("");
   el.scrollTop = el.scrollHeight;
+}
+function renderTicketHistory(list){
+  var el = document.getElementById("ticketHistoryList");
+  if(!el) return;
+  if(!list.length){ el.innerHTML = '<div class="ticket-replies-empty">No history yet</div>'; return; }
+  el.innerHTML = list.map(function(h){
+    var who = h.byName ? h.byName : (DEPTS[h.byDepartment] ? DEPTS[h.byDepartment].name : h.byDepartment);
+    var label = h.fromStatus ? "Reported" : "Reported";
+    if(h.toStatus === "in_progress") label = "Started work";
+    else if(h.toStatus === "fixed") label = "Marked fixed";
+    else if(h.toStatus === "reported" && h.fromStatus) label = "Reopened";
+    return '<div class="ticket-history-row"><b>'+esc(label)+'</b> by '+esc(who)+' · '+fmtNoteTime(h.createdAt)+'</div>';
+  }).join("");
+}
+function loadAndRenderTicketHistory(ticketId){
+  apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/history').then(function(res){
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketHistory(res.history);
+  }).catch(function(){
+    var el = document.getElementById("ticketHistoryList");
+    if(el) el.innerHTML = '<div class="ticket-replies-empty">Couldn\'t load history</div>';
+  });
 }
 function loadAndRenderTicketReplies(ticketId){
   apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies').then(function(res){
@@ -7345,6 +7512,94 @@ maintPhotoRemove.addEventListener("click", function(){
   maintPhotoPreviewVideo.src = "";
 });
 
+/* ---- maintenance report: attach a voice note ---- */
+var maintVoiceBtn = document.getElementById("maintVoiceBtn");
+var maintVoiceRecording = document.getElementById("maintVoiceRecording");
+var maintVoiceTimer = document.getElementById("maintVoiceTimer");
+var maintVoicePreview = document.getElementById("maintVoicePreview");
+var maintVoicePreviewDur = document.getElementById("maintVoicePreviewDur");
+var maintVoicePlayBtn = document.getElementById("maintVoicePlayBtn");
+var maintVoiceRemove = document.getElementById("maintVoiceRemove");
+var maintVoiceState = {
+  recording: false, mediaRecorder: null, stream: null, chunks: [],
+  startedAt: 0, timerId: null, blob: null, duration: 0, audioEl: null,
+};
+function fmtMaintVoiceDur(s){
+  var m = Math.floor(s/60), r = s%60;
+  return m+":"+(r<10?"0":"")+r;
+}
+function maintVoiceTick(){
+  var s = Math.floor((Date.now() - maintVoiceState.startedAt)/1000);
+  maintVoiceTimer.textContent = fmtMaintVoiceDur(s);
+}
+function maintVoiceStart(){
+  if(maintVoiceState.recording || maintVoiceState.blob) return;
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    showToast("Microphone not available on this device.");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var rec;
+    try{ rec = new MediaRecorder(stream); }catch(e){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      showToast("Couldn't start recording.");
+      return;
+    }
+    maintVoiceState.stream = stream;
+    maintVoiceState.mediaRecorder = rec;
+    maintVoiceState.chunks = [];
+    maintVoiceState.recording = true;
+    maintVoiceState.startedAt = Date.now();
+    maintVoiceState.timerId = setInterval(maintVoiceTick, 250);
+    rec.ondataavailable = function(e){ if(e.data.size>0) maintVoiceState.chunks.push(e.data); };
+    rec.start();
+    maintVoiceBtn.classList.add("recording");
+    maintVoiceRecording.hidden = false;
+    maintVoiceTimer.textContent = "0:00";
+  }).catch(function(){
+    showToast("Microphone permission was blocked.");
+  });
+}
+function maintVoiceStop(){
+  if(!maintVoiceState.mediaRecorder) return;
+  var rec = maintVoiceState.mediaRecorder;
+  var duration = Math.max(1, Math.round((Date.now() - maintVoiceState.startedAt)/1000));
+  rec.onstop = function(){
+    clearInterval(maintVoiceState.timerId);
+    if(maintVoiceState.stream){ maintVoiceState.stream.getTracks().forEach(function(t){ t.stop(); }); maintVoiceState.stream = null; }
+    maintVoiceState.mediaRecorder = null;
+    maintVoiceState.recording = false;
+    maintVoiceBtn.classList.remove("recording");
+    maintVoiceRecording.hidden = true;
+    var blob = new Blob(maintVoiceState.chunks, {type: maintVoiceState.chunks[0] ? maintVoiceState.chunks[0].type : "audio/webm"});
+    maintVoiceState.chunks = [];
+    maintVoiceState.blob = blob;
+    maintVoiceState.duration = duration;
+    maintVoicePreviewDur.textContent = fmtMaintVoiceDur(duration);
+    maintVoicePreview.hidden = false;
+  };
+  try{ rec.stop(); }catch(e){}
+}
+function maintVoiceClear(){
+  if(maintVoiceState.audioEl){ maintVoiceState.audioEl.pause(); maintVoiceState.audioEl = null; }
+  maintVoiceState.blob = null;
+  maintVoiceState.duration = 0;
+  maintVoicePreview.hidden = true;
+}
+maintVoiceBtn.addEventListener("click", function(){
+  if(maintVoiceState.recording) maintVoiceStop();
+  else maintVoiceStart();
+});
+maintVoiceRemove.addEventListener("click", maintVoiceClear);
+maintVoicePlayBtn.addEventListener("click", function(){
+  if(!maintVoiceState.blob) return;
+  if(!maintVoiceState.audioEl){
+    maintVoiceState.audioEl = new Audio(URL.createObjectURL(maintVoiceState.blob));
+  }
+  if(maintVoiceState.audioEl.paused) maintVoiceState.audioEl.play().catch(function(){});
+  else maintVoiceState.audioEl.pause();
+});
+
 newMaintForm.addEventListener("submit", function(e){
   e.preventDefault();
   maintError.textContent = "";
@@ -7358,14 +7613,25 @@ newMaintForm.addEventListener("submit", function(e){
     deadline: newMaintDeadline.value || undefined,
   };
   var submitBtn = newMaintForm.querySelector(".admin-add-btn");
+  var originalBtnLabel = submitBtn.textContent;
   submitBtn.disabled = true;
-  var sendPromise = maintPhotoFile
+  submitBtn.textContent = "Reporting…";
+  var voiceBlob = maintVoiceState.blob, voiceDuration = maintVoiceState.duration;
+  var sendPromise = (maintPhotoFile
     ? blobToBase64(maintPhotoFile).then(function(b64){
         payload.photoBase64 = b64;
         payload.photoMime = maintPhotoFile.type;
-        return apiSend('/api/maintenance', 'POST', payload);
       })
-    : apiSend('/api/maintenance', 'POST', payload);
+    : Promise.resolve())
+    .then(function(){
+      if(!voiceBlob) return;
+      return blobToBase64(voiceBlob).then(function(b64){
+        payload.voiceBase64 = b64;
+        payload.voiceMime = voiceBlob.type || "audio/webm";
+        payload.voiceDuration = voiceDuration;
+      });
+    })
+    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); });
   sendPromise.then(function(res){
     if(res.merged){
       var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
@@ -7380,12 +7646,24 @@ newMaintForm.addEventListener("submit", function(e){
     newMaintPhoto.value = "";
     maintPhotoPreview.hidden = true;
     maintPhotoPreviewVideo.src = "";
+    maintVoiceClear();
     newMaintGuestPresent.checked = false;
     newMaintDeadline.value = "";
     maintSelectedPriority = "problem";
     maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "problem"); });
     showToast(res.merged ? "Already reported. Added your note to it" : (isOnDuty("maintenance") ? "Reported" : "Reported. Maintenance is off duty, they'll see it once they're back on"));
+    // The toast alone is easy to miss while still looking at the form that
+    // was just filled in - a clear confirmation right on the button itself
+    // (what the eye is already on) makes it obvious the report actually
+    // went through, not just that the fields cleared.
+    submitBtn.textContent = "✓ Reported";
+    submitBtn.classList.add("success");
+    setTimeout(function(){
+      submitBtn.textContent = originalBtnLabel;
+      submitBtn.classList.remove("success");
+    }, 1800);
   }).catch(function(err){
+    submitBtn.textContent = originalBtnLabel;
     maintError.textContent = err.message || "Couldn't report that issue.";
   }).finally(function(){ submitBtn.disabled = false; });
 });

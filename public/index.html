@@ -394,7 +394,25 @@
             <span id="maintPhotoBtnLabel">Add photo or video</span>
           </label>
           <input type="file" id="newMaintPhoto" accept="image/*,video/*" hidden>
+          <button type="button" class="maint-voice-btn" id="maintVoiceBtn" aria-label="Record a voice note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg>
+          </button>
           <button type="submit" class="admin-add-btn">Report issue</button>
+        </div>
+        <div class="maint-voice-recording" id="maintVoiceRecording" hidden>
+          <span class="maint-voice-dot"></span>
+          <span class="maint-voice-timer" id="maintVoiceTimer">0:00</span>
+          <span class="maint-voice-hint">Recording… tap mic to stop</span>
+        </div>
+        <div class="maint-voice-preview" id="maintVoicePreview" hidden>
+          <button type="button" class="maint-voice-play" id="maintVoicePlayBtn" aria-label="Play voice note">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <span id="maintVoicePreviewDur">0:00</span>
+          <span class="maint-voice-label">Voice note attached</span>
+          <button type="button" class="maint-voice-remove" id="maintVoiceRemove" aria-label="Remove voice note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
         <div class="maint-photo-preview" id="maintPhotoPreview" hidden>
           <img id="maintPhotoPreviewImg" alt="Photo preview">
@@ -1147,6 +1165,7 @@
       </button>
     </div>
     <textarea class="story-editor-caption" id="storyCaptionInput" placeholder="Write something…" rows="1" maxlength="200"></textarea>
+    <div class="story-mention-popover" id="storyMentionPopover" hidden></div>
   </div>
   <div class="story-editor-error" id="storyPostError"></div>
 </div>

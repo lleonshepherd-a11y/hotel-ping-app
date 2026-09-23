@@ -140,6 +140,8 @@ CREATE TABLE IF NOT EXISTS event_stations (
   icon TEXT,
   assigned_dept_id TEXT,
   confirmed_at TEXT,
+  confirmed_by_staff_id TEXT,
+  created_by_staff_id TEXT,
   position INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
@@ -152,6 +154,7 @@ CREATE TABLE IF NOT EXISTS event_runsheet_items (
   title TEXT NOT NULL,
   description TEXT,
   team_label TEXT,
+  created_by_staff_id TEXT,
   position INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
@@ -166,6 +169,13 @@ CREATE TABLE IF NOT EXISTS group_members (
 CREATE INDEX IF NOT EXISTS idx_group_members_dept ON group_members(department_id);
 CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
 
+-- Group/event fields that live here rather than on the dashboard's own
+-- groups table (NOIR_DB) - same split as maintenance_ticket_meta.
+CREATE TABLE IF NOT EXISTS group_meta (
+  group_id TEXT PRIMARY KEY,
+  shared_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS group_reads (
   group_id TEXT NOT NULL,
   department_id TEXT NOT NULL,
@@ -178,6 +188,8 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   room_number TEXT,
   description TEXT NOT NULL,
   photo_path TEXT,
+  voice_path TEXT,
+  voice_duration INTEGER,
   status TEXT NOT NULL DEFAULT 'reported' CHECK(status IN ('reported','in_progress','fixed')),
   priority TEXT NOT NULL DEFAULT 'problem' CHECK(priority IN ('safety','guest','problem','routine')),
   guest_present INTEGER NOT NULL DEFAULT 0,
@@ -204,6 +216,22 @@ CREATE TABLE IF NOT EXISTS maintenance_ticket_meta (
   escalated_at TEXT,
   sort_order REAL
 );
+
+-- One row per status transition a ticket goes through (reported ->
+-- in_progress -> fixed, or any repeat), so "who marked this fixed and
+-- when" is always answerable after the fact - maintenance_tickets.status
+-- itself only ever holds the current value.
+CREATE TABLE IF NOT EXISTS maintenance_ticket_status_log (
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT NOT NULL,
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  changed_by_staff_id TEXT NOT NULL,
+  changed_by_name TEXT,
+  changed_by_department_id TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_maint_status_log_ticket ON maintenance_ticket_status_log(ticket_id, created_at);
 
 -- Planner/calendar entries from the dashboard, surfaced to a department as
 -- a standalone notification in "Missed" - never as a chat message from a

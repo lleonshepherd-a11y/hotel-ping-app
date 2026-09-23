@@ -93,6 +93,15 @@ function json(data, status, headers) {
   });
 }
 
+// A base64 string decodes to roughly 3/4 of its own length - cheap to check
+// up front, before ever calling atob() and looping byte-by-byte over the
+// result. Skipping this let a big-enough payload burn through the Worker's
+// CPU-time budget on the decode loop alone and get killed with a bare 503,
+// instead of a clean "too large" error from the size check that came AFTER
+// the (already too slow) decode.
+function base64ExceedsBytes(b64, maxBytes) {
+  return Math.floor((b64.length * 3) / 4) > maxBytes;
+}
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -440,7 +449,7 @@ function dashboardApiOrigin(env) {
 // notification + chat message our own flow would have sent.
 async function checkUnnotifiedTickets(env, ctx) {
   const rows = await env.NOIR_DB.prepare(
-    `SELECT mt.id, mt.room_number, mt.description, mt.priority, mt.guest_present, mt.deadline, mt.created_at, s.department_id AS creator_dept
+    `SELECT mt.id, mt.room_number, mt.description, mt.priority, mt.guest_present, mt.deadline, mt.created_at, mt.photo_path, s.department_id AS creator_dept
      FROM maintenance_tickets mt LEFT JOIN staff s ON s.id = mt.created_by_staff_id
      WHERE mt.status != 'fixed' ORDER BY mt.created_at DESC LIMIT 50`
   ).all();
@@ -456,8 +465,9 @@ async function checkUnnotifiedTickets(env, ctx) {
     // Give our own creation flow a moment to write its meta row first,
     // so this never races a ticket Hotel Ping itself just created.
     if (Date.now() - new Date(t.created_at).getTime() < 30000) continue;
-    await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(t.id).run();
-    let body = (t.room_number ? "Room " + t.room_number + ": " : "") + t.description;
+    const metaInsert = await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(t.id).run();
+    const ticketNumber = metaInsert.meta.last_row_id;
+    let body = "#" + ticketNumber + " " + (t.room_number ? "Room " + t.room_number + ": " : "") + t.description;
     if (t.guest_present) body += " · Guest in room";
     if (t.deadline) body += " · Needed by " + t.deadline;
     // Deliver as if the reporting department (restaurant, reception, kitchen,
@@ -469,7 +479,25 @@ async function checkUnnotifiedTickets(env, ctx) {
     const originDept = t.creator_dept ? fromNoirDept(t.creator_dept) : null;
     const validOrigin = originDept && DEPT_IDS.has(originDept) && originDept !== "maintenance";
     if (validOrigin) {
-      await insertMessage(env, ctx, { from: originDept, to: "maintenance", type: "text", body: "🔧 New ticket: " + body });
+      // roomNumber/taskStatus give this the same room chip + status pill
+      // layout as any other tagged message, instead of a flat text bubble -
+      // the room is already carried by roomNumber, so it's left out of the
+      // body text here (unlike the push notification below, which has no
+      // separate chip and needs it inline).
+      let chatBody = t.description;
+      if (t.guest_present) chatBody += " · Guest in room";
+      if (t.deadline) chatBody += " · Needed by " + t.deadline;
+      // Same "the actual photo rides along in the ping" rule as Hotel
+      // Ping's own creation flow - a dashboard-side ticket's photo is just
+      // as much part of the report as one created here.
+      const isVideoFile = t.photo_path && /\.(mp4|webm|mov|m4v|3gp)$/i.test(t.photo_path);
+      await insertMessage(env, ctx, {
+        from: originDept, to: "maintenance", type: t.photo_path ? (isVideoFile ? "file" : "image") : "text",
+        body: "🔧 New ticket #" + ticketNumber + ": " + chatBody,
+        fileName: t.photo_path ? (isVideoFile ? "Issue video" : "Issue photo") : undefined,
+        filePath: t.photo_path || undefined,
+        roomNumber: t.room_number || null, taskStatus: "not_started",
+      });
     } else {
       console.error("Unnotified ticket " + t.id + ": reporting department could not be resolved (creator_dept=" + t.creator_dept + "), no chat message sent");
     }
@@ -676,7 +704,7 @@ async function ticketMetaMap(env, ticketIds) {
   const ids = [...new Set(ticketIds)];
   if (!ids.length) return {};
   const rows = await env.DB.prepare(
-    `SELECT * FROM maintenance_ticket_meta WHERE ticket_id IN (${ids.map(() => "?").join(",")})`
+    `SELECT rowid, * FROM maintenance_ticket_meta WHERE ticket_id IN (${ids.map(() => "?").join(",")})`
   ).bind(...ids).all();
   const byTicket = {};
   rows.results.forEach((m) => { byTicket[m.ticket_id] = m; });
@@ -688,6 +716,8 @@ function mergeTicketRow(core, meta) {
     room_number: core.room_number,
     description: core.description,
     photo_path: core.photo_path,
+    voice_path: core.voice_path,
+    voice_duration: core.voice_duration,
     status: core.status,
     priority: core.priority,
     guest_present: core.guest_present,
@@ -701,14 +731,18 @@ function mergeTicketRow(core, meta) {
     escalated_at: meta ? meta.escalated_at : null,
     owner_staff_id: core.owner_staff_id,
     sort_order: meta ? meta.sort_order : null,
+    ticket_number: meta ? meta.rowid : null,
   };
 }
 function rowToTicket(row) {
   return {
     id: row.id,
+    ticketNumber: row.ticket_number || undefined,
     roomNumber: row.room_number || undefined,
     description: row.description,
     photoUrl: row.photo_path ? "/uploads/" + row.photo_path : undefined,
+    voiceUrl: row.voice_path ? "/uploads/" + row.voice_path : undefined,
+    voiceDuration: row.voice_duration || undefined,
     status: row.status,
     priority: row.priority || "problem",
     guestPresent: !!row.guest_present,
@@ -857,6 +891,7 @@ function rowToStation(row) {
     id: row.id, groupId: row.group_id, title: row.title, category: row.category || undefined,
     description: row.description || undefined, icon: row.icon || undefined,
     assignedDeptId: row.assigned_dept_id || undefined, confirmedAt: row.confirmed_at || undefined,
+    confirmedByName: row.confirmed_by_name || undefined, createdByName: row.created_by_name || undefined,
     position: row.position,
   };
 }
@@ -864,13 +899,15 @@ function noirStationRow(r) {
   return {
     id: r.id, group_id: r.group_id, title: r.title, category: r.category, description: r.description, icon: r.icon,
     assigned_dept_id: r.assigned_department_id ? fromNoirDept(r.assigned_department_id) : null,
-    confirmed_at: r.confirmed_at, position: r.position,
+    confirmed_at: r.confirmed_at, confirmed_by_name: r.confirmed_by_name, created_by_name: r.created_by_name,
+    position: r.position,
   };
 }
 function rowToRunsheetItem(row) {
   return {
     id: row.id, groupId: row.group_id, timeLabel: row.time_label, title: row.title,
     description: row.description || undefined, teamLabel: row.team_label || undefined, position: row.position,
+    createdByName: row.created_by_name || undefined,
   };
 }
 function rowToMessage(row, viewerDeptId, isAdmin) {
@@ -956,6 +993,36 @@ async function readJsonBody(request) {
     return {};
   }
 }
+
+// /uploads/:key (see below) is fetched by plain <img>/<video>/<audio> tags,
+// which can't carry an Authorization header - so file access there is
+// proven with an HttpOnly cookie instead, set at login. The cookie is
+// checked against the FILE'S OWN hotel (from its key prefix), not the
+// caller's current hotel context, so a session only ever unlocks files
+// that belong to the same hotel it was issued for.
+function parseCookie(request, name) {
+  const header = request.headers.get("cookie") || "";
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim();
+  }
+  return null;
+}
+async function hasValidSessionCookie(noirDb, request) {
+  const token = parseCookie(request, "hp_session");
+  if (!token) return false;
+  const tokenHash = await sha256Hex(token);
+  const row = await noirDb.prepare(
+    `SELECT ss.id FROM staff_sessions ss JOIN staff s ON s.id = ss.staff_id
+     WHERE ss.token_hash = ? AND ss.ended_at IS NULL AND ss.expires_at > ? AND s.active = 1`
+  ).bind(tokenHash, new Date().toISOString()).first();
+  return !!row;
+}
+function sessionCookieHeader(token) {
+  return "hp_session=" + token + "; Path=/; Max-Age=" + (NOIR_SESSION_MINUTES * 60) + "; HttpOnly; Secure; SameSite=Lax";
+}
+const CLEAR_SESSION_COOKIE = "hp_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax";
 
 async function staffFromToken(env, request) {
   const auth = request.headers.get("authorization") || "";
@@ -1058,10 +1125,18 @@ export default {
         const slashIdx = key.indexOf("/");
         const keyPrefixSlug = slashIdx === -1 ? "" : key.slice(0, slashIdx);
         const uploadsRegistry = hotelRegistry(rawEnv);
-        const bucket = (keyPrefixSlug && uploadsRegistry[keyPrefixSlug])
-          ? uploadsRegistry[keyPrefixSlug].uploads
-          : rawEnv.UPLOADS;
+        const owningHotel = (keyPrefixSlug && uploadsRegistry[keyPrefixSlug]) ? uploadsRegistry[keyPrefixSlug] : uploadsRegistry.main;
+        const bucket = owningHotel.uploads;
         if (!bucket) return json({ error: "Not found" }, 404);
+        // A signed-in session cookie (set at login, sent automatically by the
+        // browser on this same-origin request - an Authorization header
+        // can't be, since plain <img>/<video>/<audio> tags trigger this) is
+        // required, and checked against the FILE'S OWN hotel specifically -
+        // never the caller's current X-Hotel-Slug context - so a session
+        // only ever unlocks files belonging to that same hotel.
+        if (!(await hasValidSessionCookie(owningHotel.noirDb, request))) {
+          return json({ error: "Not signed in" }, 401);
+        }
         const obj = await bucket.get(key);
         if (!obj) return json({ error: "Not found" }, 404);
         const headers = new Headers();
@@ -1284,7 +1359,7 @@ export default {
         const identity = noirIdentity(matched);
         const photoRow = await env.DB.prepare("SELECT photo_path FROM staff_photos WHERE staff_id = ?").bind(matched.id).first();
         if (photoRow) identity.photo_url = "/uploads/" + photoRow.photo_path;
-        return json({ token, staff: rowToStaff(identity) });
+        return json({ token, staff: rowToStaff(identity) }, 200, { "Set-Cookie": sessionCookieHeader(token) });
       }
 
       // ---- Self-service signup: the GM tells someone directly to sign up,
@@ -1353,7 +1428,7 @@ export default {
           const tokenHash = await sha256Hex(token);
           await env.NOIR_DB.prepare("UPDATE staff_sessions SET ended_at = ? WHERE token_hash = ? AND ended_at IS NULL").bind(new Date().toISOString(), tokenHash).run();
         }
-        return json({ ok: true });
+        return json({ ok: true }, 200, { "Set-Cookie": CLEAR_SESSION_COOKIE });
       }
 
       if (method === "GET" && p === "/api/auth/me") {
@@ -1449,7 +1524,10 @@ export default {
         if (!row) return json({ error: "Not found" }, 404);
         return json({ staff: rowToStaff(noirIdentity(row)) });
       }
-      if (p === "/api/staff" || p.startsWith("/api/staff/")) {
+      // /api/staff/:id/photo (below) is a personal-photo upload, not
+      // account creation/deletion - it must stay excluded from this block,
+      // or every photo upload gets wrongly rejected as an account change.
+      if ((p === "/api/staff" || p.startsWith("/api/staff/")) && !p.endsWith("/photo")) {
         if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
         if (method === "POST" || method === "DELETE") {
           return json({ error: "Staff accounts are now managed from the dashboard, not from Hotel Ping" }, 410);
@@ -1494,12 +1572,20 @@ export default {
         const id = decodeURIComponent(p.slice("/api/staff/".length, -"/photo".length));
         const requester = request._staff;
         if (requester.id !== id && !requester.is_admin) return json({ error: "You can only change your own photo" }, 403);
+        // An admin acting on someone else's behalf must be pointed at a real,
+        // active staff member of THIS hotel - otherwise this would happily
+        // create an orphaned photo row keyed to any id string the caller
+        // supplies, including one borrowed from a different hotel.
+        if (requester.id !== id) {
+          const targetStaff = await env.NOIR_DB.prepare("SELECT id FROM staff WHERE id = ? AND hotel_id = ? AND active = 1").bind(id, resolvedNoirHotelId).first();
+          if (!targetStaff) return json({ error: "Staff member not found" }, 404);
+        }
         const body = await readJsonBody(request);
         if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
+        if (base64ExceedsBytes(body.fileBase64, 8 * 1024 * 1024)) return json({ error: "Photo is too large (8MB max)" }, 400);
         const binary = atob(body.fileBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Photo is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
         const safeName = hotelKeyPrefix + "staff-" + id + "-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
@@ -1513,6 +1599,10 @@ export default {
         const id = decodeURIComponent(p.slice("/api/staff/".length, -"/photo".length));
         const requester = request._staff;
         if (requester.id !== id && !requester.is_admin) return json({ error: "You can only change your own photo" }, 403);
+        if (requester.id !== id) {
+          const targetStaff = await env.NOIR_DB.prepare("SELECT id FROM staff WHERE id = ? AND hotel_id = ? AND active = 1").bind(id, resolvedNoirHotelId).first();
+          if (!targetStaff) return json({ error: "Staff member not found" }, 404);
+        }
         await env.DB.prepare("DELETE FROM staff_photos WHERE staff_id = ?").bind(id).run();
         return json({ ok: true });
       }
@@ -1539,10 +1629,10 @@ export default {
         if (!request._staff.is_admin) return json({ error: "Admin only" }, 403);
         const body = await readJsonBody(request);
         if (!body.fileBase64) return json({ error: "Logo is required" }, 400);
+        if (base64ExceedsBytes(body.fileBase64, 8 * 1024 * 1024)) return json({ error: "Logo is too large (8MB max)" }, 400);
         const binary = atob(body.fileBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Logo is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
         const safeName = hotelKeyPrefix + "hotel-logo-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
@@ -1687,10 +1777,10 @@ export default {
         if (!existing) return json({ error: "Not found" }, 404);
         const body = await readJsonBody(request);
         if (!body.fileBase64) return json({ error: "Plan image is required" }, 400);
+        if (base64ExceedsBytes(body.fileBase64, 8 * 1024 * 1024)) return json({ error: "Plan image is too large (8MB max)" }, 400);
         const binary = atob(body.fileBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        if (bytes.length > 8 * 1024 * 1024) return json({ error: "Plan image is too large (8MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
         const safeName = hotelKeyPrefix + "floor-" + id + "-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
@@ -2029,7 +2119,11 @@ export default {
       // ---- Event stations (drag-a-department-icon-in role assignments) ----
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/stations")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/stations".length));
-        const rows = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        const rows = await env.NOIR_DB.prepare(
+          `SELECT es.*, cs.display_name AS created_by_name, fs.display_name AS confirmed_by_name FROM event_stations es
+           LEFT JOIN staff cs ON cs.id = es.created_by_staff_id LEFT JOIN staff fs ON fs.id = es.confirmed_by_staff_id
+           WHERE es.group_id = ? ORDER BY es.position ASC, es.created_at ASC`
+        ).bind(id).all();
         return json({ stations: rows.results.map((r) => rowToStation(noirStationRow(r))) });
       }
 
@@ -2051,9 +2145,13 @@ export default {
         const posRow = await env.NOIR_DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_stations WHERE group_id = ?").bind(id).first();
         const stationId = crypto.randomUUID();
         await env.NOIR_DB.prepare(
-          "INSERT INTO event_stations (id, group_id, title, category, description, icon, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(stationId, id, title, category, description, icon, posRow.maxPos + 1, new Date().toISOString()).run();
-        const row = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(stationId).first();
+          "INSERT INTO event_stations (id, group_id, title, category, description, icon, position, created_at, created_by_staff_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(stationId, id, title, category, description, icon, posRow.maxPos + 1, new Date().toISOString(), requester.id).run();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT es.*, cs.display_name AS created_by_name, fs.display_name AS confirmed_by_name FROM event_stations es
+           LEFT JOIN staff cs ON cs.id = es.created_by_staff_id LEFT JOIN staff fs ON fs.id = es.confirmed_by_staff_id
+           WHERE es.id = ?`
+        ).bind(stationId).first();
         return json({ station: rowToStation(noirStationRow(row)) }, 201);
       }
 
@@ -2076,7 +2174,8 @@ export default {
           if (fromNoirDept(station.assigned_department_id) !== requester.department_id && !requester.is_admin) {
             return json({ error: "Only the assigned department can confirm this station" }, 403);
           }
-          await env.NOIR_DB.prepare("UPDATE event_stations SET confirmed_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+          await env.NOIR_DB.prepare("UPDATE event_stations SET confirmed_at = ?, confirmed_by_staff_id = ? WHERE id = ?")
+            .bind(new Date().toISOString(), requester.id, id).run();
         }
         if (typeof body.title === "string" || typeof body.category === "string" || typeof body.description === "string") {
           if (!canManage) return json({ error: "Only the department that created this event can edit stations" }, 403);
@@ -2092,7 +2191,11 @@ export default {
             await env.NOIR_DB.prepare("UPDATE event_stations SET description = ? WHERE id = ?").bind(body.description.trim().slice(0, 200) || null, id).run();
           }
         }
-        const row = await env.NOIR_DB.prepare("SELECT * FROM event_stations WHERE id = ?").bind(id).first();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT es.*, cs.display_name AS created_by_name, fs.display_name AS confirmed_by_name FROM event_stations es
+           LEFT JOIN staff cs ON cs.id = es.created_by_staff_id LEFT JOIN staff fs ON fs.id = es.confirmed_by_staff_id
+           WHERE es.id = ?`
+        ).bind(id).first();
         return json({ station: rowToStation(noirStationRow(row)) });
       }
 
@@ -2112,7 +2215,11 @@ export default {
       // ---- Event run sheet ----
       if (method === "GET" && p.startsWith("/api/groups/") && p.endsWith("/runsheet")) {
         const id = decodeURIComponent(p.slice("/api/groups/".length, -"/runsheet".length));
-        const rows = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE group_id = ? ORDER BY position ASC, created_at ASC").bind(id).all();
+        const rows = await env.NOIR_DB.prepare(
+          `SELECT eri.*, s.display_name AS created_by_name FROM event_runsheet_items eri
+           LEFT JOIN staff s ON s.id = eri.created_by_staff_id
+           WHERE eri.group_id = ? ORDER BY eri.position ASC, eri.created_at ASC`
+        ).bind(id).all();
         return json({ items: rows.results.map(rowToRunsheetItem) });
       }
 
@@ -2136,9 +2243,12 @@ export default {
         const posRow = await env.NOIR_DB.prepare("SELECT COALESCE(MAX(position), -1) AS maxPos FROM event_runsheet_items WHERE group_id = ?").bind(id).first();
         const itemId = crypto.randomUUID();
         await env.NOIR_DB.prepare(
-          "INSERT INTO event_runsheet_items (id, group_id, time_label, title, description, team_label, position, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(itemId, id, timeLabel, title, description, teamLabel, posRow.maxPos + 1, new Date().toISOString()).run();
-        const row = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(itemId).first();
+          "INSERT INTO event_runsheet_items (id, group_id, time_label, title, description, team_label, position, created_at, created_by_staff_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(itemId, id, timeLabel, title, description, teamLabel, posRow.maxPos + 1, new Date().toISOString(), requester.id).run();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT eri.*, s.display_name AS created_by_name FROM event_runsheet_items eri
+           LEFT JOIN staff s ON s.id = eri.created_by_staff_id WHERE eri.id = ?`
+        ).bind(itemId).first();
         return json({ item: rowToRunsheetItem(row) }, 201);
       }
 
@@ -2164,7 +2274,10 @@ export default {
         if (typeof body.teamLabel === "string") {
           await env.NOIR_DB.prepare("UPDATE event_runsheet_items SET team_label = ? WHERE id = ?").bind(body.teamLabel.trim().slice(0, 60) || null, id).run();
         }
-        const row = await env.NOIR_DB.prepare("SELECT * FROM event_runsheet_items WHERE id = ?").bind(id).first();
+        const row = await env.NOIR_DB.prepare(
+          `SELECT eri.*, s.display_name AS created_by_name FROM event_runsheet_items eri
+           LEFT JOIN staff s ON s.id = eri.created_by_staff_id WHERE eri.id = ?`
+        ).bind(id).first();
         return json({ item: rowToRunsheetItem(row) });
       }
 
@@ -2705,10 +2818,10 @@ export default {
         let filePathOnDisk = null;
         let fileSize = null;
         if (fileBase64) {
+          if (base64ExceedsBytes(fileBase64, 25 * 1024 * 1024)) return json({ error: "File is too large (25MB max)" }, 400);
           const binary = atob(fileBase64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          if (bytes.length > 25 * 1024 * 1024) return json({ error: "File is too large (25MB max)" }, 400);
           const ext = fileMime && fileMime.split("/")[1] ? "." + fileMime.split("/")[1].split(";")[0] : "";
           const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: fileMime || "application/octet-stream" } });
@@ -2957,10 +3070,10 @@ export default {
         let filePathOnDisk = null;
         let fileSize = null;
         if (body.fileBase64) {
+          if (base64ExceedsBytes(body.fileBase64, 25 * 1024 * 1024)) return json({ error: "File is too large (25MB max)" }, 400);
           const binary = atob(body.fileBase64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          if (bytes.length > 25 * 1024 * 1024) return json({ error: "File is too large (25MB max)" }, 400);
           const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
           const safeName = hotelKeyPrefix + "note-" + crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
@@ -3208,10 +3321,10 @@ export default {
         const requester = request._staff;
         const body = await readJsonBody(request);
         if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
+        if (base64ExceedsBytes(body.fileBase64, 10 * 1024 * 1024)) return json({ error: "Photo is too large (10MB max)" }, 400);
         const binary = atob(body.fileBase64);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        if (bytes.length > 10 * 1024 * 1024) return json({ error: "Photo is too large (10MB max)" }, 400);
         const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
         const safeName = hotelKeyPrefix + "story-" + crypto.randomUUID() + ext;
         await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
@@ -3354,32 +3467,95 @@ export default {
         }
 
         let photoPath = null;
+        let photoSize = null;
+        const isVideoAttachment = !!(body.photoMime && body.photoMime.indexOf("video/") === 0);
         if (body.photoBase64) {
+          if (base64ExceedsBytes(body.photoBase64, 60 * 1024 * 1024)) return json({ error: "File is too large (60MB max)" }, 400);
           const binary = atob(body.photoBase64);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          if (bytes.length > 60 * 1024 * 1024) return json({ error: "File is too large (60MB max)" }, 400);
           const ext = body.photoMime && body.photoMime.split("/")[1] ? "." + body.photoMime.split("/")[1].split(";")[0] : "";
           const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
           await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.photoMime || "application/octet-stream" } });
           photoPath = safeName;
+          photoSize = bytes.length;
+        }
+
+        let voicePath = null;
+        let voiceDuration = null;
+        if (body.voiceBase64) {
+          if (base64ExceedsBytes(body.voiceBase64, 25 * 1024 * 1024)) return json({ error: "Voice note is too large (25MB max)" }, 400);
+          const binary = atob(body.voiceBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const ext = body.voiceMime && body.voiceMime.split("/")[1] ? "." + body.voiceMime.split("/")[1].split(";")[0].split(";")[0] : ".webm";
+          const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
+          await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.voiceMime || "audio/webm" } });
+          voicePath = safeName;
+          voiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
         }
 
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare(
-          "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
-        ).bind(id, resolvedNoirHotelId, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
-        await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(id).run();
+          "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, voice_path, voice_duration, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
+        ).bind(id, resolvedNoirHotelId, roomNumber, description, photoPath, voicePath, voiceDuration, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
+        // The meta row's own rowid is a free, guaranteed-unique, always-
+        // incrementing integer - reused as the ticket's human-facing
+        // number (#N) rather than adding a separate counter to track.
+        const metaInsert = await env.DB.prepare("INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level) VALUES (?, 0)").bind(id).run();
+        const ticketNumber = metaInsert.meta.last_row_id;
+        await env.DB.prepare(
+          "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, NULL, 'reported', ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, now).run();
         const coreRow = {
-          id, room_number: roomNumber, description, photo_path: photoPath, status: "reported", priority,
+          id, room_number: roomNumber, description, photo_path: photoPath, voice_path: voicePath, voice_duration: voiceDuration,
+          status: "reported", priority,
           guest_present: guestPresent ? 1 : 0, deadline, creator_dept: toNoirDept(requester.department_id),
           created_at: now, updated_at: now, resolved_at: null, owner_staff_id: null,
         };
 
-        let notifyBody = (roomNumber ? "Room " + roomNumber + ": " : "") + description;
+        let notifyBody = "#" + ticketNumber + " " + (roomNumber ? "Room " + roomNumber + ": " : "") + description;
         if (guestPresent) notifyBody += " · Guest in room";
         if (deadline) notifyBody += " · Needed by " + deadline;
+        // Deliver into maintenance's own chat too, same as a dashboard-side
+        // ticket does via checkUnnotifiedTickets - a ticket someone raises
+        // through this screen must show up as a message, not just a push
+        // notification, or maintenance has no record of it in-app at all.
+        // Self-reported (maintenance reporting on itself) has no one to
+        // message it from, so it's skipped there same as the other path.
+        if (requester.department_id !== "maintenance" && DEPT_IDS.has(requester.department_id)) {
+          let chatBody = description;
+          if (guestPresent) chatBody += " · Guest in room";
+          if (deadline) chatBody += " · Needed by " + deadline;
+          // Backgrounded via waitUntil like the push notification below -
+          // the ticket is already saved at this point, so nothing about
+          // reporting it should keep waiting on this extra chat write.
+          // A reported photo/video rides along as the ping's own attachment
+          // (not just referenced in text) - maintenance sees the actual
+          // photo in the thread the same as if it had been sent to them
+          // directly, per the "everything is a ping" product promise.
+          const chatMessagePromise = insertMessage(env, ctx, {
+            from: requester.department_id, to: "maintenance", type: photoPath ? (isVideoAttachment ? "file" : "image") : "text",
+            body: "🔧 New ticket #" + ticketNumber + ": " + chatBody,
+            fileName: photoPath ? (isVideoAttachment ? "Issue video" : "Issue photo") : undefined,
+            filePath: photoPath || undefined, fileSize: photoSize || undefined,
+            roomNumber: roomNumber || null, taskStatus: "not_started",
+          }).catch((e) => console.error("insertMessage (new maintenance ticket) error:", e && e.stack || e));
+          if (ctx && ctx.waitUntil) ctx.waitUntil(chatMessagePromise); else await chatMessagePromise;
+          // A voice note rides along as its own ping right behind the main
+          // one, same "everything is a ping" rule as the photo/video above -
+          // maintenance hears the actual recording in the thread, not just
+          // a note that one was attached.
+          if (voicePath) {
+            const voiceMessagePromise = insertMessage(env, ctx, {
+              from: requester.department_id, to: "maintenance", type: "audio",
+              filePath: voicePath, duration: voiceDuration || undefined,
+              roomNumber: roomNumber || null,
+            }).catch((e) => console.error("insertMessage (new maintenance ticket voice) error:", e && e.stack || e));
+            if (ctx && ctx.waitUntil) ctx.waitUntil(voiceMessagePromise); else await voiceMessagePromise;
+          }
+        }
         const notifyPromise = notifyDepartment(env, "maintenance", {
           title: priority === "safety" ? "🚨 Safety issue reported" : "🔧 New maintenance ticket",
           body: notifyBody,
@@ -3388,7 +3564,7 @@ export default {
         }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maintenance) error:", e && e.stack || e); });
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
 
-        return json({ ticket: rowToTicket(mergeTicketRow(coreRow, { pinned_at: null, escalation_level: 0, escalated_at: null })) }, 201);
+        return json({ ticket: rowToTicket(mergeTicketRow(coreRow, { pinned_at: null, escalation_level: 0, escalated_at: null, rowid: ticketNumber })) }, 201);
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
@@ -3454,16 +3630,42 @@ export default {
         ).bind(id).first();
         const meta = (await ticketMetaMap(env, [id]))[id];
 
+        // A provable, per-transition record of exactly who changed this
+        // ticket's status and when - a plain overwrite of mt.status alone
+        // can't answer "who marked this fixed" after the fact, which the
+        // paid-for accountability promise requires.
+        await env.DB.prepare(
+          "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), id, existing.status, status, request._staff.id, request._staff.name || null, request._staff.department_id, now).run();
+
         const creatorDept = fromNoirDept(existing.creator_dept);
         const statusNotice = { in_progress: "Started work on: ", fixed: "Fixed: " };
         if (statusNotice[status] && creatorDept !== "maintenance") {
+          const byName = request._staff.name ? request._staff.name + " – " : "";
           await insertMessage(env, ctx, {
             from: "maintenance", to: creatorDept, type: "text",
-            body: statusNotice[status] + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
+            body: byName + statusNotice[status] + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
           });
         }
 
         return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
+      }
+
+      if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/history")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/history".length));
+        const rows = await env.DB.prepare(
+          "SELECT * FROM maintenance_ticket_status_log WHERE ticket_id = ? ORDER BY created_at ASC"
+        ).bind(id).all();
+        return json({
+          history: rows.results.map((r) => ({
+            id: r.id,
+            fromStatus: r.from_status,
+            toStatus: r.to_status,
+            byName: r.changed_by_name || undefined,
+            byDepartment: r.changed_by_department_id,
+            createdAt: r.created_at,
+          })),
+        });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/owner")) {
@@ -3674,7 +3876,13 @@ export default {
 
       return json({ error: "Not found" }, 404);
     } catch (err) {
-      return json({ error: "Server error", detail: String((err && err.message) || err) }, 500);
+      // The failure detail (SQL error text, stack) goes to the Worker's own
+      // logs only - returning it to the caller would hand out internal
+      // schema/implementation info (table names, column names, query shape)
+      // to anyone who can trigger a 500, not just to us debugging via
+      // `wrangler tail`.
+      console.error("Unhandled error:", err && err.stack || err);
+      return json({ error: "Server error" }, 500);
     }
   },
 
