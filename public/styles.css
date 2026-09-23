@@ -441,7 +441,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    bottom-left so it never sits over the send button in the composer pill. */
 .ptt-float{
   position:absolute;left:20px;bottom:78px;z-index:3;
-  width:58px;height:58px;border-radius:50%;
+  width:64px;height:64px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.14);
   backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);

@@ -8470,7 +8470,6 @@ if(installDismissBtn){
   // talking instantly; only a real finger movement past a small
   // threshold turns the gesture into a reposition instead.
   var POS_KEY = 'hp_ptt_pos';
-  var DRAG_THRESHOLD = 12;
   function applyPos(left, top){
     var host = pttFloat.offsetParent || document.body;
     var maxLeft = host.clientWidth - pttFloat.offsetWidth - 8;
@@ -8487,28 +8486,29 @@ if(installDismissBtn){
     if(saved && typeof saved.left === 'number' && typeof saved.top === 'number') applyPos(saved.left, saved.top);
   }catch(e){}
 
+  // The black core is the talk zone; the glass rim around it is the only
+  // place a drag can start. Splitting by zone (rather than guessing from
+  // finger movement) means pressing to talk can never get mistaken for
+  // the start of a drag, and dragging can never trigger a stray "talk".
+  var pttCore = pttFloat.querySelector('.ptt-core');
   var pressing = false, dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
   pttFloat.addEventListener('pointerdown', function(e){
     e.preventDefault();
+    var onRim = !pttCore.contains(e.target);
     pressing = true;
-    dragging = false;
+    dragging = onRim;
     startX = e.clientX; startY = e.clientY;
     var rect = pttFloat.getBoundingClientRect();
     var hostRect = (pttFloat.offsetParent || document.body).getBoundingClientRect();
     startLeft = rect.left - hostRect.left;
     startTop = rect.top - hostRect.top;
-    startLive();
+    if(dragging) pttFloat.classList.add('dragging'); else startLive();
     pttFloat.setPointerCapture(e.pointerId);
   });
   pttFloat.addEventListener('pointermove', function(e){
-    if(!pressing) return;
+    if(!pressing || !dragging) return;
     var dx = e.clientX - startX, dy = e.clientY - startY;
-    if(!dragging && Math.sqrt(dx*dx + dy*dy) > DRAG_THRESHOLD){
-      dragging = true;
-      stopLive();
-      pttFloat.classList.add('dragging');
-    }
-    if(dragging) applyPos(startLeft + dx, startTop + dy);
+    applyPos(startLeft + dx, startTop + dy);
   });
   function endPress(){
     if(!pressing) return;
