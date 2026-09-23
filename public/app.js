@@ -8425,10 +8425,11 @@ if(installDismissBtn){
   });
 }
 
-/* ---- Push-to-talk preview button - look/feel only, not wired to
-   recording, sending or ticket creation yet. Press-and-hold just
-   animates the waveform so the interaction can be judged in place. ---- */
-(function setupPttPreview(){
+/* ---- Push-to-talk button: hold the black core to record, release to
+   send instantly - as a voice ping in whatever chat is open, or, if
+   Maintenance is the open chat, transcribed straight into a real
+   ticket (room number pulled from what was said, if it said one). ---- */
+(function setupPtt(){
   var pttFloat = document.getElementById('pttFloatBtn');
   var waveRow = document.getElementById('pttWaveRow');
   if(!pttFloat || !waveRow) return;
@@ -8443,7 +8444,7 @@ if(installDismissBtn){
   function setIdleBars(){ bars.forEach(function(b, idx){ b.style.height = REST_HEIGHTS[idx] + 'px'; }); }
   setIdleBars();
   var waveTimer = null;
-  function startLive(){
+  function startWaveAnim(){
     pttFloat.classList.add('live');
     if(navigator.vibrate) navigator.vibrate(12);
     waveTimer = setInterval(function(){
@@ -8455,11 +8456,149 @@ if(installDismissBtn){
       });
     }, 100);
   }
-  function stopLive(){
+  function stopWaveAnim(){
     pttFloat.classList.remove('live');
     clearInterval(waveTimer);
     setIdleBars();
     if(navigator.vibrate) navigator.vibrate(8);
+  }
+
+  var MIN_HOLD_MS = 350;
+  var ptt = { recording:false, mediaRecorder:null, stream:null, chunks:[], startedAt:0, recognition:null, transcript:"" };
+
+  function pttStartTranscription(){
+    var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!Recognition) return;
+    try{
+      var rec = new Recognition();
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.lang = "en-GB";
+      rec.onresult = function(e){
+        var text = "";
+        for(var i=0;i<e.results.length;i++) text += e.results[i][0].transcript;
+        ptt.transcript = text.trim();
+      };
+      rec.onerror = function(){};
+      rec.start();
+      ptt.recognition = rec;
+    }catch(e){ ptt.recognition = null; }
+  }
+  function pttStopTranscription(){
+    if(ptt.recognition){ try{ ptt.recognition.stop(); }catch(e){} ptt.recognition = null; }
+  }
+  function pttCleanupStream(){
+    pttStopTranscription();
+    if(ptt.mediaRecorder && ptt.mediaRecorder.state !== "inactive"){ try{ ptt.mediaRecorder.stop(); }catch(e){} }
+    ptt.mediaRecorder = null;
+    if(ptt.stream){ ptt.stream.getTracks().forEach(function(t){ t.stop(); }); ptt.stream = null; }
+  }
+
+  function extractRoomNumber(text){
+    if(!text) return null;
+    var m = text.match(/room\s*#?\s*(\d{1,4})/i);
+    if(m) return m[1];
+    m = text.match(/\b(\d{3,4})\b/);
+    return m ? m[1] : null;
+  }
+
+  function pttSendRecording(blob, durationSec, transcript){
+    var isMaintenance = STATE.active === "maintenance" && !STATE.activeGroupId;
+    if(isMaintenance){
+      blobToBase64(blob).then(function(b64){
+        var payload = {
+          description: transcript ? transcript : "Reported via push-to-talk",
+          voiceBase64: b64, voiceMime: blob.type || "audio/webm", voiceDuration: durationSec,
+        };
+        var roomNumber = extractRoomNumber(transcript);
+        if(roomNumber) payload.roomNumber = roomNumber;
+        return apiSend('/api/maintenance', 'POST', payload);
+      }).then(function(res){
+        STATE.tickets = STATE.tickets || [];
+        var idx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
+        if(idx !== -1) STATE.tickets[idx] = res.ticket; else STATE.tickets.unshift(res.ticket);
+        if(typeof renderMaintenanceBoard === "function" && !maintenancePage.hidden) renderMaintenanceBoard();
+        showToast(res.merged ? "Added to an existing ticket" : "Ticket #" + (res.ticket.ticketNumber || "") + " raised");
+      }).catch(function(err){
+        showToast(err.message || "Couldn't raise that ticket");
+      });
+    } else {
+      qvSend(blob, durationSec, transcript || null);
+    }
+  }
+
+  function pttBeginRecording(){
+    ptt.chunks = [];
+    ptt.transcript = "";
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+      showToast("Microphone not available on this device.");
+      stopWaveAnim();
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      if(!ptt.recording){ stream.getTracks().forEach(function(t){ t.stop(); }); return; }
+      ptt.stream = stream;
+      var rec;
+      try{ rec = new MediaRecorder(stream); }catch(e){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        showToast("Couldn't start recording.");
+        stopWaveAnim();
+        return;
+      }
+      ptt.mediaRecorder = rec;
+      rec.ondataavailable = function(e){ if(e.data.size>0) ptt.chunks.push(e.data); };
+      rec.start();
+      pttStartTranscription();
+    }).catch(function(){
+      ptt.recording = false;
+      showToast("Microphone permission was blocked.");
+      stopWaveAnim();
+    });
+  }
+
+  function pttFinishRecording(){
+    var elapsedMs = Date.now() - ptt.startedAt;
+    if(!ptt.mediaRecorder){
+      // Permission was still pending when the button was released, or it
+      // never started - nothing recorded, nothing to send.
+      ptt.recording = false;
+      return;
+    }
+    var rec = ptt.mediaRecorder;
+    var durationSec = Math.max(1, Math.round(elapsedMs/1000));
+    var transcript = ptt.transcript;
+    var settled = false;
+    var safetyTimer = setTimeout(function(){ if(!settled){ settled = true; pttCleanupStream(); } }, 4000);
+    rec.onstop = function(){
+      if(settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      pttStopTranscription();
+      if(ptt.stream){ ptt.stream.getTracks().forEach(function(t){ t.stop(); }); ptt.stream = null; }
+      ptt.mediaRecorder = null;
+      ptt.recording = false;
+      var blob = new Blob(ptt.chunks, {type: ptt.chunks[0] ? ptt.chunks[0].type : "audio/webm"});
+      ptt.chunks = [];
+      // Too short to be a real message - almost certainly a stray tap,
+      // not someone actually trying to say something.
+      if(elapsedMs < MIN_HOLD_MS) return;
+      pttSendRecording(blob, durationSec, transcript);
+    };
+    try{
+      if(rec.state === "inactive"){ clearTimeout(safetyTimer); ptt.recording = false; return; }
+      rec.stop();
+    }catch(e){ clearTimeout(safetyTimer); ptt.recording = false; }
+  }
+
+  function startLive(){
+    ptt.recording = true;
+    ptt.startedAt = Date.now();
+    startWaveAnim();
+    pttBeginRecording();
+  }
+  function stopLive(){
+    stopWaveAnim();
+    pttFinishRecording();
   }
   // Draggable so it can sit wherever a person's thumb naturally falls -
   // not everyone holds their phone the same way. Pressing still starts

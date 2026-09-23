@@ -747,8 +747,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #msgInput:focus-visible{outline:none}
 #msgInput::placeholder{color:var(--text-faint)}
 .send-btn{
-  flex:none;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.18);
-  background:#3a3a36;color:#fff;
+  flex:none;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.26);
+  background:#232326;color:#fff;
   display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
   opacity:1;transform:scale(1);margin-left:0;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 8px 18px -4px rgba(20,20,22,.4);
@@ -758,9 +758,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    panel like the PTT button, just enough to read as glossy/premium */
 .send-btn::before{
   content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-  background:linear-gradient(160deg, rgba(255,255,255,.38) 0%, rgba(255,255,255,.08) 32%, rgba(255,255,255,0) 55%);
+  background:linear-gradient(160deg, rgba(255,255,255,.46) 0%, rgba(255,255,255,.14) 34%, rgba(255,255,255,0) 58%);
 }
-.send-btn:not(.ready){opacity:.42}
 .send-btn.ready.urgent{background:linear-gradient(150deg,var(--urgent),var(--urgent-2))}
 .send-btn svg{width:18px;height:18px}
 
