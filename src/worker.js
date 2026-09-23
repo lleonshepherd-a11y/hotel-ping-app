@@ -1023,6 +1023,7 @@ function resolveHotel(request, env, url) {
   return {
     slug,
     hotelId: hotel.hotelId,
+    hasDashboardBridge: hotel.hasDashboardBridge,
     env: Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads }),
   };
 }
@@ -1079,6 +1080,16 @@ export default {
         if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
           return json({ error: "Unauthorized" }, 401);
         }
+        // EXTERNAL_API_KEY is one secret for the whole Worker, not one per
+        // hotel - without this, holding that single key would let a caller
+        // write into ANY hotel just by changing X-Hotel-Slug. Only a hotel
+        // actually wired to the dashboard bridge may accept these calls at
+        // all, so a synthetic test tenant (or any future hotel that never
+        // got its own integration) can't be reached this way regardless of
+        // whether the key is valid.
+        if (!resolvedHotel.hasDashboardBridge) {
+          return json({ error: "This hotel has no dashboard integration" }, 403);
+        }
         const body = await readJsonBody(request);
         const idempotencyKey = String(body.idempotencyKey || "").trim();
         const departmentId = body.departmentId;
@@ -1133,6 +1144,12 @@ export default {
         const apiKey = request.headers.get("x-api-key") || "";
         if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
           return json({ error: "Unauthorized" }, 401);
+        }
+        // Same reasoning as /api/external/notify above: EXTERNAL_API_KEY is
+        // one shared secret, not per-hotel, so this must independently
+        // refuse any hotel that isn't actually wired to the dashboard.
+        if (!resolvedHotel.hasDashboardBridge) {
+          return json({ error: "This hotel has no dashboard integration" }, 403);
         }
         const body = await readJsonBody(request);
         const idempotencyKey = String(body.idempotencyKey || "").trim();
