@@ -479,7 +479,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p.startsWith('/uploads/')) {
       const filePath = path.join(UPLOADS_DIR, path.basename(p));
       if (!fs.existsSync(filePath)) return send(res, 404, { error: 'Not found' });
-      res.writeHead(200);
+      const size = fs.statSync(filePath).size;
+      const range = req.headers.range;
+      // Mirrors src/worker.js's R2 range handling - Safari's <audio>/<video>
+      // won't play at all without a real 206 response to its Range probe.
+      const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+      if (m && (m[1] || m[2])) {
+        const start = m[1] ? parseInt(m[1], 10) : size - parseInt(m[2], 10);
+        const end = m[2] && m[1] ? Math.min(parseInt(m[2], 10), size - 1) : size - 1;
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${size}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': end - start + 1,
+        });
+        fs.createReadStream(filePath, { start, end }).pipe(res);
+        return;
+      }
+      res.writeHead(200, { 'Accept-Ranges': 'bytes', 'Content-Length': size });
       fs.createReadStream(filePath).pipe(res);
       return;
     }

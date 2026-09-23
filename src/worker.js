@@ -1154,11 +1154,30 @@ export default {
         if (!(await hasValidSessionCookie(owningHotel.noirDb, request))) {
           return json({ error: "Not signed in" }, 401);
         }
-        const obj = await bucket.get(key);
+        // Safari's <audio>/<video> won't play an MP4 at all unless the
+        // server honours byte-range requests - it probes with a Range
+        // header before it'll commit to playing, and a plain 200 with the
+        // whole body (fine for Chrome) makes it silently refuse to decode.
+        // R2 will parse the browser's own Range header directly, but it
+        // always reports back an obj.range (covering the whole object when
+        // no Range header was sent) - so whether to answer 206 is decided
+        // by whether the request actually asked for one, not by obj.range.
+        const hasRangeRequest = request.headers.has("Range");
+        const obj = await bucket.get(key, hasRangeRequest ? { range: request.headers } : undefined);
         if (!obj) return json({ error: "Not found" }, 404);
         const headers = new Headers();
         obj.writeHttpMetadata(headers);
         headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        headers.set("Accept-Ranges", "bytes");
+        if (hasRangeRequest && obj.range) {
+          const start = obj.range.offset || 0;
+          const len = obj.range.length != null ? obj.range.length : obj.size - start;
+          const end = start + len - 1;
+          headers.set("Content-Range", `bytes ${start}-${end}/${obj.size}`);
+          headers.set("Content-Length", String(len));
+          return new Response(obj.body, { status: 206, headers });
+        }
+        headers.set("Content-Length", String(obj.size));
         return new Response(obj.body, { headers });
       }
 

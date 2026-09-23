@@ -8526,7 +8526,11 @@ if(installDismissBtn){
   }
 
   function pttSendRecording(blob, durationSec, transcript){
-    var isMaintenance = STATE.active === "maintenance" && !STATE.activeGroupId;
+    // The button floats above every tab, not just the Maintenance chat
+    // thread - someone reporting a fault naturally presses it from the
+    // Repairs board itself, so that counts as "maintenance" too, not just
+    // STATE.active being the maintenance department chat.
+    var isMaintenance = !maintenancePage.hidden || (STATE.active === "maintenance" && !STATE.activeGroupId);
     if(isMaintenance){
       blobToBase64(blob).then(function(b64){
         var payload = {
