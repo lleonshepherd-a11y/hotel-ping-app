@@ -2313,6 +2313,8 @@ function refreshSendState(){
   var ready = msgInput.value.trim().length > 0 || !!STATE.attachment;
   sendBtn.classList.toggle("ready", ready);
   sendBtn.classList.toggle("urgent", ready && urgentActive);
+  sendBtn.classList.toggle("hide", !ready);
+  composerMicBtn.classList.toggle("hide", ready);
 }
 
 function closePlusMenu(){
@@ -2850,7 +2852,7 @@ sendBtn.addEventListener("click", doSend);
 
 
 /* ---- quick voice note: tap to record, tap to stop, tap to send ---- */
-var quickVoiceBtn = document.getElementById("quickVoiceBtn");
+var composerMicBtn = document.getElementById("composerMicBtn");
 var quickVoiceOverlay = document.getElementById("quickVoiceOverlay");
 var qvHint = document.getElementById("qvHint");
 var qvRecRow = document.getElementById("qvRecRow");
@@ -3097,7 +3099,7 @@ function qvSendNote(blob, duration, transcript){
   });
 }
 
-quickVoiceBtn.addEventListener("click", function(){ qvStart("message"); });
+composerMicBtn.addEventListener("click", function(){ qvStart("message"); });
 qvStopBtn.addEventListener("click", function(){ qvStopRecording(false); });
 qvCancelBtn.addEventListener("click", function(){ qvStopRecording(true); });
 qvDiscardBtn.addEventListener("click", qvCloseOverlay);
