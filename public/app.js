@@ -7021,6 +7021,11 @@ function enableTicketDrag(card, handle){
 
   function cleanupTimer(){ if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; } }
 
+  function resetPress(){
+    card.style.transition = "transform .15s ease";
+    card.style.transform = "";
+  }
+
   function beginDrag(){
     dragging = true;
     card._wasDragged = true;
@@ -7030,9 +7035,12 @@ function enableTicketDrag(card, handle){
     targetIndex = draggedIndex;
     itemHeight = card.getBoundingClientRect().height + 13;
     if(navigator.vibrate) navigator.vibrate(15);
-    card.style.transition = "transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s ease";
-    card.style.transform = "translateY(-7px) scale(1.06) rotate(-1.2deg)";
-    setTimeout(function(){ if(dragging) card.style.transition = "none"; }, 150);
+    // Transform is never transitioned once the drag is live - it always
+    // jumps straight to wherever the finger is, frame by frame, so the
+    // card can't lag behind and fight the transition like it used to.
+    // Only the shadow eases in, which is what actually reads as "lifted".
+    card.style.transition = "box-shadow .15s ease";
+    card.style.transform = "translateY(-5px) scale(1.035)";
   }
 
   function applyShift(dy){
@@ -7054,11 +7062,11 @@ function enableTicketDrag(card, handle){
     if(pointerId === null || e.pointerId !== pointerId) return;
     var dx = e.clientX - startX, dy = e.clientY - startY;
     if(!dragging){
-      if(Math.abs(dx) > MAINT_DRAG_MOVE_CANCEL || Math.abs(dy) > MAINT_DRAG_MOVE_CANCEL) cleanupTimer();
+      if(Math.abs(dx) > MAINT_DRAG_MOVE_CANCEL || Math.abs(dy) > MAINT_DRAG_MOVE_CANCEL){ cleanupTimer(); resetPress(); }
       return;
     }
     e.preventDefault();
-    card.style.transform = "translateY(" + (dy - 7) + "px) scale(1.06) rotate(-1.2deg)";
+    card.style.transform = "translateY(" + (dy - 5) + "px) scale(1.035)";
     applyShift(dy);
   }
 
@@ -7077,6 +7085,8 @@ function enableTicketDrag(card, handle){
         reorderTickets(reordered.map(function(el){ return el.dataset.ticketId; }));
       }
       setTimeout(function(){ card._wasDragged = false; }, 50);
+    } else {
+      resetPress();
     }
     dragging = false;
     cleanupTimer();
@@ -7094,6 +7104,11 @@ function enableTicketDrag(card, handle){
     startX = e.clientX; startY = e.clientY;
     pointerId = e.pointerId;
     if(navigator.vibrate) navigator.vibrate(6);
+    // A small, immediate settle-down the instant the handle is touched -
+    // so it's clear the press registered right away instead of nothing
+    // visibly happening for the whole hold, then the card just popping.
+    card.style.transition = "transform .12s ease";
+    card.style.transform = "scale(.985)";
     handle.setPointerCapture(pointerId);
     handle.addEventListener("pointermove", onPointerMove);
     handle.addEventListener("pointerup", finishDrag);
