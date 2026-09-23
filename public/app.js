@@ -7018,6 +7018,7 @@ function enableTicketDrag(card, handle){
   var holdTimer = null, dragging = false, pointerId = null;
   var startX = 0, startY = 0;
   var cardEls = [], itemHeight = 0, draggedIndex = -1, targetIndex = -1;
+  var rafId = null, pendingDy = 0;
 
   function cleanupTimer(){ if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; } }
 
@@ -7058,6 +7059,12 @@ function enableTicketDrag(card, handle){
     targetIndex = newIndex;
   }
 
+  function flushFrame(){
+    rafId = null;
+    card.style.transform = "translateY(" + (pendingDy - 5) + "px) scale(1.035)";
+    applyShift(pendingDy);
+  }
+
   function onPointerMove(e){
     if(pointerId === null || e.pointerId !== pointerId) return;
     var dx = e.clientX - startX, dy = e.clientY - startY;
@@ -7066,11 +7073,17 @@ function enableTicketDrag(card, handle){
       return;
     }
     e.preventDefault();
-    card.style.transform = "translateY(" + (dy - 5) + "px) scale(1.035)";
-    applyShift(dy);
+    // A touchscreen can fire pointermove faster than the browser can
+    // paint - writing the transform straight from every single event
+    // is what was making the drag look stuttery. Collapsing all the
+    // moves that land in the same frame down to one DOM write keeps it
+    // tracking the finger at a rate the screen can actually keep up with.
+    pendingDy = dy;
+    if(rafId === null) rafId = requestAnimationFrame(flushFrame);
   }
 
   function finishDrag(){
+    if(rafId !== null){ cancelAnimationFrame(rafId); rafId = null; }
     if(dragging){
       cardEls.forEach(function(el){ el.style.transform = ""; });
       card.style.transition = "transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease";
