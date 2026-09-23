@@ -144,6 +144,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bottom-tab.active .bottom-tab-icon{background:rgba(77,132,245,.14);width:46px;height:30px}
 .bottom-tab.active .bottom-tab-label{display:block;font-weight:800}
 .bottom-tab.drag-hover{background:var(--surface-3);color:var(--text)}
+#tabEventsBtn{color:#4d84f5}
+#tabEventsBtn.active .bottom-tab-icon{background:rgba(77,132,245,.14)}
+#tabMaintBtn{color:#2f9a5c}
+#tabMaintBtn.active{color:#2f9a5c}
+#tabMaintBtn.active .bottom-tab-icon{background:rgba(47,154,92,.14)}
 .bottom-tab .tab-badge{
   position:absolute;top:-3px;right:-7px;min-width:15px;height:15px;padding:0 3px;
   border-radius:8px;background:var(--urgent);color:#fff;font-size:9px;font-weight:800;
