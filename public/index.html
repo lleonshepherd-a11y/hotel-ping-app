@@ -230,11 +230,13 @@
           <span class="sb-menu-label">Notification settings</span>
           <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
         </button>
-        <button class="sb-menu-row sb-menu-row-sub" id="gmMuteDeptsBtn" type="button" hidden>
+        <div class="sb-menu-row sb-menu-row-sub sb-menu-row-switch" id="gmMuteDeptsBtn" hidden>
           <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/><path d="M3 3l18 18" id="gmMuteDeptsSlash" stroke-width="2.2"/></svg></span>
           <span class="sb-menu-label">Only notify me for department heads</span>
-          <span class="sb-menu-chevron" id="gmMuteDeptsState" style="font-size:13px;font-weight:600;opacity:.6;">Off</span>
-        </button>
+          <button type="button" class="pill-switch" id="gmMuteDeptsSwitch" role="switch" aria-checked="false" aria-label="Only notify me for department heads">
+            <span class="pill-switch-knob"></span>
+          </button>
+        </div>
         <button class="sb-menu-row sb-menu-row-sub" id="pushEnableRowBtn" type="button">
           <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><circle cx="18" cy="6" r="4" fill="#e0902c" stroke="none"/></svg></span>
           <span class="sb-menu-label">Re-enable push notifications</span>

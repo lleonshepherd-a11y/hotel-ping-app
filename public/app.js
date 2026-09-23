@@ -4852,27 +4852,30 @@ notifSettingsOverlay.addEventListener("click", function(e){ if(e.target === noti
 // housekeeping, ...); a head-of-department contact (head_kitchen etc.)
 // still notifies him regardless of this switch's state.
 var gmMuteDeptsBtn = document.getElementById("gmMuteDeptsBtn");
-var gmMuteDeptsState = document.getElementById("gmMuteDeptsState");
+var gmMuteDeptsSwitch = document.getElementById("gmMuteDeptsSwitch");
+var gmMuteDeptsOn = false;
 function renderGmMuteDepartments(on){
-  gmMuteDeptsState.textContent = on ? "On" : "Off";
-  gmMuteDeptsState.style.opacity = on ? "1" : ".6";
-  gmMuteDeptsState.style.color = on ? "var(--accent, #2f9aa0)" : "";
+  gmMuteDeptsOn = !!on;
+  gmMuteDeptsSwitch.classList.toggle("on", gmMuteDeptsOn);
+  gmMuteDeptsSwitch.setAttribute("aria-checked", gmMuteDeptsOn ? "true" : "false");
 }
 function loadGmMuteDepartments(){
   apiGet('/api/gm/mute-departments').then(function(res){
     renderGmMuteDepartments(!!res.muteDepartments);
   }).catch(function(){});
 }
-gmMuteDeptsBtn.addEventListener("click", function(){
-  var next = gmMuteDeptsState.textContent !== "On";
-  gmMuteDeptsBtn.disabled = true;
+function toggleGmMuteDepartments(){
+  var next = !gmMuteDeptsOn;
+  gmMuteDeptsSwitch.disabled = true;
   apiSend('/api/gm/mute-departments', 'POST', { on: next }).then(function(res){
     renderGmMuteDepartments(!!res.muteDepartments);
     showToast(res.muteDepartments ? "Only department heads will notify you now" : "All departments will notify you again");
   }).catch(function(){
     showToast("Couldn't update that setting");
-  }).finally(function(){ gmMuteDeptsBtn.disabled = false; });
-});
+  }).finally(function(){ gmMuteDeptsSwitch.disabled = false; });
+}
+gmMuteDeptsBtn.addEventListener("click", toggleGmMuteDepartments);
+gmMuteDeptsSwitch.addEventListener("click", function(e){ e.stopPropagation(); toggleGmMuteDepartments(); });
 
 var pushEnableRowBtn = document.getElementById("pushEnableRowBtn");
 pushEnableRowBtn.addEventListener("click", function(){
