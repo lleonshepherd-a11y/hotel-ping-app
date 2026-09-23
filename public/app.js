@@ -8471,7 +8471,8 @@ if(installDismissBtn){
     if(navigator.vibrate) navigator.vibrate(8);
   }
 
-  var MIN_HOLD_MS = 350;
+  var MIN_HOLD_MS = 450;
+  var TALK_MOVE_CANCEL = 18;
   var ptt = { recording:false, mediaRecorder:null, stream:null, chunks:[], startedAt:0, recognition:null, transcript:"" };
 
   function pttStartTranscription(){
@@ -8564,7 +8565,7 @@ if(installDismissBtn){
     });
   }
 
-  function pttFinishRecording(){
+  function pttFinishRecording(forceCancel){
     var elapsedMs = Date.now() - ptt.startedAt;
     if(!ptt.mediaRecorder){
       // Permission was still pending when the button was released, or it
@@ -8585,13 +8586,17 @@ if(installDismissBtn){
       if(ptt.stream){ ptt.stream.getTracks().forEach(function(t){ t.stop(); }); ptt.stream = null; }
       ptt.mediaRecorder = null;
       ptt.recording = false;
+      var chunks = ptt.chunks;
+      ptt.chunks = [];
+      // A brush or a pocket press, not someone deliberately holding it
+      // down to talk - never sends whatever it happened to pick up.
+      // Two independent checks, either one is enough to cancel: too
+      // short to be real speech, or the finger moved across the button
+      // rather than staying put like a genuine press-and-hold does.
+      if(forceCancel || elapsedMs < MIN_HOLD_MS) return;
       // rec.mimeType, not the chunk's own .type (empty on Safari) or a
       // hardcoded guess - see the same note in qvStopRecording.
-      var blob = new Blob(ptt.chunks, {type: rec.mimeType || (ptt.chunks[0] && ptt.chunks[0].type) || "audio/webm"});
-      ptt.chunks = [];
-      // Too short to be a real message - almost certainly a stray tap,
-      // not someone actually trying to say something.
-      if(elapsedMs < MIN_HOLD_MS) return;
+      var blob = new Blob(chunks, {type: rec.mimeType || (chunks[0] && chunks[0].type) || "audio/webm"});
       pttSendRecording(blob, durationSec, transcript);
     };
     try{
@@ -8606,9 +8611,9 @@ if(installDismissBtn){
     startWaveAnim();
     pttBeginRecording();
   }
-  function stopLive(){
+  function stopLive(cancel){
     stopWaveAnim();
-    pttFinishRecording();
+    pttFinishRecording(cancel);
   }
   // Draggable so it can sit wherever a person's thumb naturally falls -
   // not everyone holds their phone the same way. Pressing still starts
@@ -8636,12 +8641,13 @@ if(installDismissBtn){
   // finger movement) means pressing to talk can never get mistaken for
   // the start of a drag, and dragging can never trigger a stray "talk".
   var pttCore = pttFloat.querySelector('.ptt-core');
-  var pressing = false, dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  var pressing = false, dragging = false, talkMoved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
   pttFloat.addEventListener('pointerdown', function(e){
     e.preventDefault();
     var onRim = !pttCore.contains(e.target);
     pressing = true;
     dragging = onRim;
+    talkMoved = false;
     startX = e.clientX; startY = e.clientY;
     var rect = pttFloat.getBoundingClientRect();
     var hostRect = (pttFloat.offsetParent || document.body).getBoundingClientRect();
@@ -8651,9 +8657,18 @@ if(installDismissBtn){
     pttFloat.setPointerCapture(e.pointerId);
   });
   pttFloat.addEventListener('pointermove', function(e){
-    if(!pressing || !dragging) return;
+    if(!pressing) return;
     var dx = e.clientX - startX, dy = e.clientY - startY;
-    applyPos(startLeft + dx, startTop + dy);
+    if(dragging){
+      applyPos(startLeft + dx, startTop + dy);
+      return;
+    }
+    // A real press-and-hold stays roughly still on the button. A finger
+    // just brushing past it - in a pocket, or on the way to somewhere
+    // else - drags sideways while it's in contact. Once it's moved too
+    // far to be a deliberate hold, the recording is marked for discard
+    // no matter how long it ends up lasting.
+    if(!talkMoved && Math.sqrt(dx*dx + dy*dy) > TALK_MOVE_CANCEL) talkMoved = true;
   });
   function endPress(){
     if(!pressing) return;
@@ -8665,7 +8680,7 @@ if(installDismissBtn){
       try{ localStorage.setItem(POS_KEY, JSON.stringify({ left: left, top: top })); }catch(e){}
       if(navigator.vibrate) navigator.vibrate(10);
     } else {
-      stopLive();
+      stopLive(talkMoved);
     }
   }
   pttFloat.addEventListener('pointerup', endPress);
