@@ -336,7 +336,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .thread-scroll{
   flex:1;overflow-y:auto;padding:20px 22px 10px;display:flex;flex-direction:column;gap:2px;
   background-color:#eeeeec;
-  background-image:radial-gradient(rgba(20,20,15,.09) 1.3px, transparent 1.3px);
+  background-image:radial-gradient(rgba(20,20,15,.06) 1.3px, transparent 1.3px);
   background-size:20px 20px;
   background-position:-4px -4px;
   scrollbar-width:none;
@@ -348,7 +348,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-pin-btn{flex:none;width:22px;height:22px;border:none;background:none;color:var(--text-faint);opacity:.32;display:flex;align-items:center;justify-content:center;margin-bottom:3px;transition:opacity .15s ease,color .15s ease,transform .1s ease}
 .msg-pin-btn svg{width:14px;height:14px}
 .msg-pin-btn:active{transform:scale(.82)}
-.msg-pin-btn.pinned{opacity:1;color:var(--accent)}
+.msg-pin-btn.pinned{opacity:1;color:#2f5fe0}
 .msg-row.group-end{margin-bottom:9px}
 @keyframes bubbleIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .msg-row.out{justify-content:flex-end}
