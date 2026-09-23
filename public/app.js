@@ -7093,6 +7093,7 @@ function enableTicketDrag(card, handle){
     e.stopPropagation();
     startX = e.clientX; startY = e.clientY;
     pointerId = e.pointerId;
+    if(navigator.vibrate) navigator.vibrate(6);
     handle.setPointerCapture(pointerId);
     handle.addEventListener("pointermove", onPointerMove);
     handle.addEventListener("pointerup", finishDrag);

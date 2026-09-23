@@ -345,7 +345,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .day-div{text-align:center;font-size:11px;font-weight:700;color:var(--text-faint);margin:14px 0 10px;text-transform:uppercase;letter-spacing:.04em}
 
 .msg-row{display:flex;align-items:flex-end;gap:2px;margin:1.5px 0;position:relative;animation:bubbleIn .3s cubic-bezier(.2,.8,.3,1) both}
-.msg-pin-btn{flex:none;width:22px;height:22px;border:none;background:none;color:var(--text-faint);opacity:.32;display:flex;align-items:center;justify-content:center;margin-bottom:3px;transition:opacity .15s ease,color .15s ease,transform .1s ease}
+.msg-pin-btn{flex:none;width:22px;height:22px;border:none;background:none;color:var(--text);opacity:.55;display:flex;align-items:center;justify-content:center;margin-bottom:3px;transition:opacity .15s ease,color .15s ease,transform .1s ease}
 .msg-pin-btn svg{width:14px;height:14px}
 .msg-pin-btn:active{transform:scale(.82)}
 .msg-pin-btn.pinned{opacity:1;color:#2f5fe0}
@@ -1164,7 +1164,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .request-card-meta{font-size:11.5px;color:var(--text-faint);margin-top:2px}
 .request-amount-hero{font-size:20px;font-weight:800;color:#3a63b8;line-height:1.15;font-variant-numeric:tabular-nums;margin-bottom:1px}
 .request-card{position:relative;padding-right:38px}
-.request-pin-btn{position:absolute;top:9px;right:9px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer}
+.request-pin-btn{position:absolute;top:9px;right:9px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer}
 .request-pin-btn svg{width:11px;height:11px}
 .request-pin-btn.pinned{background:rgba(47,95,224,.18);color:#2f5fe0}
 .maint-form-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1208,12 +1208,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-photo-remove svg{width:11px;height:11px}
 .maint-feed{display:flex;flex-direction:column;gap:13px;padding:14px 20px 20px}
 .maint-col-empty{font-size:11.5px;color:var(--text-faint);text-align:center;padding:16px 0}
-.maint-card{position:relative;background:var(--surface-2);border-radius:16px;padding:8px 34px 8px 34px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
-.maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:26px;display:flex;align-items:center;justify-content:center;color:var(--text-faint);touch-action:none;cursor:grab}
-.maint-card-handle svg{width:14px;height:18px}
+.maint-card{position:relative;background:var(--surface-2);border-radius:16px;padding:8px 34px 8px 40px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:none;cursor:grab}
+.maint-card-handle::before{content:"";position:absolute;left:5px;top:50%;transform:translateY(-50%);width:22px;height:36px;border-radius:10px;background:var(--surface-3)}
+.maint-card-handle svg{position:relative;width:16px;height:20px}
 .maint-card.dragging .maint-card-handle{color:var(--accent)}
 .maint-card.dragging{z-index:20;box-shadow:0 22px 40px -12px rgba(0,0,0,.45),0 8px 16px -6px rgba(0,0,0,.3)}
-.maint-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer}
+.maint-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer}
 .maint-pin-btn svg{width:11px;height:11px}
 .maint-pin-btn.pinned{background:rgba(47,95,224,.18);color:#2f5fe0}
 .maint-card.status-reported{border-left-color:var(--urgent)}
@@ -1266,7 +1267,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guest-card{position:relative;background:var(--surface-2);border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid #e0902c}
 .guest-card.status-in_progress{border-left-color:#3b82c4}
 .guest-card.status-completed{border-left-color:#2f9a5c;opacity:.88}
-.guest-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-faint);cursor:pointer}
+.guest-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer}
 .guest-pin-btn svg{width:11px;height:11px}
 .guest-pin-btn.pinned{background:rgba(47,95,224,.18);color:#2f5fe0}
 .guest-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;gap:8px}
