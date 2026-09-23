@@ -8223,12 +8223,13 @@ newRequestForm.addEventListener("submit", function(e){
   var to = newRequestTo.value;
   if(!to){ requestError.textContent = "Choose who to send this to."; return; }
   var amountRaw = newRequestAmount.value.trim();
+  if(!amountRaw){ requestError.textContent = "Enter the amount this will cost."; return; }
   var payload = {
     from: STATE.self, to: to, type: "text",
     text: "Requesting approval: " + title,
     signoff: {
       title: title,
-      amount: amountRaw ? Number(amountRaw) : undefined,
+      amount: Number(amountRaw),
       category: newRequestCategory.value || undefined,
       target: newRequestTarget.value.trim() || undefined,
       guestInfo: newRequestGuest.value.trim() || undefined,
