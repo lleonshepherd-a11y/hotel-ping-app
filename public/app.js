@@ -1071,18 +1071,33 @@ function buildAudioNode(msg, holderIsOut){
     });
   }
 
+  function showPlayIcon(){ icPlay.style.display = ""; icPause.style.display = "none"; }
+  function showPauseIcon(){ icPlay.style.display = "none"; icPause.style.display = ""; }
+
   playBtn.addEventListener("click", function(){
     if(audioEl.paused){
       var startPlayback = function(){
         audioEl.playbackRate = speeds[speedIdx];
-        audioEl.play().catch(function(){});
+        // Icon state is driven entirely by the audioEl's own play/pause/error
+        // events below - never set optimistically here - so a failed play()
+        // (bad decode, network hiccup, autoplay block) can't leave the button
+        // stuck showing "pause" with nothing actually playing and no way to
+        // retry it.
+        audioEl.play().catch(function(){
+          showPlayIcon();
+          showToast("Couldn't play that voice note");
+        });
       };
       if(!ready){ ensureSrc().then(startPlayback); } else { startPlayback(); }
-      icPlay.style.display = "none"; icPause.style.display = "";
     } else {
       audioEl.pause();
-      icPlay.style.display = ""; icPause.style.display = "none";
     }
+  });
+  audioEl.addEventListener("play", showPauseIcon);
+  audioEl.addEventListener("pause", showPlayIcon);
+  audioEl.addEventListener("error", function(){
+    showPlayIcon();
+    showToast("Couldn't play that voice note");
   });
   audioEl.addEventListener("loadedmetadata", function(){
     if(isFinite(audioEl.duration) && audioEl.duration > 0){ totalDur = audioEl.duration; }
@@ -1093,7 +1108,6 @@ function buildAudioNode(msg, holderIsOut){
     durLabel.textContent = fmtDur(Math.max(0, totalDur - audioEl.currentTime));
   });
   audioEl.addEventListener("ended", function(){
-    icPlay.style.display = ""; icPause.style.display = "none";
     setProgressPct(0);
     durLabel.textContent = fmtDur(totalDur);
   });
