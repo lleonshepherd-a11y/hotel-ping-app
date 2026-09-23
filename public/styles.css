@@ -146,9 +146,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bottom-tab.drag-hover{background:var(--surface-3);color:var(--text)}
 #tabEventsBtn{color:#4d84f5}
 #tabEventsBtn.active .bottom-tab-icon{background:rgba(77,132,245,.14)}
-#tabMaintBtn{color:#2f9a5c}
-#tabMaintBtn.active{color:#2f9a5c}
-#tabMaintBtn.active .bottom-tab-icon{background:rgba(47,154,92,.14)}
 .bottom-tab .tab-badge{
   position:absolute;top:-3px;right:-7px;min-width:15px;height:15px;padding:0 3px;
   border-radius:8px;background:var(--urgent);color:#fff;font-size:9px;font-weight:800;
@@ -1279,6 +1276,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .guests-header-icon{width:30px;height:30px;border-radius:9px;background:rgba(184,151,92,.14);color:#b8975c;display:flex;align-items:center;justify-content:center;flex:none}
 .assets-header-icon{background:rgba(20,20,22,.14);color:var(--accent)}
 #maintenancePage .guests-header-icon{background:rgba(47,154,92,.14);color:#2f9a5c}
+#eventsPage .guests-header-icon{background:rgba(77,132,245,.14);color:#4d84f5}
 .guests-header-icon svg{width:15px;height:15px}
 .guests-feed{display:flex;flex-direction:column;gap:7px;padding:14px 20px 20px}
 .guest-card{position:relative;background:var(--surface-2);border-radius:12px;padding:8px 34px 8px 12px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid #e0902c}
