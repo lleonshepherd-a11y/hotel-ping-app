@@ -3133,7 +3133,13 @@ function qvStopRecording(discard){
       qvCloseOverlay();
       return;
     }
-    var blob = new Blob(qvState.chunks, {type: qvState.chunks[0] ? qvState.chunks[0].type : "audio/webm"});
+    // rec.mimeType is the recorder's own authoritative answer for what it
+    // actually encoded - Safari in particular reports an empty .type on
+    // the individual data chunks even though the recording itself is a
+    // real, playable format, so trusting the chunk type (or worse, a
+    // hardcoded guess) mislabels the file and breaks playback everywhere,
+    // including on the phone that just recorded it.
+    var blob = new Blob(qvState.chunks, {type: rec.mimeType || (qvState.chunks[0] && qvState.chunks[0].type) || "audio/webm"});
     qvState.chunks = [];
     qvState.stoppedBlob = blob;
     qvState.stoppedDuration = duration;
@@ -7656,7 +7662,9 @@ function maintVoiceStop(){
     maintVoiceState.recording = false;
     maintVoiceBtn.classList.remove("recording");
     maintVoiceRecording.hidden = true;
-    var blob = new Blob(maintVoiceState.chunks, {type: maintVoiceState.chunks[0] ? maintVoiceState.chunks[0].type : "audio/webm"});
+    // rec.mimeType, not the chunk's own .type (empty on Safari) or a
+    // hardcoded guess - see the same note in qvStopRecording.
+    var blob = new Blob(maintVoiceState.chunks, {type: rec.mimeType || (maintVoiceState.chunks[0] && maintVoiceState.chunks[0].type) || "audio/webm"});
     maintVoiceState.chunks = [];
     maintVoiceState.blob = blob;
     maintVoiceState.duration = duration;
@@ -8577,7 +8585,9 @@ if(installDismissBtn){
       if(ptt.stream){ ptt.stream.getTracks().forEach(function(t){ t.stop(); }); ptt.stream = null; }
       ptt.mediaRecorder = null;
       ptt.recording = false;
-      var blob = new Blob(ptt.chunks, {type: ptt.chunks[0] ? ptt.chunks[0].type : "audio/webm"});
+      // rec.mimeType, not the chunk's own .type (empty on Safari) or a
+      // hardcoded guess - see the same note in qvStopRecording.
+      var blob = new Blob(ptt.chunks, {type: rec.mimeType || (ptt.chunks[0] && ptt.chunks[0].type) || "audio/webm"});
       ptt.chunks = [];
       // Too short to be a real message - almost certainly a stray tap,
       // not someone actually trying to say something.
