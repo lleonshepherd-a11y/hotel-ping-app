@@ -3111,6 +3111,42 @@ export default {
         return json({ muted: true });
       }
 
+      // ---- GM's own "don't notify me for plain departments" switch ----
+      // A personal GM setting, not a department one - only the GM (is_admin,
+      // which is GM-only now) can read or flip it. Built on the same
+      // muted_conversations table /api/muted already uses, just applied to
+      // every plain department (foh, kitchen, housekeeping, ...) at once.
+      // Head-of-department contacts (head_kitchen etc.) are never in
+      // DEPT_IDS, so they're never touched by this - a head's message to
+      // the GM still notifies exactly as normal, on or off. This never
+      // blocks the message itself, only the push notification - it still
+      // lands in the GM's normal inbox for that department, same as any
+      // other conversation, so he can always open it and reply directly.
+      const GM_MUTABLE_DEPTS = Array.from(DEPT_IDS).filter((d) => d !== "gm");
+      if (method === "GET" && p === "/api/gm/mute-departments") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const rows = await env.DB.prepare("SELECT other_dept_id FROM muted_conversations WHERE department_id = 'gm'").all();
+        const mutedSet = new Set(rows.results.map((r) => r.other_dept_id));
+        const on = GM_MUTABLE_DEPTS.every((d) => mutedSet.has(d));
+        return json({ muteDepartments: on });
+      }
+      if (method === "POST" && p === "/api/gm/mute-departments") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const body = await readJsonBody(request);
+        const on = !!body.on;
+        if (on) {
+          const now = new Date().toISOString();
+          await env.DB.batch(GM_MUTABLE_DEPTS.map((d) =>
+            env.DB.prepare("INSERT OR IGNORE INTO muted_conversations (department_id, other_dept_id, muted_at) VALUES ('gm', ?, ?)").bind(d, now)
+          ));
+        } else {
+          await env.DB.batch(GM_MUTABLE_DEPTS.map((d) =>
+            env.DB.prepare("DELETE FROM muted_conversations WHERE department_id = 'gm' AND other_dept_id = ?").bind(d)
+          ));
+        }
+        return json({ muteDepartments: on });
+      }
+
       if (method === "GET" && p === "/api/quick-replies") {
         const dept = toNoirDept(request._staff.department_id);
         let rows = await env.NOIR_DB.prepare("SELECT * FROM quick_replies WHERE department_id = ? ORDER BY position ASC").bind(dept).all();

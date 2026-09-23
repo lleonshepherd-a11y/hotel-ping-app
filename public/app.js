@@ -3323,6 +3323,8 @@ function enterApp(staff){
   feedBtn.hidden = !staff.isAdmin;
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
+  gmMuteDeptsBtn.hidden = !staff.isAdmin;
+  if(staff.isAdmin) loadGmMuteDepartments();
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
@@ -4835,6 +4837,35 @@ notifSettingsBtn.addEventListener("click", function(){
 });
 notifSettingsClose.addEventListener("click", function(){ notifSettingsOverlay.hidden = true; });
 notifSettingsOverlay.addEventListener("click", function(e){ if(e.target === notifSettingsOverlay) notifSettingsOverlay.hidden = true; });
+
+// ---- GM's "only notify me for department heads" switch (GM-only) ----
+// Whether the message itself gets through is untouched by this - the GM
+// still sees every department's conversation and can reply normally. This
+// only silences the push notification for plain departments (foh, kitchen,
+// housekeeping, ...); a head-of-department contact (head_kitchen etc.)
+// still notifies him regardless of this switch's state.
+var gmMuteDeptsBtn = document.getElementById("gmMuteDeptsBtn");
+var gmMuteDeptsState = document.getElementById("gmMuteDeptsState");
+function renderGmMuteDepartments(on){
+  gmMuteDeptsState.textContent = on ? "On" : "Off";
+  gmMuteDeptsState.style.opacity = on ? "1" : ".6";
+  gmMuteDeptsState.style.color = on ? "var(--accent, #2f9aa0)" : "";
+}
+function loadGmMuteDepartments(){
+  apiGet('/api/gm/mute-departments').then(function(res){
+    renderGmMuteDepartments(!!res.muteDepartments);
+  }).catch(function(){});
+}
+gmMuteDeptsBtn.addEventListener("click", function(){
+  var next = gmMuteDeptsState.textContent !== "On";
+  gmMuteDeptsBtn.disabled = true;
+  apiSend('/api/gm/mute-departments', 'POST', { on: next }).then(function(res){
+    renderGmMuteDepartments(!!res.muteDepartments);
+    showToast(res.muteDepartments ? "Only department heads will notify you now" : "All departments will notify you again");
+  }).catch(function(){
+    showToast("Couldn't update that setting");
+  }).finally(function(){ gmMuteDeptsBtn.disabled = false; });
+});
 
 var pushEnableRowBtn = document.getElementById("pushEnableRowBtn");
 pushEnableRowBtn.addEventListener("click", function(){

@@ -2218,6 +2218,28 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { muted: true });
     }
 
+    const GM_MUTABLE_DEPTS = Array.from(DEPT_IDS).filter((d) => d !== 'gm');
+    if (req.method === 'GET' && p === '/api/gm/mute-departments') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const rows = db.prepare("SELECT other_dept_id FROM muted_conversations WHERE department_id = 'gm'").all();
+      const mutedSet = new Set(rows.map((r) => r.other_dept_id));
+      const on = GM_MUTABLE_DEPTS.every((d) => mutedSet.has(d));
+      return send(res, 200, { muteDepartments: on });
+    }
+    if (req.method === 'POST' && p === '/api/gm/mute-departments') {
+      const requester = staffFromToken(req);
+      if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
+      const body = await readJsonBody(req);
+      const on = !!body.on;
+      const now = new Date().toISOString();
+      for (const d of GM_MUTABLE_DEPTS) {
+        if (on) db.prepare("INSERT OR IGNORE INTO muted_conversations (department_id, other_dept_id, muted_at) VALUES ('gm', ?, ?)").run(d, now);
+        else db.prepare("DELETE FROM muted_conversations WHERE department_id = 'gm' AND other_dept_id = ?").run(d);
+      }
+      return send(res, 200, { muteDepartments: on });
+    }
+
     if (req.method === 'GET' && p === '/api/quick-replies') {
       const requester = staffFromToken(req);
       const dept = requester.department_id;
