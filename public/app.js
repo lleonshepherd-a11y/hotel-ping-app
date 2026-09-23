@@ -8465,10 +8465,66 @@ if(installDismissBtn){
     setIdleBars();
     if(navigator.vibrate) navigator.vibrate(8);
   }
-  var pressing = false;
-  pttFloat.addEventListener('pointerdown', function(e){ e.preventDefault(); pressing = true; startLive(); });
-  window.addEventListener('pointerup', function(){ if(pressing){ pressing = false; stopLive(); } });
-  window.addEventListener('pointercancel', function(){ if(pressing){ pressing = false; stopLive(); } });
+  // Draggable so it can sit wherever a person's thumb naturally falls -
+  // not everyone holds their phone the same way. Pressing still starts
+  // talking instantly; only a real finger movement past a small
+  // threshold turns the gesture into a reposition instead.
+  var POS_KEY = 'hp_ptt_pos';
+  var DRAG_THRESHOLD = 12;
+  function applyPos(left, top){
+    var host = pttFloat.offsetParent || document.body;
+    var maxLeft = host.clientWidth - pttFloat.offsetWidth - 8;
+    var maxTop = host.clientHeight - pttFloat.offsetHeight - 8;
+    left = Math.max(8, Math.min(maxLeft, left));
+    top = Math.max(8, Math.min(maxTop, top));
+    pttFloat.style.left = left + 'px';
+    pttFloat.style.top = top + 'px';
+    pttFloat.style.bottom = 'auto';
+    return { left: left, top: top };
+  }
+  try{
+    var saved = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+    if(saved && typeof saved.left === 'number' && typeof saved.top === 'number') applyPos(saved.left, saved.top);
+  }catch(e){}
+
+  var pressing = false, dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
+  pttFloat.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    pressing = true;
+    dragging = false;
+    startX = e.clientX; startY = e.clientY;
+    var rect = pttFloat.getBoundingClientRect();
+    var hostRect = (pttFloat.offsetParent || document.body).getBoundingClientRect();
+    startLeft = rect.left - hostRect.left;
+    startTop = rect.top - hostRect.top;
+    startLive();
+    pttFloat.setPointerCapture(e.pointerId);
+  });
+  pttFloat.addEventListener('pointermove', function(e){
+    if(!pressing) return;
+    var dx = e.clientX - startX, dy = e.clientY - startY;
+    if(!dragging && Math.sqrt(dx*dx + dy*dy) > DRAG_THRESHOLD){
+      dragging = true;
+      stopLive();
+      pttFloat.classList.add('dragging');
+    }
+    if(dragging) applyPos(startLeft + dx, startTop + dy);
+  });
+  function endPress(){
+    if(!pressing) return;
+    pressing = false;
+    if(dragging){
+      dragging = false;
+      pttFloat.classList.remove('dragging');
+      var left = parseFloat(pttFloat.style.left), top = parseFloat(pttFloat.style.top);
+      try{ localStorage.setItem(POS_KEY, JSON.stringify({ left: left, top: top })); }catch(e){}
+      if(navigator.vibrate) navigator.vibrate(10);
+    } else {
+      stopLive();
+    }
+  }
+  pttFloat.addEventListener('pointerup', endPress);
+  pttFloat.addEventListener('pointercancel', endPress);
 })();
 
 })();
