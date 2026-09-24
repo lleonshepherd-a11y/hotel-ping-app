@@ -522,6 +522,26 @@ CREATE TABLE IF NOT EXISTS ops_calendar_entries (
 );
 CREATE INDEX IF NOT EXISTS idx_ops_calendar_date ON ops_calendar_entries(entry_date);
 
+-- 7/3/1-day advance reminders for ops calendar entries. One row per
+-- (entry, interval, audience) so a department and an individually-tagged
+-- staff member each get their own dismissible reminder, and each of the
+-- three intervals fires exactly once per entry per audience member.
+CREATE TABLE IF NOT EXISTS ops_planner_reminders_sent (
+  id TEXT PRIMARY KEY,
+  entry_id TEXT NOT NULL,
+  interval_days INTEGER NOT NULL,
+  department_id TEXT,
+  staff_id TEXT,
+  title TEXT NOT NULL,
+  entry_date TEXT NOT NULL,
+  entry_time TEXT,
+  sent_at TEXT NOT NULL,
+  read_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_dept ON ops_planner_reminders_sent(department_id, read_at);
+CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_staff ON ops_planner_reminders_sent(staff_id, read_at);
+CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_entry ON ops_planner_reminders_sent(entry_id, interval_days);
+
 -- Every unhandled server error, so a GM can see when something's actually
 -- broken from inside the app itself instead of only via `wrangler tail`
 -- (which needs a terminal open and watching live to catch anything).

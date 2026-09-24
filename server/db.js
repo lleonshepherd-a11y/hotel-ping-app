@@ -497,6 +497,22 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_ops_calendar_date ON ops_calendar_entries(entry_date);
+
+  CREATE TABLE IF NOT EXISTS ops_planner_reminders_sent (
+    id TEXT PRIMARY KEY,
+    entry_id TEXT NOT NULL,
+    interval_days INTEGER NOT NULL,
+    department_id TEXT,
+    staff_id TEXT,
+    title TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    entry_time TEXT,
+    sent_at TEXT NOT NULL,
+    read_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_dept ON ops_planner_reminders_sent(department_id, read_at);
+  CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_staff ON ops_planner_reminders_sent(staff_id, read_at);
+  CREATE INDEX IF NOT EXISTS idx_ops_planner_reminders_entry ON ops_planner_reminders_sent(entry_id, interval_days);
 `);
 
 const calendarColumns = db.prepare("PRAGMA table_info(ops_calendar_entries)").all().map((c) => c.name);

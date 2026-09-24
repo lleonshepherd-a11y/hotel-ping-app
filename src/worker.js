@@ -616,6 +616,68 @@ async function checkPlannerAlerts(env, ctx) {
   }
 }
 
+// 7/3/1-day advance reminders for the in-app Ops Planner (ops_calendar_entries -
+// hotel's own calendar, not the dashboard bridge above). One row per
+// (entry, interval, department-or-staff) in ops_planner_reminders_sent keeps
+// each interval firing exactly once per audience member, even across
+// overlapping cron ticks, and lets a department and an individually-tagged
+// staff member each dismiss their own copy independently.
+const OPS_PLANNER_REMINDER_DAYS = [7, 3, 1];
+async function checkOpsPlannerReminders(env, ctx) {
+  try {
+    const today = new Date();
+    const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    const minDate = new Date(todayUTC).toISOString().slice(0, 10);
+    const maxDate = new Date(todayUTC + 8 * 86400000).toISOString().slice(0, 10);
+    const rows = await env.DB.prepare(
+      "SELECT * FROM ops_calendar_entries WHERE entry_date >= ? AND entry_date <= ?"
+    ).bind(minDate, maxDate).all();
+    if (!rows.results.length) return;
+    for (const row of rows.results) {
+      const [y, m, d] = row.entry_date.split("-").map(Number);
+      const targetUTC = Date.UTC(y, m - 1, d);
+      const daysUntil = Math.round((targetUTC - todayUTC) / 86400000);
+      if (!OPS_PLANNER_REMINDER_DAYS.includes(daysUntil)) continue;
+      const deptIds = JSON.parse(row.department_ids || "[]").filter((id) => DEPT_IDS.has(id));
+      const staffIds = JSON.parse(row.staff_ids || "[]");
+      if (!deptIds.length && !staffIds.length) continue;
+
+      const already = await env.DB.prepare(
+        "SELECT department_id, staff_id FROM ops_planner_reminders_sent WHERE entry_id = ? AND interval_days = ?"
+      ).bind(row.id, daysUntil).all();
+      const sentDepts = new Set(already.results.filter((r) => r.department_id).map((r) => r.department_id));
+      const sentStaff = new Set(already.results.filter((r) => r.staff_id).map((r) => r.staff_id));
+
+      const label = daysUntil === 1 ? "Tomorrow" : "In " + daysUntil + " days";
+      const body = row.title + " — " + label + (row.entry_time ? " at " + row.entry_time : "");
+      const now = new Date().toISOString();
+
+      for (const dept of deptIds) {
+        if (sentDepts.has(dept)) continue;
+        await env.DB.prepare(
+          "INSERT INTO ops_planner_reminders_sent (id, entry_id, interval_days, department_id, staff_id, title, entry_date, entry_time, sent_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), row.id, daysUntil, dept, row.title, row.entry_date, row.entry_time || null, now).run();
+        const notifyPromise = notifyDepartment(env, dept, {
+          title: "📅 Ops Planner reminder", body, url: "/", tag: "hotel-ping-ops-reminder-" + row.id + "-" + daysUntil,
+        }, null).catch((e) => console.error("notifyDepartment (ops planner reminder) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+      }
+      for (const staffId of staffIds) {
+        if (sentStaff.has(staffId)) continue;
+        await env.DB.prepare(
+          "INSERT INTO ops_planner_reminders_sent (id, entry_id, interval_days, department_id, staff_id, title, entry_date, entry_time, sent_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), row.id, daysUntil, staffId, row.title, row.entry_date, row.entry_time || null, now).run();
+        const notifyPromise = notifyStaff(env, staffId, {
+          title: "📅 Ops Planner reminder", body, url: "/", tag: "hotel-ping-ops-reminder-" + row.id + "-" + daysUntil,
+        }).catch((e) => console.error("notifyStaff (ops planner reminder) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+      }
+    }
+  } catch (e) {
+    console.error("Ops planner reminder check error:", e && e.stack || e);
+  }
+}
+
 async function checkEscalations(env) {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -2754,6 +2816,17 @@ export default {
           });
         }
 
+        const opsReminderRows = await env.DB.prepare(
+          "SELECT * FROM ops_planner_reminders_sent WHERE read_at IS NULL AND (department_id = ? OR staff_id = ?) ORDER BY sent_at ASC"
+        ).bind(dept, request._staff.id).all();
+        for (const r of opsReminderRows.results) {
+          const label = r.interval_days === 1 ? "Tomorrow" : "In " + r.interval_days + " days";
+          items.push({
+            kind: "planner", id: r.id, createdAt: r.sent_at,
+            planner: { id: r.id, title: r.title, startsAt: label + (r.entry_time ? " at " + r.entry_time : "") + " (" + r.entry_date + ")", details: undefined },
+          });
+        }
+
         items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
         return json({ items });
       }
@@ -2761,6 +2834,17 @@ export default {
       if (method === "POST" && p.startsWith("/api/planner-notifications/") && p.endsWith("/read")) {
         const id = decodeURIComponent(p.slice("/api/planner-notifications/".length, -"/read".length));
         const requester = request._staff;
+        const opsReminder = await env.DB.prepare("SELECT department_id, staff_id FROM ops_planner_reminders_sent WHERE id = ?").bind(id).first();
+        if (opsReminder) {
+          if (opsReminder.department_id && opsReminder.department_id !== requester.department_id && !requester.is_admin) {
+            return json({ error: "Not part of this department" }, 403);
+          }
+          if (opsReminder.staff_id && opsReminder.staff_id !== requester.id && !requester.is_admin) {
+            return json({ error: "Not addressed to you" }, 403);
+          }
+          await env.DB.prepare("UPDATE ops_planner_reminders_sent SET read_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+          return json({ ok: true });
+        }
         const existing = await env.DB.prepare("SELECT department_id FROM planner_alerts_sent WHERE entry_id = ?").bind(id).first();
         if (!existing) return json({ error: "Not found" }, 404);
         if (existing.department_id !== requester.department_id && !requester.is_admin) {
@@ -4235,6 +4319,7 @@ export default {
         const count = await checkEscalations(env);
         await checkUnnotifiedTickets(env, ctx);
         await checkPlannerAlerts(env, ctx);
+        await checkOpsPlannerReminders(env, ctx);
         return json({ escalated: count });
       }
 
@@ -4288,6 +4373,7 @@ export default {
       const hotelEnv = Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads });
       ctx.waitUntil(checkEscalations(hotelEnv));
       ctx.waitUntil(checkUnnotifiedTickets(hotelEnv, ctx));
+      ctx.waitUntil(checkOpsPlannerReminders(hotelEnv, ctx));
       ctx.waitUntil(pruneErrorLog(hotelEnv));
     }
     ctx.waitUntil(checkDashboardDepartmentDrift(env));

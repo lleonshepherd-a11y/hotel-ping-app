@@ -483,6 +483,28 @@ function playChime(urgent){
     });
   }catch(e){}
 }
+function playPlannerChime(){
+  try{
+    unlockChime();
+    var ctx = chimeCtx;
+    if(!ctx || ctx.state !== "running") return;
+    var now0 = ctx.currentTime;
+    // A soft, two-note ascending chime - gentle attack, slow decay - reserved
+    // for Ops Planner 7/3/1-day reminders. Deliberately not the sharp triple
+    // ping used for new messages: this is an FYI, not an alert.
+    var notes = [{ freq: 659.25, offset: 0 }, { freq: 880, offset: 0.14 }];
+    notes.forEach(function(note){
+      var osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = "sine"; osc.frequency.value = note.freq;
+      var t = now0 + note.offset;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.09, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+  }catch(e){}
+}
 
 /* fridge thermostat illustration as inline SVG data URI (stand-in "photo") */
 function fridgeImageSrc(){
@@ -4403,15 +4425,6 @@ handoverForm.addEventListener("submit", function(e){
   }).finally(function(){ handoverSendBtn.disabled = false; });
 });
 
-/* ---- Profile: More options dropdown ---- */
-var moreOptionsBtn = document.getElementById("moreOptionsBtn");
-var moreOptionsSub = document.getElementById("moreOptionsSub");
-moreOptionsBtn.addEventListener("click", function(){
-  var open = moreOptionsSub.hidden;
-  moreOptionsSub.hidden = !open;
-  moreOptionsBtn.classList.toggle("open", open);
-});
-
 /* ---- Profile: Admin dropdown (Hotel setup, Activity feed, Response
    times, Error log, Broadcast messages, Priority alert, Ops overview -
    grouped so the day-to-day rows above aren't buried under admin-only
@@ -5300,8 +5313,15 @@ function renderMissedFeed(items){
   missedEmptyState.hidden = !(missedApprovalsBox.hidden && missedMsgBox.hidden && missedTicketsBox.hidden && missedGuestsBox.hidden && missedPlannerBox.hidden);
 }
 
+var lastPlannerReminderIds = null;
 function pollMissed(){
   apiGet('/api/missed').then(function(res){
+    var plannerIds = res.items.filter(function(i){ return i.kind === "planner"; }).map(function(i){ return i.id; });
+    if(lastPlannerReminderIds !== null){
+      var hasNewReminder = plannerIds.some(function(id){ return lastPlannerReminderIds.indexOf(id) === -1; });
+      if(hasNewReminder && isOnDuty(STATE.self)) playPlannerChime();
+    }
+    lastPlannerReminderIds = plannerIds;
     if(!profilePage.hidden) renderMissedFeed(res.items);
   }).catch(function(){});
 }

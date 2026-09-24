@@ -331,6 +331,50 @@ function checkEscalations() {
   return escalatedCount;
 }
 
+const OPS_PLANNER_REMINDER_DAYS = [7, 3, 1];
+function checkOpsPlannerReminders() {
+  const today = new Date();
+  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const minDate = new Date(todayUTC).toISOString().slice(0, 10);
+  const maxDate = new Date(todayUTC + 8 * 86400000).toISOString().slice(0, 10);
+  const rows = db.prepare(
+    "SELECT * FROM ops_calendar_entries WHERE entry_date >= ? AND entry_date <= ?"
+  ).all(minDate, maxDate);
+  let sentCount = 0;
+  for (const row of rows) {
+    const [y, m, d] = row.entry_date.split('-').map(Number);
+    const targetUTC = Date.UTC(y, m - 1, d);
+    const daysUntil = Math.round((targetUTC - todayUTC) / 86400000);
+    if (!OPS_PLANNER_REMINDER_DAYS.includes(daysUntil)) continue;
+    const deptIds = JSON.parse(row.department_ids || '[]').filter((id) => DEPT_IDS.has(id));
+    const staffIds = JSON.parse(row.staff_ids || '[]');
+    if (!deptIds.length && !staffIds.length) continue;
+
+    const already = db.prepare(
+      "SELECT department_id, staff_id FROM ops_planner_reminders_sent WHERE entry_id = ? AND interval_days = ?"
+    ).all(row.id, daysUntil);
+    const sentDepts = new Set(already.filter((r) => r.department_id).map((r) => r.department_id));
+    const sentStaff = new Set(already.filter((r) => r.staff_id).map((r) => r.staff_id));
+    const now = new Date().toISOString();
+
+    for (const dept of deptIds) {
+      if (sentDepts.has(dept)) continue;
+      db.prepare(
+        "INSERT INTO ops_planner_reminders_sent (id, entry_id, interval_days, department_id, staff_id, title, entry_date, entry_time, sent_at) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)"
+      ).run(crypto.randomUUID(), row.id, daysUntil, dept, row.title, row.entry_date, row.entry_time || null, now);
+      sentCount++;
+    }
+    for (const staffId of staffIds) {
+      if (sentStaff.has(staffId)) continue;
+      db.prepare(
+        "INSERT INTO ops_planner_reminders_sent (id, entry_id, interval_days, department_id, staff_id, title, entry_date, entry_time, sent_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?)"
+      ).run(crypto.randomUUID(), row.id, daysUntil, staffId, row.title, row.entry_date, row.entry_time || null, now);
+      sentCount++;
+    }
+  }
+  return sentCount;
+}
+
 function nextSignoffCode() {
   const row = db.prepare("SELECT COUNT(*) AS n FROM messages WHERE signoff_title IS NOT NULL").get();
   return 'RQ-' + String((row ? row.n : 0) + 1).padStart(4, '0');
@@ -1419,8 +1463,34 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
+      const opsReminderRows = db.prepare(
+        "SELECT * FROM ops_planner_reminders_sent WHERE read_at IS NULL AND (department_id = ? OR staff_id = ?) ORDER BY sent_at ASC"
+      ).all(dept, requester.id);
+      for (const r of opsReminderRows) {
+        const label = r.interval_days === 1 ? 'Tomorrow' : 'In ' + r.interval_days + ' days';
+        items.push({
+          kind: 'planner', id: r.id, createdAt: r.sent_at,
+          planner: { id: r.id, title: r.title, startsAt: label + (r.entry_time ? ' at ' + r.entry_time : '') + ' (' + r.entry_date + ')', details: undefined },
+        });
+      }
+
       items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
       return send(res, 200, { items });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/planner-notifications/') && p.endsWith('/read')) {
+      const id = decodeURIComponent(p.slice('/api/planner-notifications/'.length, -'/read'.length));
+      const requester = staffFromToken(req);
+      const existing = db.prepare("SELECT department_id, staff_id FROM ops_planner_reminders_sent WHERE id = ?").get(id);
+      if (!existing) return send(res, 404, { error: 'Not found' });
+      if (existing.department_id && existing.department_id !== requester.department_id && !requester.is_admin) {
+        return send(res, 403, { error: 'Not part of this department' });
+      }
+      if (existing.staff_id && existing.staff_id !== requester.id && !requester.is_admin) {
+        return send(res, 403, { error: 'Not addressed to you' });
+      }
+      db.prepare('UPDATE ops_planner_reminders_sent SET read_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p === '/api/help-alerts') {
@@ -2754,7 +2824,8 @@ const server = http.createServer(async (req, res) => {
       const requester = staffFromToken(req);
       if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
       const count = checkEscalations();
-      return send(res, 200, { escalated: count });
+      const remindersSent = checkOpsPlannerReminders();
+      return send(res, 200, { escalated: count, plannerRemindersSent: remindersSent });
     }
 
     return send(res, 404, { error: 'Not found' });
