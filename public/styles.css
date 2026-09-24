@@ -1622,6 +1622,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* Ops calendar */
 .calendar-modal{padding-bottom:20px}
+.calendar-add-icon-btn{border:none;background:#3E63C9;color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px -2px rgba(62,99,201,.6)}
+.calendar-add-icon-btn:active{background:#3556ad}
 .calendar-toolbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
 .calendar-nav-btn{border:1px solid var(--border);background:var(--surface-2);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text)}
 .calendar-nav-btn:active{background:var(--surface-3)}
