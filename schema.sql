@@ -502,6 +502,25 @@ CREATE TABLE IF NOT EXISTS personal_notes (
 );
 CREATE INDEX IF NOT EXISTS idx_personal_notes_staff ON personal_notes(staff_id, created_at);
 
+-- Hotel-wide ops calendar: weddings, conferences, large bookings and the
+-- like, colour-tagged by whoever adds them and pinned to the departments
+-- they affect. Planning data, not the message record - unlike a sent
+-- message, it's fine for anyone to correct or take an entry down.
+CREATE TABLE IF NOT EXISTS ops_calendar_entries (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  entry_date TEXT NOT NULL,
+  entry_time TEXT,
+  category_label TEXT NOT NULL,
+  category_color TEXT NOT NULL,
+  department_ids TEXT NOT NULL,
+  notes TEXT,
+  created_by TEXT,
+  created_by_name TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ops_calendar_date ON ops_calendar_entries(entry_date);
+
 -- Every unhandled server error, so a GM can see when something's actually
 -- broken from inside the app itself instead of only via `wrangler tail`
 -- (which needs a terminal open and watching live to catch anything).

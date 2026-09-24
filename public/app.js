@@ -1490,7 +1490,6 @@ function hideMessageActionMenu(){
 var THUMB_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22V11l5-9a2.5 2.5 0 0 1 2.5 3l-1 5h5.5a2 2 0 0 1 2 2.4l-1.7 7A2 2 0 0 1 17.4 22H7z"/><path d="M7 22H4a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1h3"/></svg>';
 var THUMB_REACTION = "thumbsup";
 function showMessageActionMenu(m, x, y){
-  var canDelete = !m.deleted && (m.from === "self" || (AUTH.staff && AUTH.staff.isAdmin));
   var rows = [];
   rows.push({ key:"reply", label:"Reply", icon:ACTION_ICONS.reply });
   if(!m.deleted && m.from === "self" && m.type === "text") rows.push({ key:"edit", label:"Edit", icon:ACTION_ICONS.edit });
@@ -1507,10 +1506,10 @@ function showMessageActionMenu(m, x, y){
   var html = rows.map(function(r){
     return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
   }).join("");
-  if(canDelete){
-    html += '<div class="msg-action-divider"></div>' +
-      '<button type="button" class="msg-action-row danger" data-action="delete">'+ACTION_ICONS.trash+'<span>Delete</span></button>';
-  }
+  // No delete action, for anyone, ever - once a message has gone through
+  // the system it stays. See confirmDeleteMessage's removal for the full
+  // reasoning; this is the deliberate absence of that button, not an
+  // oversight.
   msgActionMenu.innerHTML = reactHtml + html;
   if(!m.deleted){
     msgActionMenu.querySelectorAll(".msg-action-react-btn").forEach(function(btn){
@@ -1541,7 +1540,6 @@ function showMessageActionMenu(m, x, y){
       else if(action === "copy") copyMessageContent(m);
       else if(action === "pin") togglePinMessage(m);
       else if(action === "complete") toggleCompleteMessage(m);
-      else if(action === "delete") confirmDeleteMessage(m.id);
     });
   });
 }
@@ -2186,23 +2184,6 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   return row;
 }
 
-function confirmDeleteMessage(id){
-  showConfirm({
-    title: "Delete this message?",
-    body: "It will be hidden from this conversation, but it is not erased. Management can still see the original message."
-  }).then(function(ok){
-    if(!ok) return;
-    apiDelete('/api/messages/' + encodeURIComponent(id)).then(function(res){
-      var msgs = currentMessagesArray();
-      var idx = msgs.findIndex(function(x){ return x.id === id; });
-      if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-      renderList();
-      renderThread();
-    }).catch(function(){
-      showToast("Couldn't delete that message");
-    });
-  });
-}
 
 /* ---------------- Identity switching ---------------- */
 function loadMutedList(){
@@ -6115,6 +6096,259 @@ notesBtn.addEventListener("click", function(){
 notesClose.addEventListener("click", function(){ notesOverlay.hidden = true; });
 notesOverlay.addEventListener("click", function(e){ if(e.target === notesOverlay) notesOverlay.hidden = true; });
 notesRecordBtn.addEventListener("click", function(){ qvStart("note"); });
+
+/* ---------------- Ops calendar ---------------- */
+var CALENDAR_COLORS = ['#B14D74', '#3E63C9', '#C57A1E', '#2E8B79', '#7C62A8', '#555B66'];
+var calendarBtn = document.getElementById("calendarBtn");
+var calendarOverlay = document.getElementById("calendarOverlay");
+var calendarClose = document.getElementById("calendarClose");
+var calendarAddBtn = document.getElementById("calendarAddBtn");
+var calendarPrevBtn = document.getElementById("calendarPrevBtn");
+var calendarNextBtn = document.getElementById("calendarNextBtn");
+var calendarMonthLabel = document.getElementById("calendarMonthLabel");
+var calendarLegend = document.getElementById("calendarLegend");
+var calendarWeekdays = document.getElementById("calendarWeekdays");
+var calendarGrid = document.getElementById("calendarGrid");
+var calendarDayPanel = document.getElementById("calendarDayPanel");
+
+var calendarAddOverlay = document.getElementById("calendarAddOverlay");
+var calendarAddClose = document.getElementById("calendarAddClose");
+var calendarAddForm = document.getElementById("calendarAddForm");
+var calendarTitleInput = document.getElementById("calendarTitleInput");
+var calendarDateInput = document.getElementById("calendarDateInput");
+var calendarTimeInput = document.getElementById("calendarTimeInput");
+var calendarCategoryInput = document.getElementById("calendarCategoryInput");
+var calendarColorRow = document.getElementById("calendarColorRow");
+var calendarDeptRow = document.getElementById("calendarDeptRow");
+var calendarNotesInput = document.getElementById("calendarNotesInput");
+var calendarAddError = document.getElementById("calendarAddError");
+
+var calendarViewDate = new Date();
+calendarViewDate.setDate(1);
+var calendarEntries = [];
+var calendarSelectedDate = null;
+var calendarSelectedColor = CALENDAR_COLORS[0];
+var calendarSelectedDepts = [];
+
+["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(function(d){
+  var el = document.createElement("span");
+  el.textContent = d;
+  calendarWeekdays.appendChild(el);
+});
+
+CALENDAR_COLORS.forEach(function(color, i){
+  var sw = document.createElement("button");
+  sw.type = "button";
+  sw.className = "calendar-color-swatch" + (i === 0 ? " selected" : "");
+  sw.style.background = color;
+  sw.setAttribute("aria-label", "Tag colour " + (i + 1));
+  sw.addEventListener("click", function(){
+    calendarSelectedColor = color;
+    Array.prototype.forEach.call(calendarColorRow.children, function(c){ c.classList.remove("selected"); });
+    sw.classList.add("selected");
+  });
+  calendarColorRow.appendChild(sw);
+});
+
+DEPT_ORDER.forEach(function(id){
+  var chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "calendar-dept-chip";
+  chip.textContent = DEPTS[id] ? DEPTS[id].name : id;
+  chip.addEventListener("click", function(){
+    var idx = calendarSelectedDepts.indexOf(id);
+    if(idx === -1){ calendarSelectedDepts.push(id); chip.classList.add("selected"); }
+    else { calendarSelectedDepts.splice(idx, 1); chip.classList.remove("selected"); }
+  });
+  calendarDeptRow.appendChild(chip);
+});
+
+function calendarMonthKey(d){
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+}
+function calendarDateKey(d){
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+function loadCalendarMonth(){
+  calendarMonthLabel.textContent = calendarViewDate.toLocaleString([], {month: "long", year: "numeric"});
+  calendarGrid.innerHTML = '<div class="calendar-empty-day">Loading…</div>';
+  apiGet('/api/calendar-entries?month=' + calendarMonthKey(calendarViewDate)).then(function(res){
+    calendarEntries = res.entries || [];
+    renderCalendarGrid();
+    renderCalendarLegend();
+    if(calendarSelectedDate) renderCalendarDayPanel(calendarSelectedDate);
+  }).catch(function(){
+    calendarGrid.innerHTML = '<div class="calendar-empty-day">Couldn\'t load the calendar.</div>';
+  });
+}
+
+function renderCalendarLegend(){
+  var seen = {};
+  var chips = [];
+  calendarEntries.forEach(function(e){
+    var key = e.categoryLabel + '|' + e.categoryColor;
+    if(seen[key]) return;
+    seen[key] = true;
+    chips.push('<span class="calendar-legend-chip"><i style="background:' + esc(e.categoryColor) + '"></i>' + esc(e.categoryLabel) + '</span>');
+  });
+  calendarLegend.innerHTML = chips.join("");
+}
+
+function calendarEntriesForDate(dateStr){
+  return calendarEntries.filter(function(e){ return e.date === dateStr; });
+}
+
+function renderCalendarGrid(){
+  calendarGrid.innerHTML = "";
+  var year = calendarViewDate.getFullYear();
+  var month = calendarViewDate.getMonth();
+  var firstWeekday = new Date(year, month, 1).getDay();
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var daysInPrevMonth = new Date(year, month, 0).getDate();
+  var todayStr = calendarDateKey(new Date());
+  for(var i = 0; i < 42; i++){
+    var dayNum, cellMonth = month, outside = false;
+    if(i < firstWeekday){
+      dayNum = daysInPrevMonth - firstWeekday + 1 + i;
+      cellMonth = month - 1; outside = true;
+    } else if(i - firstWeekday >= daysInMonth){
+      dayNum = i - firstWeekday - daysInMonth + 1;
+      cellMonth = month + 1; outside = true;
+    } else {
+      dayNum = i - firstWeekday + 1;
+    }
+    var cellDate = new Date(year, cellMonth, dayNum);
+    var dateStr = calendarDateKey(cellDate);
+    var cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "calendar-day" + (outside ? " outside" : "") + (dateStr === todayStr ? " today" : "") + (dateStr === calendarSelectedDate ? " selected" : "");
+    var numEl = document.createElement("span");
+    numEl.className = "calendar-day-num";
+    numEl.textContent = String(dayNum);
+    cell.appendChild(numEl);
+    var dayEntries = outside ? [] : calendarEntriesForDate(dateStr);
+    dayEntries.slice(0, 2).forEach(function(e){
+      var chip = document.createElement("span");
+      chip.className = "calendar-day-chip";
+      chip.style.background = e.categoryColor + "22";
+      chip.style.color = e.categoryColor;
+      chip.textContent = e.title;
+      cell.appendChild(chip);
+    });
+    if(dayEntries.length > 2){
+      var more = document.createElement("span");
+      more.className = "calendar-day-more";
+      more.textContent = "+" + (dayEntries.length - 2) + " more";
+      cell.appendChild(more);
+    }
+    if(outside){
+      cell.disabled = true;
+    } else {
+      cell.addEventListener("click", (function(ds){ return function(){ selectCalendarDay(ds); }; })(dateStr));
+    }
+    calendarGrid.appendChild(cell);
+  }
+}
+
+function selectCalendarDay(dateStr){
+  calendarSelectedDate = dateStr;
+  renderCalendarGrid();
+  renderCalendarDayPanel(dateStr);
+}
+
+function renderCalendarDayPanel(dateStr){
+  calendarDayPanel.hidden = false;
+  var entries = calendarEntriesForDate(dateStr);
+  var dateLabel = new Date(dateStr + "T00:00:00").toLocaleDateString([], {weekday: "long", day: "numeric", month: "long"});
+  var html = '<div class="calendar-day-panel-title">' + esc(dateLabel) + '</div>';
+  if(!entries.length){
+    html += '<div class="calendar-empty-day">Nothing on the calendar yet.</div>';
+  } else {
+    entries.forEach(function(e){
+      html += '<div class="calendar-entry-card">'
+        + '<div class="calendar-entry-top">'
+        + '<span class="calendar-entry-tag" style="background:' + esc(e.categoryColor) + '18;color:' + esc(e.categoryColor) + '">' + esc(e.categoryLabel) + '</span>'
+        + (e.time ? '<span class="calendar-entry-time">' + esc(e.time) + '</span>' : '')
+        + '</div>'
+        + '<div class="calendar-entry-title">' + esc(e.title) + '</div>'
+        + (e.departmentIds && e.departmentIds.length ? '<div class="calendar-entry-depts">' + e.departmentIds.map(function(id){ return '<span class="calendar-entry-dept-chip">' + esc(DEPTS[id] ? DEPTS[id].name : id) + '</span>'; }).join("") + '</div>' : '')
+        + (e.notes ? '<div class="calendar-entry-notes">' + esc(e.notes) + '</div>' : '')
+        + '<button type="button" class="calendar-entry-delete" data-del="' + esc(e.id) + '">Remove</button>'
+        + '</div>';
+    });
+  }
+  calendarDayPanel.innerHTML = html;
+  Array.prototype.forEach.call(calendarDayPanel.querySelectorAll("[data-del]"), function(btn){
+    btn.addEventListener("click", function(){
+      apiDelete('/api/calendar-entries/' + encodeURIComponent(btn.getAttribute("data-del"))).then(function(){
+        loadCalendarMonth();
+      }).catch(function(){ showToast("Couldn't remove that entry"); });
+    });
+  });
+}
+
+calendarBtn.addEventListener("click", function(){
+  calendarOverlay.hidden = false;
+  calendarSelectedDate = null;
+  calendarDayPanel.hidden = true;
+  loadCalendarMonth();
+});
+calendarClose.addEventListener("click", function(){ calendarOverlay.hidden = true; });
+calendarOverlay.addEventListener("click", function(e){ if(e.target === calendarOverlay) calendarOverlay.hidden = true; });
+calendarPrevBtn.addEventListener("click", function(){
+  calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+  calendarSelectedDate = null;
+  calendarDayPanel.hidden = true;
+  loadCalendarMonth();
+});
+calendarNextBtn.addEventListener("click", function(){
+  calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+  calendarSelectedDate = null;
+  calendarDayPanel.hidden = true;
+  loadCalendarMonth();
+});
+
+calendarAddBtn.addEventListener("click", function(){
+  calendarAddError.textContent = "";
+  calendarAddForm.reset();
+  calendarSelectedColor = CALENDAR_COLORS[0];
+  Array.prototype.forEach.call(calendarColorRow.children, function(c, i){ c.classList.toggle("selected", i === 0); });
+  calendarSelectedDepts = [];
+  Array.prototype.forEach.call(calendarDeptRow.children, function(c){ c.classList.remove("selected"); });
+  calendarDateInput.value = calendarSelectedDate || calendarDateKey(new Date());
+  calendarAddOverlay.hidden = false;
+});
+calendarAddClose.addEventListener("click", function(){ calendarAddOverlay.hidden = true; });
+calendarAddOverlay.addEventListener("click", function(e){ if(e.target === calendarAddOverlay) calendarAddOverlay.hidden = true; });
+
+calendarAddForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  calendarAddError.textContent = "";
+  var payload = {
+    title: calendarTitleInput.value.trim(),
+    date: calendarDateInput.value,
+    time: calendarTimeInput.value || null,
+    categoryLabel: calendarCategoryInput.value.trim(),
+    categoryColor: calendarSelectedColor,
+    departmentIds: calendarSelectedDepts.slice(),
+    notes: calendarNotesInput.value.trim() || null,
+  };
+  if(!payload.title || !payload.date || !payload.categoryLabel){
+    calendarAddError.textContent = "Title, date and a tag name are required";
+    return;
+  }
+  apiSend('/api/calendar-entries', 'POST', payload).then(function(){
+    calendarAddOverlay.hidden = true;
+    var parts = payload.date.split("-");
+    calendarViewDate = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+    calendarSelectedDate = payload.date;
+    loadCalendarMonth();
+    showToast("Added to the calendar");
+  }).catch(function(err){
+    calendarAddError.textContent = err.message || "Couldn't save that entry";
+  });
+});
 
 blockerAddForm.addEventListener("submit", function(e){
   e.preventDefault();

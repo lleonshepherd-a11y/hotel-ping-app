@@ -667,6 +667,42 @@ async function nextSignoffCode(env) {
   return "RQ-" + String((row ? row.n : 0) + 1).padStart(4, "0");
 }
 
+// A hash-chained, append-only record of sensitive actions, in NOIR_DB
+// (the shared database) rather than anywhere Hotel Ping's own admin/GM
+// role can read, edit or clear - so a message being deleted still leaves
+// a permanent, independently-verifiable trace of who deleted what and
+// when, even for the hotel's own top-level account. Each row's hash
+// covers the previous row's hash too, so altering or removing any past
+// entry breaks every hash after it - detectable, not just discouraged.
+// This table already existed (249 historical rows logging message.sent
+// and several other actions) but nothing in this codebase was writing to
+// it anymore - restored for message.sent, and message.deleted is new.
+async function logAuditEvent(env, hotelId, opts) {
+  try {
+    const last = await env.NOIR_DB.prepare(
+      "SELECT event_hash FROM audit_events WHERE hotel_id = ? ORDER BY created_at DESC LIMIT 1"
+    ).bind(hotelId).first();
+    const previousHash = last ? last.event_hash : "genesis";
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const metadataJson = JSON.stringify(opts.metadata || {});
+    const hashInput = [previousHash, id, hotelId, opts.actorStaffId || "", opts.actorDeptId || "", opts.action, opts.entityType, opts.entityId, metadataJson, createdAt].join("|");
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
+    const eventHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    await env.NOIR_DB.prepare(
+      `INSERT INTO audit_events (id, hotel_id, actor_staff_id, actor_department_id, action, entity_type, entity_id, metadata_json, previous_event_hash, event_hash, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, hotelId, opts.actorStaffId || null, opts.actorDeptId || null, opts.action, opts.entityType, opts.entityId, metadataJson, previousHash, eventHash, createdAt).run();
+  } catch (e) {
+    // Never let audit logging block the actual request - but this failing
+    // silently would defeat the point, so it goes to error_log too.
+    try {
+      await env.DB.prepare("INSERT INTO error_log (id, method, path, message, stack, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(crypto.randomUUID(), "AUDIT", opts.action, "logAuditEvent failed: " + String(e && e.message || e), String(e && e.stack || ""), new Date().toISOString()).run();
+    } catch (e2) { /* truly best-effort */ }
+  }
+}
+
 async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -734,6 +770,14 @@ async function insertMessage(env, ctx, opts) {
     dashboard_conversation_id: opts.dashboardConversationId || null, from_staff_name: opts.fromStaffName || null,
     client_message_id: opts.clientMessageId || null,
   };
+  if (opts.hotelId) {
+    const auditPromise = logAuditEvent(env, opts.hotelId, {
+      actorStaffId: opts.actorStaffId, actorDeptId: opts.from, action: "message.sent",
+      entityType: "message", entityId: id,
+      metadata: { from: opts.from, to: opts.to || null, groupId: opts.groupId || null, type: opts.type, body: opts.body || null },
+    });
+    if (ctx && ctx.waitUntil) ctx.waitUntil(auditPromise); else await auditPromise;
+  }
   if (opts.silent) return row;
 
   const previewMap = { text: opts.body || "", image: "📷 Photo", file: "📎 " + (opts.fileName || "File"), audio: "🎤 Voice message" };
@@ -1089,6 +1133,18 @@ function rowToNote(row) {
     fileUrl: row.file_path ? "/uploads/" + row.file_path : undefined,
     fileSize: row.file_size || undefined, duration: row.duration || undefined,
     transcript: row.transcript || undefined, createdAt: row.created_at,
+  };
+}
+
+function rowToCalendarEntry(row) {
+  let departmentIds = [];
+  try { departmentIds = JSON.parse(row.department_ids || "[]"); } catch (e) { departmentIds = []; }
+  return {
+    id: row.id, title: row.title, date: row.entry_date, time: row.entry_time || undefined,
+    categoryLabel: row.category_label, categoryColor: row.category_color,
+    departmentIds, notes: row.notes || undefined,
+    createdBy: row.created_by || undefined, createdByName: row.created_by_name || undefined,
+    createdAt: row.created_at,
   };
 }
 
@@ -3004,6 +3060,7 @@ export default {
           poll: pollData,
           fromStaffName: request._staff.name || null,
           clientMessageId: clientMessageId && String(clientMessageId).trim() ? String(clientMessageId).trim().slice(0, 100) : null,
+          hotelId: resolvedNoirHotelId, actorStaffId: request._staff.id,
         });
 
         if (to === "dashboard" && row.body) {
@@ -3027,17 +3084,13 @@ export default {
         return json({ message: rowToMessage(row, from, false) }, 201);
       }
 
+      // No one deletes a message - not a department, not an admin, not the
+      // GM. Once it's gone through the system it stays, permanently and
+      // without exception, so this route deliberately refuses rather than
+      // being removed outright: silently 404ing here would look like a
+      // bug to report, when it's actually a rule.
       if (method === "DELETE" && p.startsWith("/api/messages/")) {
-        const id = decodeURIComponent(p.slice("/api/messages/".length));
-        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-        if (!existing) return json({ error: "Message not found" }, 404);
-        const requester = request._staff;
-        if (existing.from_dept !== requester.department_id && !requester.is_admin) {
-          return json({ error: "You can only delete your own department's messages" }, 403);
-        }
-        await env.DB.prepare("UPDATE messages SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
-        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-        return json({ message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+        return json({ error: "Messages can't be deleted once sent - this is permanent, for every role including admin." }, 403);
       }
 
       if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/edit")) {
@@ -3287,6 +3340,57 @@ export default {
         if (!existing || existing.deleted_at) return json({ error: "Note not found" }, 404);
         if (existing.staff_id !== requester.id) return json({ error: "Not your note" }, 403);
         await env.DB.prepare("UPDATE personal_notes SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();
+        return json({ ok: true });
+      }
+
+      // ---- Ops calendar: hotel-wide events (weddings, conferences, large
+      // bookings...) visible to every department, colour-tagged by whoever
+      // adds them, and pinned to the departments it affects. This is
+      // planning data, not the message record - unlike a sent message,
+      // it's fine for anyone to correct or take an entry down.
+      if (method === "GET" && p === "/api/calendar-entries") {
+        const monthParam = (url.searchParams.get("month") || "").trim();
+        const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : new Date().toISOString().slice(0, 7);
+        const rows = await env.DB.prepare(
+          "SELECT * FROM ops_calendar_entries WHERE entry_date LIKE ? ORDER BY entry_date ASC, entry_time ASC"
+        ).bind(month + "%").all();
+        return json({ month, entries: rows.results.map(rowToCalendarEntry) });
+      }
+
+      if (method === "POST" && p === "/api/calendar-entries") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const title = body.title ? String(body.title).trim().slice(0, 120) : "";
+        const date = body.date ? String(body.date).trim() : "";
+        if (!title) return json({ error: "Title is required" }, 400);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: "A valid date is required" }, 400);
+        const time = body.time && /^\d{2}:\d{2}$/.test(body.time) ? body.time : null;
+        const categoryLabel = body.categoryLabel ? String(body.categoryLabel).trim().slice(0, 40) : "Event";
+        const categoryColor = /^#[0-9a-fA-F]{6}$/.test(body.categoryColor || "") ? body.categoryColor : "#3E63C9";
+        const departmentIds = Array.isArray(body.departmentIds) ? body.departmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+        const notes = body.notes ? String(body.notes).trim().slice(0, 500) : null;
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, notes, created_by, created_by_name, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), notes, requester.id, requester.name || null, now).run();
+        const row = await env.DB.prepare("SELECT * FROM ops_calendar_entries WHERE id = ?").bind(id).first();
+        const entry = rowToCalendarEntry(row);
+        const notifyAll = Promise.all(departmentIds.map((dept) =>
+          notifyDepartment(env, dept, {
+            title: "📅 " + categoryLabel, body: title + " — " + date + (time ? " " + time : ""), url: "/", tag: "hotel-ping-calendar-" + id,
+          }, null).catch((e) => console.error("notifyDepartment (calendar) error:", e && e.stack || e))
+        ));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyAll); else await notifyAll;
+        return json({ entry }, 201);
+      }
+
+      if (method === "DELETE" && p.startsWith("/api/calendar-entries/")) {
+        const id = decodeURIComponent(p.slice("/api/calendar-entries/".length));
+        const existing = await env.DB.prepare("SELECT id FROM ops_calendar_entries WHERE id = ?").bind(id).first();
+        if (!existing) return json({ error: "Entry not found" }, 404);
+        await env.DB.prepare("DELETE FROM ops_calendar_entries WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 

@@ -160,14 +160,6 @@ if (!messageColumns.includes('client_message_id')) {
 }
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL');
 
-const replyColumns = db.prepare("PRAGMA table_info(maintenance_replies)").all().map((c) => c.name);
-if (!replyColumns.includes('voice_path')) {
-  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_path TEXT');
-}
-if (!replyColumns.includes('voice_duration')) {
-  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_duration INTEGER');
-}
-
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
   db.exec(`
@@ -314,6 +306,17 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
+`);
+
+const replyColumns = db.prepare("PRAGMA table_info(maintenance_replies)").all().map((c) => c.name);
+if (!replyColumns.includes('voice_path')) {
+  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_path TEXT');
+}
+if (!replyColumns.includes('voice_duration')) {
+  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_duration INTEGER');
+}
+
+db.exec(`
 
   CREATE TABLE IF NOT EXISTS guest_requests (
     id TEXT PRIMARY KEY,
@@ -478,6 +481,21 @@ db.exec(`
     deleted_at TEXT
   );
   CREATE INDEX IF NOT EXISTS idx_personal_notes_staff ON personal_notes(staff_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS ops_calendar_entries (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    entry_time TEXT,
+    category_label TEXT NOT NULL,
+    category_color TEXT NOT NULL,
+    department_ids TEXT NOT NULL,
+    notes TEXT,
+    created_by TEXT,
+    created_by_name TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ops_calendar_date ON ops_calendar_entries(entry_date);
 `);
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);

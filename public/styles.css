@@ -1619,3 +1619,49 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   .thread-head{padding-left:64px}
   .bubble-wrap{max-width:84%}
 }
+
+/* Ops calendar */
+.calendar-modal{padding-bottom:20px}
+.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 14px}
+.calendar-nav-btn{border:1px solid var(--border);background:var(--surface-2);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.calendar-nav-btn:active{background:var(--surface-3)}
+.calendar-month-label{font-family:Manrope,sans-serif;font-weight:800;font-size:15px}
+.calendar-legend{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.calendar-legend-chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:var(--surface-2);font-size:11px;font-weight:700}
+.calendar-legend-chip i{width:6px;height:6px;border-radius:999px;flex:none}
+.calendar-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:4px}
+.calendar-weekdays span{text-align:center;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint)}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calendar-day{min-height:clamp(44px,9vw,64px);border-radius:12px;border:1.5px solid transparent;background:var(--surface-2);padding:clamp(4px,1.2vw,6px);display:flex;flex-direction:column;gap:3px;text-align:left;cursor:pointer}
+.calendar-day:active{background:var(--surface-3)}
+.calendar-day.outside{opacity:.35}
+.calendar-day.today{border-color:var(--accent)}
+.calendar-day.selected{border-color:var(--accent);background:#fff;box-shadow:var(--shadow-soft)}
+.calendar-day-num{font-size:clamp(10px,1.6vw,12px);font-weight:700}
+.calendar-day.today .calendar-day-num{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:999px;background:var(--accent);color:#fff}
+.calendar-day-chip{font-size:clamp(7px,1vw,9px);font-weight:800;padding:1.5px 5px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calendar-day-more{font-size:9px;color:var(--text-faint);font-weight:700}
+.calendar-day-panel{margin-top:14px;padding:14px;border-radius:14px;background:var(--surface-2);display:flex;flex-direction:column;gap:8px}
+.calendar-day-panel-title{font-size:12px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em}
+.calendar-entry-card{background:#fff;border-radius:12px;box-shadow:var(--shadow-soft);padding:11px 12px;display:flex;flex-direction:column;gap:6px}
+.calendar-entry-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.calendar-entry-tag{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.calendar-entry-time{font-size:11.5px;color:var(--text-dim);font-weight:600}
+.calendar-entry-title{font-size:13.5px;font-weight:700}
+.calendar-entry-depts{display:flex;flex-wrap:wrap;gap:5px}
+.calendar-entry-dept-chip{font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--surface-2);color:var(--text-dim)}
+.calendar-entry-notes{font-size:12px;color:var(--text-dim);line-height:1.4}
+.calendar-entry-delete{align-self:flex-start;border:none;background:none;color:var(--text-faint);font-size:11px;font-weight:700;padding:0;cursor:pointer}
+.calendar-empty-day{font-size:12.5px;color:var(--text-dim);text-align:center;padding:10px 0}
+.calendar-add-row{display:flex;gap:8px}
+.calendar-add-row input{flex:1}
+.calendar-color-row{display:flex;gap:8px;margin:2px 0}
+.calendar-color-swatch{width:26px;height:26px;border-radius:999px;border:2px solid transparent;padding:0;cursor:pointer}
+.calendar-color-swatch.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--surface)}
+.calendar-dept-row{display:flex;flex-wrap:wrap;gap:6px}
+.calendar-dept-chip{border:1px solid var(--border);background:var(--surface-2);color:var(--text-dim);font-size:11.5px;font-weight:700;padding:6px 10px;border-radius:999px;cursor:pointer}
+.calendar-dept-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
+#calendarAddForm textarea{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:14px;font-family:inherit;resize:vertical}
+@media(max-width:600px){
+  .calendar-modal{width:100%}
+}

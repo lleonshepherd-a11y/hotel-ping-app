@@ -438,6 +438,18 @@ function rowToNote(row) {
   };
 }
 
+function rowToCalendarEntry(row) {
+  let departmentIds = [];
+  try { departmentIds = JSON.parse(row.department_ids || '[]'); } catch (e) { departmentIds = []; }
+  return {
+    id: row.id, title: row.title, date: row.entry_date, time: row.entry_time || undefined,
+    categoryLabel: row.category_label, categoryColor: row.category_color,
+    departmentIds, notes: row.notes || undefined,
+    createdBy: row.created_by || undefined, createdByName: row.created_by_name || undefined,
+    createdAt: row.created_at,
+  };
+}
+
 function hashPin(pin, salt) {
   return crypto.scryptSync(String(pin), salt, 64).toString('hex');
 }
@@ -1915,17 +1927,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }
 
+    // No one deletes a message - see src/worker.js for the full reasoning.
     if (req.method === 'DELETE' && p.startsWith('/api/messages/')) {
-      const id = decodeURIComponent(p.slice('/api/messages/'.length));
-      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Message not found' });
-      const requester = staffFromToken(req);
-      if (existing.from_dept !== requester.department_id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only delete your own department's messages" });
-      }
-      db.prepare('UPDATE messages SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
-      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-      return send(res, 200, { message: rowToMessage(row, existing.from_dept, requester.is_admin) });
+      return send(res, 403, { error: "Messages can't be deleted once sent - this is permanent, for every role including admin." });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/edit')) {
@@ -2131,6 +2135,46 @@ const server = http.createServer(async (req, res) => {
       if (!existing || existing.deleted_at) return send(res, 404, { error: 'Note not found' });
       if (existing.staff_id !== requester.id) return send(res, 403, { error: 'Not your note' });
       db.prepare('UPDATE personal_notes SET deleted_at = ? WHERE id = ?').run(new Date().toISOString(), id);
+      return send(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && p === '/api/calendar-entries') {
+      const monthParam = (url.searchParams.get('month') || '').trim();
+      const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : new Date().toISOString().slice(0, 7);
+      const rows = db.prepare(
+        'SELECT * FROM ops_calendar_entries WHERE entry_date LIKE ? ORDER BY entry_date ASC, entry_time ASC'
+      ).all(month + '%');
+      return send(res, 200, { month, entries: rows.map(rowToCalendarEntry) });
+    }
+
+    if (req.method === 'POST' && p === '/api/calendar-entries') {
+      const requester = staffFromToken(req);
+      if (!requester) return send(res, 401, { error: 'Not signed in' });
+      const body = await readJsonBody(req);
+      const title = body.title ? String(body.title).trim().slice(0, 120) : '';
+      const date = body.date ? String(body.date).trim() : '';
+      if (!title) return send(res, 400, { error: 'Title is required' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return send(res, 400, { error: 'A valid date is required' });
+      const time = body.time && /^\d{2}:\d{2}$/.test(body.time) ? body.time : null;
+      const categoryLabel = body.categoryLabel ? String(body.categoryLabel).trim().slice(0, 40) : 'Event';
+      const categoryColor = /^#[0-9a-fA-F]{6}$/.test(body.categoryColor || '') ? body.categoryColor : '#3E63C9';
+      const departmentIds = Array.isArray(body.departmentIds) ? body.departmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+      const notes = body.notes ? String(body.notes).trim().slice(0, 500) : null;
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, notes, created_by, created_by_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), notes, requester.id, requester.name || null, now);
+      const row = db.prepare('SELECT * FROM ops_calendar_entries WHERE id = ?').get(id);
+      return send(res, 201, { entry: rowToCalendarEntry(row) });
+    }
+
+    if (req.method === 'DELETE' && p.startsWith('/api/calendar-entries/')) {
+      const id = decodeURIComponent(p.slice('/api/calendar-entries/'.length));
+      const existing = db.prepare('SELECT id FROM ops_calendar_entries WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Entry not found' });
+      db.prepare('DELETE FROM ops_calendar_entries WHERE id = ?').run(id);
       return send(res, 200, { ok: true });
     }
 
