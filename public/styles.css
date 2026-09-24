@@ -1285,6 +1285,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-photo-remove svg{width:11px;height:11px}
 .maint-feed{display:flex;flex-direction:column;gap:13px;padding:14px 20px 20px}
 .maint-col-empty{font-size:11.5px;color:var(--text-faint);text-align:center;padding:16px 0}
+.maint-board-restricted{font-size:11.5px;color:var(--text-faint);text-align:center;padding:18px 24px}
+/* .sb-search/.chat-filter-row/.maint-feed all set an explicit display,
+   which otherwise beats the [hidden] attribute at equal specificity. */
+#maintSearchWrap[hidden],#maintFilterRow[hidden],#maintFeed[hidden]{display:none}
 .maint-card{position:relative;background:var(--surface-2);border-radius:16px;padding:8px 34px 8px 40px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:none;cursor:grab}
 .maint-card-handle::before{content:"";position:absolute;left:5px;top:50%;transform:translateY(-50%);width:22px;height:36px;border-radius:10px;background:var(--surface-3)}

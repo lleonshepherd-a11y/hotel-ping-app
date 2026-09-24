@@ -3406,7 +3406,7 @@ function startPolling(){
   pollTimer = setInterval(function(){
     if(document.hidden) return;
     refreshActiveThread().catch(function(){});
-    if(!tabMaintBtn.hidden) refreshMaintenanceBadge();
+    if(canManageMaintenanceView()) refreshMaintenanceBadge();
     pollMissed();
     pollHelpAlerts();
     pollPriorityBroadcast();
@@ -3497,15 +3497,11 @@ function enterApp(staff){
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
-  // Reporting a fault stays open to everyone (that's the whole point of the
-  // button), but the board itself - every ticket, how many are open,
-  // replying, changing status - is Maintenance's and the GM's job.
-  tabMaintBtn.hidden = staff.departmentId !== "maintenance" && staff.departmentId !== "gm" && !staff.isAdmin;
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
   startPolling();
   setTimeout(function(){
-    if(!tabMaintBtn.hidden) refreshMaintenanceBadge();
+    if(canManageMaintenanceView()) refreshMaintenanceBadge();
     refreshRequestsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(staff.departmentId === "concierge") refreshGuestsBadge();
@@ -6896,9 +6892,25 @@ function renderMaintOffDutyBanner(){
   maintOffDutyBanner.hidden = isOnDuty("maintenance");
 }
 
+// Reporting a fault stays open to everyone (that's the whole point of the
+// button and this form) - but the board itself, seeing every logged job and
+// its status, is Maintenance's and the GM's job, not whoever happens to be
+// signed in.
+function canManageMaintenanceView(){
+  return !!(AUTH.staff && (AUTH.staff.departmentId === "maintenance" || AUTH.staff.departmentId === "gm" || AUTH.staff.isAdmin));
+}
+var maintBoardRestricted = document.getElementById("maintBoardRestricted");
+var maintSearchWrap = document.getElementById("maintSearchWrap");
 function openMaintenanceTab(){
-  maintFeed.innerHTML = '<div class="maint-col-empty">Loading…</div>';
-  refreshMaintenanceBadge();
+  var canManage = canManageMaintenanceView();
+  maintBoardRestricted.hidden = canManage;
+  maintSearchWrap.hidden = !canManage;
+  maintFilterRow.hidden = !canManage;
+  maintFeed.hidden = !canManage;
+  if(canManage){
+    maintFeed.innerHTML = '<div class="maint-col-empty">Loading…</div>';
+    refreshMaintenanceBadge();
+  }
   renderMaintOffDutyBanner();
 }
 
@@ -7756,13 +7768,19 @@ newMaintForm.addEventListener("submit", function(e){
     })
     .then(function(){ return apiSend('/api/maintenance', 'POST', payload); });
   sendPromise.then(function(res){
-    if(res.merged){
-      var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
-      if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
-    } else {
-      STATE.tickets.unshift(res.ticket);
+    // A reporter who isn't Maintenance/GM never fetched the board (see
+    // canManageMaintenanceView) - STATE.tickets stays empty for them, and
+    // there's no board on screen to update anyway.
+    if(canManageMaintenanceView()){
+      STATE.tickets = STATE.tickets || [];
+      if(res.merged){
+        var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
+        if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
+      } else {
+        STATE.tickets.unshift(res.ticket);
+      }
+      renderMaintenanceBoard();
     }
-    renderMaintenanceBoard();
     newMaintDesc.value = "";
     newMaintRoom.value = "";
     maintPhotoFile = null;
