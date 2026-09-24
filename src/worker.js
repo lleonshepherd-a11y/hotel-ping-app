@@ -686,7 +686,29 @@ async function insertMessage(env, ctx, opts) {
     opts.fromStaffName || null
   ).run();
 
-  const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
+  // Built straight from the values we just inserted rather than reading
+  // the row back - under heavy concurrent write load a read-after-write
+  // SELECT here occasionally throws even though the INSERT itself already
+  // committed, which turned a successful send into a false failure for
+  // the caller. Every field below matches an insert(ed) column 1:1.
+  const row = {
+    id, from_dept: opts.from, to_dept: opts.to || null, type: opts.type,
+    body: opts.body || null, file_name: opts.fileName || null, file_path: opts.filePath || null, file_size: opts.fileSize || null,
+    duration: opts.duration || null, transcript: opts.transcript || null, urgent: opts.urgent ? 1 : 0, status: "delivered", created_at: now,
+    deleted_at: null, reply_to_id: opts.replyToId || null, pinned_at: null, completed_at: null, completed_by: null,
+    broadcast_id: opts.broadcastId || null, room_number: opts.roomNumber || null, room_clean: opts.roomClean || null,
+    task_status: opts.taskStatus || null, group_id: opts.groupId || null, edited_at: null, mentions: mentionsJson,
+    signoff_title: opts.signoff ? opts.signoff.title : null,
+    signoff_amount: opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
+    signoff_target: opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+    signoff_category: opts.signoff && opts.signoff.category ? opts.signoff.category : null,
+    signoff_guest_info: opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
+    signoff_status: opts.signoff ? "pending" : null,
+    signoff_decided_by: null, signoff_decided_at: null, signoff_code: signoffCode,
+    poll_question: opts.poll ? opts.poll.question : null, poll_options: pollOptionsJson, poll_votes: opts.poll ? "{}" : null,
+    escalation_level: 0, affects_guest: opts.affectsGuest ? 1 : 0,
+    dashboard_conversation_id: opts.dashboardConversationId || null, from_staff_name: opts.fromStaffName || null,
+  };
   if (opts.silent) return row;
 
   const previewMap = { text: opts.body || "", image: "📷 Photo", file: "📎 " + (opts.fileName || "File"), audio: "🎤 Voice message" };
