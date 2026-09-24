@@ -5162,6 +5162,7 @@ var missedGuestCount = document.getElementById("missedGuestCount");
 var missedPlannerBox = document.getElementById("missedPlannerBox");
 var missedPlannerList = document.getElementById("missedPlannerList");
 var missedPlannerCount = document.getElementById("missedPlannerCount");
+var missedEmptyState = document.getElementById("missedEmptyState");
 
 function buildMissedMessageCard(item){
   var m = item.message;
@@ -5295,6 +5296,8 @@ function renderMissedFeed(items){
   missedPlannerCount.textContent = String(planners.length);
   missedPlannerList.innerHTML = "";
   planners.forEach(function(item){ missedPlannerList.appendChild(buildMissedPlannerCard(item)); });
+
+  missedEmptyState.hidden = !(missedApprovalsBox.hidden && missedMsgBox.hidden && missedTicketsBox.hidden && missedGuestsBox.hidden && missedPlannerBox.hidden);
 }
 
 function pollMissed(){
