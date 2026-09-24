@@ -161,7 +161,11 @@ function rowToBlocker(row) {
   };
 }
 function rowToTicketReply(row) {
-  return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
+  return {
+    id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at,
+    voiceUrl: row.voice_path ? '/uploads/' + row.voice_path : undefined,
+    voiceDuration: row.voice_duration || undefined,
+  };
 }
 function rowToGuestRequest(row) {
   return {
@@ -2491,17 +2495,27 @@ const server = http.createServer(async (req, res) => {
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
       const body = await readJsonBody(req);
       const text = String(body.text || '').trim();
-      if (!text) return send(res, 400, { error: 'Message is required' });
+      let voicePath = null;
+      let voiceDuration = null;
+      if (body.voiceBase64) {
+        const buf = Buffer.from(body.voiceBase64, 'base64');
+        const ext = (body.voiceMime && body.voiceMime.split('/')[1]) ? '.' + body.voiceMime.split('/')[1].split(';')[0] : '.webm';
+        const safeName = crypto.randomUUID() + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
+        voicePath = safeName;
+        voiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
+      }
+      if (!text && !voicePath) return send(res, 400, { error: 'Message is required' });
       const requester = staffFromToken(req);
       const replyId = crypto.randomUUID();
       const now = new Date().toISOString();
-      db.prepare('INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at) VALUES (?, ?, ?, ?, ?)')
-        .run(replyId, id, requester.department_id, text, now);
+      db.prepare('INSERT INTO maintenance_replies (id, ticket_id, from_dept, body, created_at, voice_path, voice_duration) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(replyId, id, requester.department_id, text || '', now, voicePath, voiceDuration);
       const row = db.prepare('SELECT * FROM maintenance_replies WHERE id = ?').get(replyId);
 
       const notifyTarget = requester.department_id === 'maintenance' ? existing.created_by : 'maintenance';
       if (notifyTarget !== requester.department_id) {
-        console.log('[maintenance reply notify]', notifyTarget, ':', text);
+        console.log('[maintenance reply notify]', notifyTarget, ':', text || '(voice reply)');
       }
 
       return send(res, 201, { reply: rowToTicketReply(row) });

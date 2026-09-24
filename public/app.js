@@ -7342,11 +7342,17 @@ function renderTicketDetail(){
   } else if(t.photoUrl){
     html += '<img class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" alt="Issue photo">';
   }
-  if(t.voiceUrl){
-    html += '<audio class="ticket-detail-voice" src="' + mediaUrl(t.voiceUrl) + '" controls preload="none"></audio>';
-  }
+  if(t.voiceUrl) html += '<div id="ticketVoicePlaceholder"></div>';
   html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   ticketDetailBody.innerHTML = html;
+  if(t.voiceUrl){
+    // Same rich waveform player used for voice messages in chat, rather
+    // than a bare native <audio controls> - play/pause, seek, speed.
+    var voicePlaceholder = document.getElementById("ticketVoicePlaceholder");
+    var voiceNode = buildAudioNode({ url: t.voiceUrl, duration: t.voiceDuration });
+    voiceNode.classList.add("ticket-detail-voice");
+    voicePlaceholder.replaceWith(voiceNode);
+  }
   var pinBtn = buildPinButton(t);
   pinBtn.classList.add("ticket-detail-pin");
   ticketDetailBody.insertBefore(pinBtn, ticketDetailBody.firstChild);
@@ -7376,11 +7382,16 @@ function renderTicketDetail(){
   var repliesWrap = document.createElement("div");
   repliesWrap.className = "ticket-replies";
   repliesWrap.innerHTML = '<div class="ticket-replies-list" id="ticketRepliesList"><div class="ticket-replies-loading">Loading…</div></div>' +
-    '<div class="ticket-reply-row"><input type="text" id="ticketReplyInput" placeholder="Reply about this job…" maxlength="500"><button type="button" id="ticketReplySendBtn">Send</button></div>';
+    '<div class="ticket-reply-row">'+
+      '<input type="text" id="ticketReplyInput" placeholder="Reply about this job…" maxlength="500">'+
+      '<button type="button" id="ticketReplyVoiceBtn" aria-label="Record a voice reply"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg></button>'+
+      '<button type="button" id="ticketReplySendBtn">Send</button>'+
+    '</div>';
   ticketDetailBody.appendChild(repliesWrap);
   loadAndRenderTicketReplies(t.id);
   document.getElementById("ticketReplySendBtn").addEventListener("click", function(){ sendTicketReply(t.id); });
   document.getElementById("ticketReplyInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); sendTicketReply(t.id); } });
+  setupTicketReplyVoiceBtn(t.id);
 
   ticketDetailPos.textContent = (STATE.ticketDetailIndex + 1) + " of " + STATE.ticketDetailQueue.length + " · " + MAINT_STATUS_LABEL[t.status];
   ticketDetailPrev.disabled = STATE.ticketDetailIndex <= 0;
@@ -7390,10 +7401,25 @@ function renderTicketReplies(list){
   var el = document.getElementById("ticketRepliesList");
   if(!el) return;
   if(!list.length){ el.innerHTML = '<div class="ticket-replies-empty">No replies yet</div>'; return; }
-  el.innerHTML = list.map(function(r){
+  el.innerHTML = "";
+  list.forEach(function(r){
     var name = DEPTS[r.from] ? DEPTS[r.from].name : r.from;
-    return '<div class="ticket-reply"><div class="ticket-reply-head"><b>'+esc(name)+'</b><span>'+fmtClock(new Date(r.createdAt).getTime())+'</span></div><div class="ticket-reply-text">'+esc(r.text)+'</div></div>';
-  }).join("");
+    var row = document.createElement("div");
+    row.className = "ticket-reply";
+    row.innerHTML = '<div class="ticket-reply-head"><b>'+esc(name)+'</b><span>'+fmtClock(new Date(r.createdAt).getTime())+'</span></div>';
+    if(r.text){
+      var textEl = document.createElement("div");
+      textEl.className = "ticket-reply-text";
+      textEl.textContent = r.text;
+      row.appendChild(textEl);
+    }
+    if(r.voiceUrl){
+      var voiceNode = buildAudioNode({ url: r.voiceUrl, duration: r.voiceDuration });
+      voiceNode.classList.add("ticket-reply-voice");
+      row.appendChild(voiceNode);
+    }
+    el.appendChild(row);
+  });
   el.scrollTop = el.scrollHeight;
 }
 function renderTicketHistory(list){
@@ -7436,6 +7462,70 @@ function sendTicketReply(ticketId){
     STATE.ticketReplies[ticketId].push(res.reply);
     if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(STATE.ticketReplies[ticketId]);
   }).catch(function(){ showToast("Couldn't send that"); });
+}
+function sendTicketVoiceReply(ticketId, blob, duration){
+  return blobToBase64(blob).then(function(b64){
+    return apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies', 'POST', {
+      voiceBase64: b64, voiceMime: blob.type || "audio/webm", voiceDuration: duration,
+    });
+  }).then(function(res){
+    STATE.ticketReplies = STATE.ticketReplies || {};
+    STATE.ticketReplies[ticketId] = STATE.ticketReplies[ticketId] || [];
+    STATE.ticketReplies[ticketId].push(res.reply);
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(STATE.ticketReplies[ticketId]);
+  }).catch(function(){ showToast("Couldn't send that voice reply"); });
+}
+// Tap to start, tap again to stop and send straight away - kept deliberately
+// simple (no preview/re-record step) to match how quick a text reply is.
+// Scoped locally per ticket-detail render rather than reusing the report
+// form's maintVoiceState, which is tied to that form's own button/DOM.
+function setupTicketReplyVoiceBtn(ticketId){
+  var btn = document.getElementById("ticketReplyVoiceBtn");
+  if(!btn) return;
+  var rec = null, stream = null, chunks = [], startedAt = 0, timerId = null;
+  function tick(){
+    var s = Math.floor((Date.now() - startedAt) / 1000);
+    btn.setAttribute("aria-label", "Stop recording (" + s + "s)");
+  }
+  btn.addEventListener("click", function(){
+    if(rec){
+      rec.stop();
+      return;
+    }
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      showToast("Voice recording isn't supported on this device");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s){
+      stream = s;
+      try{ rec = new MediaRecorder(stream); }catch(e){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        stream = null;
+        showToast("Couldn't start recording");
+        return;
+      }
+      chunks = [];
+      startedAt = Date.now();
+      timerId = setInterval(tick, 250);
+      btn.classList.add("recording");
+      rec.ondataavailable = function(e){ if(e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = function(){
+        clearInterval(timerId);
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        stream = null;
+        btn.classList.remove("recording");
+        btn.setAttribute("aria-label", "Record a voice reply");
+        var duration = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+        var blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        rec = null;
+        chunks = [];
+        if(blob.size > 0) sendTicketVoiceReply(ticketId, blob, duration);
+      };
+      rec.start();
+    }).catch(function(){
+      showToast("Microphone access is needed to record a reply");
+    });
+  });
 }
 ticketDetailClose.addEventListener("click", closeTicketDetail);
 ticketDetailOverlay.addEventListener("click", function(e){ if(e.target === ticketDetailOverlay) closeTicketDetail(); });

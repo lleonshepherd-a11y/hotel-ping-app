@@ -857,10 +857,17 @@ function noirBlockerRow(r) {
   };
 }
 function rowToTicketReply(row) {
-  return { id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at };
+  return {
+    id: row.id, ticketId: row.ticket_id, from: row.from_dept, text: row.body, createdAt: row.created_at,
+    voiceUrl: row.voice_path ? "/uploads/" + row.voice_path : undefined,
+    voiceDuration: row.voice_duration || undefined,
+  };
 }
 function noirReplyRow(r) {
-  return { id: r.id, ticket_id: r.ticket_id, from_dept: fromNoirDept(r.from_department_id), body: r.body, created_at: r.created_at };
+  return {
+    id: r.id, ticket_id: r.ticket_id, from_dept: fromNoirDept(r.from_department_id), body: r.body, created_at: r.created_at,
+    voice_path: r.voice_path, voice_duration: r.voice_duration,
+  };
 }
 function rowToGuestRequest(row) {
   return {
@@ -989,14 +996,22 @@ function rowToRunsheetItem(row) {
 async function reactionsMap(env, messageIds) {
   const ids = [...new Set(messageIds)];
   if (!ids.length) return {};
-  const rows = await env.DB.prepare(
-    `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${ids.map(() => "?").join(",")})`
-  ).bind(...ids).all();
+  // Chunked rather than one IN (...) with a placeholder per id - a full
+  // page of messages (see MESSAGE_PAGE_SIZE) pushed this over D1's bound
+  // parameter limit and threw "too many SQL variables" for the whole
+  // request, not just the reactions.
+  const CHUNK = 90;
   const byMessage = {};
-  rows.results.forEach((r) => {
-    byMessage[r.message_id] = byMessage[r.message_id] || [];
-    byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
-  });
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const rows = await env.DB.prepare(
+      `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${chunk.map(() => "?").join(",")})`
+    ).bind(...chunk).all();
+    rows.results.forEach((r) => {
+      byMessage[r.message_id] = byMessage[r.message_id] || [];
+      byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
+    });
+  }
   return byMessage;
 }
 function attachReactions(messages, map) {
@@ -3763,13 +3778,26 @@ export default {
         if (!existing) return json({ error: "Ticket not found" }, 404);
         const body = await readJsonBody(request);
         const text = String(body.text || "").trim();
-        if (!text) return json({ error: "Message is required" }, 400);
+        let voicePath = null;
+        let voiceDuration = null;
+        if (body.voiceBase64) {
+          if (base64ExceedsBytes(body.voiceBase64, 25 * 1024 * 1024)) return json({ error: "File is too large (25MB max)" }, 400);
+          const binary = atob(body.voiceBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const ext = body.voiceMime && body.voiceMime.split("/")[1] ? "." + body.voiceMime.split("/")[1].split(";")[0] : ".webm";
+          const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
+          await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.voiceMime || "audio/webm" } });
+          voicePath = safeName;
+          voiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
+        }
+        if (!text && !voicePath) return json({ error: "Message is required" }, 400);
         const requester = request._staff;
         const replyId = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare(
-          "INSERT INTO maintenance_replies (id, ticket_id, from_department_id, body, created_at) VALUES (?, ?, ?, ?, ?)"
-        ).bind(replyId, id, toNoirDept(requester.department_id), text, now).run();
+          "INSERT INTO maintenance_replies (id, ticket_id, from_department_id, body, created_at, voice_path, voice_duration) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(replyId, id, toNoirDept(requester.department_id), text || "", now, voicePath, voiceDuration).run();
         const row = await env.NOIR_DB.prepare("SELECT * FROM maintenance_replies WHERE id = ?").bind(replyId).first();
 
         const creatorDept = fromNoirDept(existing.creator_dept);
@@ -3777,7 +3805,7 @@ export default {
         if (notifyTarget !== requester.department_id) {
           const notifyPromise = notifyDepartment(env, notifyTarget, {
             title: (DEPT_NAMES[requester.department_id] || requester.department_id) + " · job reply",
-            body: text,
+            body: text || "🎤 Voice reply",
             url: "/",
             tag: "hotel-ping-maint-reply-" + id,
           }, requester.department_id).catch(function(e){ console.error("notifyDepartment (maint reply) error:", e && e.stack || e); });

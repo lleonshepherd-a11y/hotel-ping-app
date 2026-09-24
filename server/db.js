@@ -160,6 +160,14 @@ if (!messageColumns.includes('client_message_id')) {
 }
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL');
 
+const replyColumns = db.prepare("PRAGMA table_info(maintenance_replies)").all().map((c) => c.name);
+if (!replyColumns.includes('voice_path')) {
+  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_path TEXT');
+}
+if (!replyColumns.includes('voice_duration')) {
+  db.exec('ALTER TABLE maintenance_replies ADD COLUMN voice_duration INTEGER');
+}
+
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
   db.exec(`
