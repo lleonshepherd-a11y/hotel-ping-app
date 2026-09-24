@@ -207,7 +207,7 @@
       </button>
       <button class="sb-menu-row" id="calendarBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span>
-        <span class="sb-menu-label">Ops calendar</span>
+        <span class="sb-menu-label">Ops Planner</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="handoverBtn" type="button">
@@ -1012,10 +1012,11 @@
 <div class="admin-overlay" id="calendarOverlay" hidden>
   <div class="admin-modal admin-modal-wide calendar-modal">
     <div class="admin-modal-head">
-      <button class="calendar-add-icon-btn" id="calendarAddBtn" type="button" aria-label="Add calendar entry">
+      <button class="calendar-add-btn" id="calendarAddBtn" type="button" aria-label="Add to the Ops Planner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Add</span>
       </button>
-      <h2>Ops calendar</h2>
+      <h2>Ops Planner</h2>
       <button class="admin-close" id="calendarClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -1024,12 +1025,12 @@
       <button type="button" id="calendarPrevBtn" class="calendar-nav-btn" aria-label="Previous month">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="calendar-legend" id="calendarLegend"></div>
+      <div class="calendar-month-label" id="calendarMonthLabel"></div>
       <button type="button" id="calendarNextBtn" class="calendar-nav-btn" aria-label="Next month">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </button>
     </div>
-    <div class="calendar-month-label" id="calendarMonthLabel"></div>
+    <div class="calendar-legend" id="calendarLegend"></div>
     <div class="calendar-weekdays" id="calendarWeekdays"></div>
     <div class="calendar-grid" id="calendarGrid"></div>
     <div class="calendar-day-panel" id="calendarDayPanel" hidden></div>
@@ -1039,7 +1040,7 @@
 <div class="admin-overlay" id="calendarAddOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
-      <h2>New calendar entry</h2>
+      <h2>New planner entry</h2>
       <button class="admin-close" id="calendarAddClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>

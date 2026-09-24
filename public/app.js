@@ -6097,7 +6097,7 @@ notesClose.addEventListener("click", function(){ notesOverlay.hidden = true; });
 notesOverlay.addEventListener("click", function(e){ if(e.target === notesOverlay) notesOverlay.hidden = true; });
 notesRecordBtn.addEventListener("click", function(){ qvStart("note"); });
 
-/* ---------------- Ops calendar ---------------- */
+/* ---------------- Ops Planner ---------------- */
 var CALENDAR_COLORS = ['#B14D74', '#3E63C9', '#C57A1E', '#2E8B79', '#7C62A8', '#555B66'];
 var calendarBtn = document.getElementById("calendarBtn");
 var calendarOverlay = document.getElementById("calendarOverlay");
@@ -6212,7 +6212,7 @@ function loadCalendarMonth(){
     renderCalendarLegend();
     if(calendarSelectedDate) renderCalendarDayPanel(calendarSelectedDate);
   }).catch(function(){
-    calendarGrid.innerHTML = '<div class="calendar-empty-day">Couldn\'t load the calendar.</div>';
+    calendarGrid.innerHTML = '<div class="calendar-empty-day">Couldn\'t load the planner.</div>';
   });
 }
 
@@ -6297,7 +6297,7 @@ function renderCalendarDayPanel(dateStr){
   var dateLabel = new Date(dateStr + "T00:00:00").toLocaleDateString([], {weekday: "long", day: "numeric", month: "long"});
   var html = '<div class="calendar-day-panel-title">' + esc(dateLabel) + '</div>';
   if(!entries.length){
-    html += '<div class="calendar-empty-day">Nothing on the calendar yet.</div>';
+    html += '<div class="calendar-empty-day">Nothing on the planner yet.</div>';
   } else {
     entries.forEach(function(e){
       html += '<div class="calendar-entry-card">'
@@ -6383,7 +6383,7 @@ calendarAddForm.addEventListener("submit", function(e){
     calendarViewDate = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
     calendarSelectedDate = payload.date;
     loadCalendarMonth();
-    showToast("Added to the calendar");
+    showToast("Added to the Ops Planner");
   }).catch(function(err){
     calendarAddError.textContent = err.message || "Couldn't save that entry";
   });

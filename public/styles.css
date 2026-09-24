@@ -1622,13 +1622,14 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* Ops calendar */
 .calendar-modal{padding-bottom:20px}
-.calendar-add-icon-btn{border:1px solid var(--border);background:var(--surface-2);color:#3E63C9;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.calendar-add-icon-btn:active{background:var(--surface-3)}
-.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;margin:4px 0 2px}
+.calendar-add-btn{border:1px solid var(--border);background:var(--surface-2);color:#3E63C9;height:28px;padding:0 11px 0 9px;border-radius:999px;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700}
+.calendar-add-btn svg{width:15px;height:15px;flex:none}
+.calendar-add-btn:active{background:var(--surface-3)}
+.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 10px}
 .calendar-nav-btn{border:1px solid var(--border);background:var(--surface-2);width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);flex:none}
 .calendar-nav-btn:active{background:var(--surface-3)}
-.calendar-month-label{font-family:Manrope,sans-serif;font-weight:800;font-size:clamp(26px,6vw,34px);letter-spacing:-0.01em;margin:2px 0 10px}
-.calendar-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.calendar-month-label{flex-grow:1;text-align:center;font-family:Manrope,sans-serif;font-weight:800;font-size:clamp(19px,4.5vw,23px);letter-spacing:-0.01em}
+.calendar-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-bottom:10px}
 .calendar-legend-chip{display:flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;background:var(--surface-2);font-size:11px;font-weight:700}
 .calendar-legend-chip i{width:6px;height:6px;border-radius:999px;flex:none}
 .calendar-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:2px}
