@@ -1687,8 +1687,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .nav-drawer-scrim{position:fixed;inset:0;z-index:35;background:rgba(20,18,14,.38);opacity:0;pointer-events:none;transition:opacity .25s ease}
 .nav-drawer-scrim.open{opacity:1;pointer-events:auto}
 .nav-drawer{position:fixed;top:0;bottom:0;z-index:36;width:min(84vw,340px);background:#fff;display:flex;flex-direction:column;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top)}
-.nav-drawer-left{left:0;transform:translateX(-100%);box-shadow:8px 0 30px rgba(0,0,0,.22)}
-.nav-drawer-left.open{transform:translateX(0)}
+.nav-drawer-right{right:0;transform:translateX(100%);box-shadow:-8px 0 30px rgba(0,0,0,.22)}
+.nav-drawer-right.open{transform:translateX(0)}
 .nav-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:18px 16px 12px;flex-shrink:0}
 .nav-drawer-title{font-family:Manrope,sans-serif;font-weight:800;font-size:17px}
 .nav-drawer-body{flex:1 1 auto;min-height:0;overflow-y:auto;margin:0;padding-bottom:8px}
