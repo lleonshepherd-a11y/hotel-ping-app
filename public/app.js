@@ -1060,7 +1060,7 @@ function buildAudioNode(msg, holderIsOut){
   var bars = [];
   for(var i=0;i<BAR_COUNT;i++){ bars.push(0.3 + 0.55*Math.abs(Math.sin(i*1.7+ (msg.freq||3)))); }
   function barsHTML(arr){
-    return arr.map(function(h){ return '<span class="wave-bar" style="height:'+Math.round(4+18*h)+'px"></span>'; }).join("");
+    return arr.map(function(h){ return '<span class="wave-bar" style="height:'+Math.round(3+14*h)+'px"></span>'; }).join("");
   }
 
   wrap.innerHTML =
@@ -1108,7 +1108,7 @@ function buildAudioNode(msg, holderIsOut){
       var els1 = wrap.querySelectorAll(".wave-static .wave-bar");
       var els2 = wrap.querySelectorAll(".wave-progress .wave-bar");
       norm.forEach(function(h, i){
-        var px = Math.round(4 + 18*h);
+        var px = Math.round(3 + 14*h);
         if(els1[i]) els1[i].style.height = px + "px";
         if(els2[i]) els2[i].style.height = px + "px";
       });
