@@ -8545,8 +8545,12 @@ if(installDismissBtn){
     var isMaintenance = !maintenancePage.hidden || (STATE.active === "maintenance" && !STATE.activeGroupId);
     if(isMaintenance){
       blobToBase64(blob).then(function(b64){
+        // No fallback text here on purpose - leaving description blank when
+        // there's no on-device transcript (always the case on iOS Safari,
+        // which has no speech recognition at all) lets the server run the
+        // same clip through Workers AI and use a real transcript instead.
         var payload = {
-          description: transcript ? transcript : "Reported via push-to-talk",
+          description: transcript || undefined,
           voiceBase64: b64, voiceMime: blob.type || "audio/webm", voiceDuration: durationSec,
         };
         var roomNumber = extractRoomNumber(transcript);

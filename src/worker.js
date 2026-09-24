@@ -102,6 +102,28 @@ function json(data, status, headers) {
 function base64ExceedsBytes(b64, maxBytes) {
   return Math.floor((b64.length * 3) / 4) > maxBytes;
 }
+// Push-to-talk's on-device transcription (Web Speech API) doesn't exist on
+// iOS Safari at all, so it never has anything to send there - this runs the
+// same clip through Workers AI instead, whenever the client came up empty,
+// so a ticket still gets real words no matter what phone reported it.
+async function transcribeVoice(env, bytes) {
+  if (!env.AI) return null;
+  try {
+    const res = await env.AI.run("@cf/openai/whisper", { audio: Array.from(bytes) });
+    const text = res && res.text ? String(res.text).trim() : "";
+    return text || null;
+  } catch (e) {
+    console.error("transcribeVoice error:", e && e.stack || e);
+    return null;
+  }
+}
+function extractRoomNumberFromText(text) {
+  if (!text) return null;
+  let m = /room\s*#?\s*(\d{1,4})/i.exec(text);
+  if (m) return m[1];
+  m = /\b(\d{3,4})\b/.exec(text);
+  return m ? m[1] : null;
+}
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -3484,10 +3506,26 @@ export default {
       if (method === "POST" && p === "/api/maintenance") {
         const requester = request._staff;
         const body = await readJsonBody(request);
-        const description = String(body.description || "").trim();
-        if (!description) return json({ error: "A description is required" }, 400);
-        const roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
+        let description = String(body.description || "").trim();
+        let roomNumber = body.roomNumber ? String(body.roomNumber).trim() : null;
         if (roomNumber && roomNumber.length > 40) return json({ error: "Location is too long" }, 400);
+
+        let voiceBytes = null;
+        if (body.voiceBase64) {
+          if (base64ExceedsBytes(body.voiceBase64, 25 * 1024 * 1024)) return json({ error: "Voice note is too large (25MB max)" }, 400);
+          const binary = atob(body.voiceBase64);
+          voiceBytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) voiceBytes[i] = binary.charCodeAt(i);
+        }
+        if (!description && voiceBytes) {
+          const transcript = await transcribeVoice(env, voiceBytes);
+          if (transcript) {
+            description = transcript;
+            if (!roomNumber) roomNumber = extractRoomNumberFromText(transcript);
+          }
+        }
+        if (!description) description = voiceBytes ? "Reported via push-to-talk" : "";
+        if (!description) return json({ error: "A description is required" }, 400);
         const priority = MAINT_PRIORITIES.includes(body.priority) ? body.priority : "problem";
         const guestPresent = !!body.guestPresent;
         let deadline = body.deadline ? String(body.deadline).trim() : null;
@@ -3552,14 +3590,10 @@ export default {
 
         let voicePath = null;
         let voiceDuration = null;
-        if (body.voiceBase64) {
-          if (base64ExceedsBytes(body.voiceBase64, 25 * 1024 * 1024)) return json({ error: "Voice note is too large (25MB max)" }, 400);
-          const binary = atob(body.voiceBase64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        if (voiceBytes) {
           const ext = body.voiceMime && body.voiceMime.split("/")[1] ? "." + body.voiceMime.split("/")[1].split(";")[0].split(";")[0] : ".webm";
           const safeName = hotelKeyPrefix + crypto.randomUUID() + ext;
-          await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.voiceMime || "audio/webm" } });
+          await env.UPLOADS.put(safeName, voiceBytes, { httpMetadata: { contentType: body.voiceMime || "audio/webm" } });
           voicePath = safeName;
           voiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
         }

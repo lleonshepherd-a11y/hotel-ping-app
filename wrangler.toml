@@ -70,6 +70,9 @@ bucket_name = "hotel-ping-uploads-hotele"
 binding = "UPLOADS_HOTELF"
 bucket_name = "hotel-ping-uploads-hotelf"
 
+[ai]
+binding = "AI"
+
 [vars]
 VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19ZghGh4evavlwqbAzP-CsuJ-xLBkU"
 VAPID_SUBJECT = "mailto:admin@hotelping.co.uk"
