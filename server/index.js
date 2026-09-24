@@ -441,10 +441,12 @@ function rowToNote(row) {
 function rowToCalendarEntry(row) {
   let departmentIds = [];
   try { departmentIds = JSON.parse(row.department_ids || '[]'); } catch (e) { departmentIds = []; }
+  let staffIds = [];
+  try { staffIds = JSON.parse(row.staff_ids || '[]'); } catch (e) { staffIds = []; }
   return {
     id: row.id, title: row.title, date: row.entry_date, time: row.entry_time || undefined,
     categoryLabel: row.category_label, categoryColor: row.category_color,
-    departmentIds, notes: row.notes || undefined,
+    departmentIds, staffIds, notes: row.notes || undefined,
     createdBy: row.created_by || undefined, createdByName: row.created_by_name || undefined,
     createdAt: row.created_at,
   };
@@ -2159,13 +2161,18 @@ const server = http.createServer(async (req, res) => {
       const categoryLabel = body.categoryLabel ? String(body.categoryLabel).trim().slice(0, 40) : 'Event';
       const categoryColor = /^#[0-9a-fA-F]{6}$/.test(body.categoryColor || '') ? body.categoryColor : '#3E63C9';
       const departmentIds = Array.isArray(body.departmentIds) ? body.departmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+      let staffIds = [];
+      if (Array.isArray(body.staffIds) && body.staffIds.length) {
+        const candidateIds = body.staffIds.filter((s) => typeof s === 'string' && s).slice(0, 30);
+        staffIds = candidateIds.filter((sid) => db.prepare('SELECT 1 FROM staff WHERE id = ?').get(sid));
+      }
       const notes = body.notes ? String(body.notes).trim().slice(0, 500) : null;
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       db.prepare(
-        `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, notes, created_by, created_by_name, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), notes, requester.id, requester.name || null, now);
+        `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, staff_ids, notes, created_by, created_by_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), JSON.stringify(staffIds), notes, requester.id, requester.name || null, now);
       const row = db.prepare('SELECT * FROM ops_calendar_entries WHERE id = ?').get(id);
       return send(res, 201, { entry: rowToCalendarEntry(row) });
     }

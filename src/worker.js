@@ -305,6 +305,20 @@ async function notifyDepartment(env, deptId, payloadObj, fromDeptId) {
   }
 }
 
+async function notifyStaff(env, staffId, payloadObj) {
+  const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE staff_id = ?").bind(staffId).all();
+  for (const sub of subs.results) {
+    try {
+      const res = await sendWebPush(env, sub, payloadObj);
+      if (res.status === 404 || res.status === 410) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
+      }
+    } catch (e) {
+      // best-effort - don't fail the calendar/message send if a push fails
+    }
+  }
+}
+
 async function notifyAdmins(env, payloadObj) {
   const subs = await env.DB.prepare("SELECT * FROM push_subscriptions WHERE is_admin = 1").all();
   for (const sub of subs.results) {
@@ -1139,10 +1153,12 @@ function rowToNote(row) {
 function rowToCalendarEntry(row) {
   let departmentIds = [];
   try { departmentIds = JSON.parse(row.department_ids || "[]"); } catch (e) { departmentIds = []; }
+  let staffIds = [];
+  try { staffIds = JSON.parse(row.staff_ids || "[]"); } catch (e) { staffIds = []; }
   return {
     id: row.id, title: row.title, date: row.entry_date, time: row.entry_time || undefined,
     categoryLabel: row.category_label, categoryColor: row.category_color,
-    departmentIds, notes: row.notes || undefined,
+    departmentIds, staffIds, notes: row.notes || undefined,
     createdBy: row.created_by || undefined, createdByName: row.created_by_name || undefined,
     createdAt: row.created_at,
   };
@@ -3368,20 +3384,43 @@ export default {
         const categoryLabel = body.categoryLabel ? String(body.categoryLabel).trim().slice(0, 40) : "Event";
         const categoryColor = /^#[0-9a-fA-F]{6}$/.test(body.categoryColor || "") ? body.categoryColor : "#3E63C9";
         const departmentIds = Array.isArray(body.departmentIds) ? body.departmentIds.filter((d) => DEPT_IDS.has(d)) : [];
+        // Named individuals (a specific Assistant Manager, F&B Manager,
+        // whoever's actually running the event) live as real staff rows in
+        // NOIR_DB - checked against the live table, not a hardcoded list,
+        // so anyone added there is immediately taggable here too.
+        let staffIds = [];
+        if (Array.isArray(body.staffIds) && body.staffIds.length) {
+          const candidateIds = body.staffIds.filter((s) => typeof s === "string" && s).slice(0, 30);
+          if (candidateIds.length) {
+            const placeholders = candidateIds.map(() => "?").join(",");
+            const validRows = await env.NOIR_DB.prepare(
+              `SELECT id FROM staff WHERE hotel_id = ? AND active = 1 AND id IN (${placeholders})`
+            ).bind(resolvedNoirHotelId, ...candidateIds).all();
+            staffIds = validRows.results.map((r) => r.id);
+          }
+        }
         const notes = body.notes ? String(body.notes).trim().slice(0, 500) : null;
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.DB.prepare(
-          `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, notes, created_by, created_by_name, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), notes, requester.id, requester.name || null, now).run();
+          `INSERT INTO ops_calendar_entries (id, title, entry_date, entry_time, category_label, category_color, department_ids, staff_ids, notes, created_by, created_by_name, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(id, title, date, time, categoryLabel, categoryColor, JSON.stringify(departmentIds), JSON.stringify(staffIds), notes, requester.id, requester.name || null, now).run();
         const row = await env.DB.prepare("SELECT * FROM ops_calendar_entries WHERE id = ?").bind(id).first();
         const entry = rowToCalendarEntry(row);
-        const notifyAll = Promise.all(departmentIds.map((dept) =>
-          notifyDepartment(env, dept, {
-            title: "📅 " + categoryLabel, body: title + " — " + date + (time ? " " + time : ""), url: "/", tag: "hotel-ping-calendar-" + id,
-          }, null).catch((e) => console.error("notifyDepartment (calendar) error:", e && e.stack || e))
-        ));
+        const pushBody = title + " — " + date + (time ? " " + time : "");
+        const notifyAll = Promise.all([
+          ...departmentIds.map((dept) =>
+            notifyDepartment(env, dept, {
+              title: "📅 " + categoryLabel, body: pushBody, url: "/", tag: "hotel-ping-calendar-" + id,
+            }, null).catch((e) => console.error("notifyDepartment (calendar) error:", e && e.stack || e))
+          ),
+          ...staffIds.map((staffId) =>
+            notifyStaff(env, staffId, {
+              title: "📅 " + categoryLabel, body: pushBody, url: "/", tag: "hotel-ping-calendar-" + id,
+            }).catch((e) => console.error("notifyStaff (calendar) error:", e && e.stack || e))
+          ),
+        ]);
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyAll); else await notifyAll;
         return json({ entry }, 201);
       }

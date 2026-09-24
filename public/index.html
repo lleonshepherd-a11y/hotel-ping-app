@@ -1012,26 +1012,24 @@
 <div class="admin-overlay" id="calendarOverlay" hidden>
   <div class="admin-modal admin-modal-wide calendar-modal">
     <div class="admin-modal-head">
+      <button class="calendar-add-icon-btn" id="calendarAddBtn" type="button" aria-label="Add calendar entry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
       <h2>Ops calendar</h2>
-      <div class="admin-modal-head-actions">
-        <button class="calendar-add-icon-btn" id="calendarAddBtn" type="button" aria-label="Add calendar entry">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-        <button class="admin-close" id="calendarClose" type="button" aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
+      <button class="admin-close" id="calendarClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
     </div>
     <div class="calendar-toolbar">
       <button type="button" id="calendarPrevBtn" class="calendar-nav-btn" aria-label="Previous month">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="calendar-month-label" id="calendarMonthLabel"></div>
+      <div class="calendar-legend" id="calendarLegend"></div>
       <button type="button" id="calendarNextBtn" class="calendar-nav-btn" aria-label="Next month">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
       </button>
     </div>
-    <div class="calendar-legend" id="calendarLegend"></div>
+    <div class="calendar-month-label" id="calendarMonthLabel"></div>
     <div class="calendar-weekdays" id="calendarWeekdays"></div>
     <div class="calendar-grid" id="calendarGrid"></div>
     <div class="calendar-day-panel" id="calendarDayPanel" hidden></div>
@@ -1055,6 +1053,8 @@
       <input type="text" id="calendarCategoryInput" placeholder="Tag name, e.g. Wedding, Conference, Private Dining" maxlength="40" required>
       <div class="calendar-color-row" id="calendarColorRow"></div>
       <div class="calendar-dept-row" id="calendarDeptRow"></div>
+      <div class="calendar-staff-label">Specific people (optional)</div>
+      <div class="calendar-dept-row" id="calendarStaffRow"></div>
       <textarea id="calendarNotesInput" placeholder="Notes (optional)" maxlength="500" rows="2"></textarea>
       <button type="submit" class="admin-add-btn">Add to calendar</button>
       <div class="admin-add-error" id="calendarAddError"></div>

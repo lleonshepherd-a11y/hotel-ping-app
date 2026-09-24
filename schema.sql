@@ -514,6 +514,7 @@ CREATE TABLE IF NOT EXISTS ops_calendar_entries (
   category_label TEXT NOT NULL,
   category_color TEXT NOT NULL,
   department_ids TEXT NOT NULL,
+  staff_ids TEXT NOT NULL DEFAULT '[]',
   notes TEXT,
   created_by TEXT,
   created_by_name TEXT,

@@ -490,6 +490,7 @@ db.exec(`
     category_label TEXT NOT NULL,
     category_color TEXT NOT NULL,
     department_ids TEXT NOT NULL,
+    staff_ids TEXT NOT NULL DEFAULT '[]',
     notes TEXT,
     created_by TEXT,
     created_by_name TEXT,
@@ -497,6 +498,11 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_ops_calendar_date ON ops_calendar_entries(entry_date);
 `);
+
+const calendarColumns = db.prepare("PRAGMA table_info(ops_calendar_entries)").all().map((c) => c.name);
+if (!calendarColumns.includes('staff_ids')) {
+  db.exec("ALTER TABLE ops_calendar_entries ADD COLUMN staff_ids TEXT NOT NULL DEFAULT '[]'");
+}
 
 const maintenanceColumns = db.prepare("PRAGMA table_info(maintenance_tickets)").all().map((c) => c.name);
 if (!maintenanceColumns.includes('pinned_at')) {

@@ -6120,6 +6120,7 @@ var calendarTimeInput = document.getElementById("calendarTimeInput");
 var calendarCategoryInput = document.getElementById("calendarCategoryInput");
 var calendarColorRow = document.getElementById("calendarColorRow");
 var calendarDeptRow = document.getElementById("calendarDeptRow");
+var calendarStaffRow = document.getElementById("calendarStaffRow");
 var calendarNotesInput = document.getElementById("calendarNotesInput");
 var calendarAddError = document.getElementById("calendarAddError");
 
@@ -6129,8 +6130,14 @@ var calendarEntries = [];
 var calendarSelectedDate = null;
 var calendarSelectedColor = CALENDAR_COLORS[0];
 var calendarSelectedDepts = [];
+var calendarSelectedStaff = [];
+// Fetched fresh every time the calendar opens, so anyone newly added as
+// staff (a new Assistant Manager, F&B Manager, whoever) is immediately
+// taggable here too - never a hardcoded list.
+var calendarStaffDirectory = [];
+var calendarStaffById = {};
 
-["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(function(d){
+["M", "T", "W", "T", "F", "S", "S"].forEach(function(d){
   var el = document.createElement("span");
   el.textContent = d;
   calendarWeekdays.appendChild(el);
@@ -6162,6 +6169,32 @@ DEPT_ORDER.forEach(function(id){
   });
   calendarDeptRow.appendChild(chip);
 });
+
+function loadCalendarStaffDirectory(){
+  return apiGet('/api/staff').then(function(res){
+    calendarStaffDirectory = res.staff || [];
+    calendarStaffById = {};
+    calendarStaffDirectory.forEach(function(s){ calendarStaffById[s.id] = s; });
+    renderCalendarStaffChips();
+  }).catch(function(){ /* best-effort - the department picker still works without it */ });
+}
+
+function renderCalendarStaffChips(){
+  calendarStaffRow.innerHTML = "";
+  calendarStaffDirectory.forEach(function(s){
+    var subtitle = s.role || (DEPTS[s.departmentId] ? DEPTS[s.departmentId].name : "");
+    var chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "calendar-dept-chip calendar-staff-chip" + (calendarSelectedStaff.indexOf(s.id) !== -1 ? " selected" : "");
+    chip.innerHTML = esc(s.name) + (subtitle ? '<small>' + esc(subtitle) + '</small>' : '');
+    chip.addEventListener("click", function(){
+      var idx = calendarSelectedStaff.indexOf(s.id);
+      if(idx === -1){ calendarSelectedStaff.push(s.id); chip.classList.add("selected"); }
+      else { calendarSelectedStaff.splice(idx, 1); chip.classList.remove("selected"); }
+    });
+    calendarStaffRow.appendChild(chip);
+  });
+}
 
 function calendarMonthKey(d){
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
@@ -6203,7 +6236,7 @@ function renderCalendarGrid(){
   calendarGrid.innerHTML = "";
   var year = calendarViewDate.getFullYear();
   var month = calendarViewDate.getMonth();
-  var firstWeekday = new Date(year, month, 1).getDay();
+  var firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Monday-start
   var daysInMonth = new Date(year, month + 1, 0).getDate();
   var daysInPrevMonth = new Date(year, month, 0).getDate();
   var todayStr = calendarDateKey(new Date());
@@ -6220,9 +6253,10 @@ function renderCalendarGrid(){
     }
     var cellDate = new Date(year, cellMonth, dayNum);
     var dateStr = calendarDateKey(cellDate);
+    var isWeekend = (i % 7 === 5) || (i % 7 === 6);
     var cell = document.createElement("button");
     cell.type = "button";
-    cell.className = "calendar-day" + (outside ? " outside" : "") + (dateStr === todayStr ? " today" : "") + (dateStr === calendarSelectedDate ? " selected" : "");
+    cell.className = "calendar-day" + (outside ? " outside" : "") + (isWeekend ? " weekend" : "") + (dateStr === todayStr ? " today" : "") + (dateStr === calendarSelectedDate ? " selected" : "");
     var numEl = document.createElement("span");
     numEl.className = "calendar-day-num";
     numEl.textContent = String(dayNum);
@@ -6273,6 +6307,7 @@ function renderCalendarDayPanel(dateStr){
         + '</div>'
         + '<div class="calendar-entry-title">' + esc(e.title) + '</div>'
         + (e.departmentIds && e.departmentIds.length ? '<div class="calendar-entry-depts">' + e.departmentIds.map(function(id){ return '<span class="calendar-entry-dept-chip">' + esc(DEPTS[id] ? DEPTS[id].name : id) + '</span>'; }).join("") + '</div>' : '')
+        + (e.staffIds && e.staffIds.length ? '<div class="calendar-entry-depts">' + e.staffIds.map(function(id){ var s = calendarStaffById[id]; return '<span class="calendar-entry-staff-chip">' + esc(s ? s.name : "Former staff") + '</span>'; }).join("") + '</div>' : '')
         + (e.notes ? '<div class="calendar-entry-notes">' + esc(e.notes) + '</div>' : '')
         + '<button type="button" class="calendar-entry-delete" data-del="' + esc(e.id) + '">Remove</button>'
         + '</div>';
@@ -6293,6 +6328,7 @@ calendarBtn.addEventListener("click", function(){
   calendarSelectedDate = null;
   calendarDayPanel.hidden = true;
   loadCalendarMonth();
+  loadCalendarStaffDirectory();
 });
 calendarClose.addEventListener("click", function(){ calendarOverlay.hidden = true; });
 calendarOverlay.addEventListener("click", function(e){ if(e.target === calendarOverlay) calendarOverlay.hidden = true; });
@@ -6316,6 +6352,8 @@ calendarAddBtn.addEventListener("click", function(){
   Array.prototype.forEach.call(calendarColorRow.children, function(c, i){ c.classList.toggle("selected", i === 0); });
   calendarSelectedDepts = [];
   Array.prototype.forEach.call(calendarDeptRow.children, function(c){ c.classList.remove("selected"); });
+  calendarSelectedStaff = [];
+  loadCalendarStaffDirectory();
   calendarDateInput.value = calendarSelectedDate || calendarDateKey(new Date());
   calendarAddOverlay.hidden = false;
 });
@@ -6332,6 +6370,7 @@ calendarAddForm.addEventListener("submit", function(e){
     categoryLabel: calendarCategoryInput.value.trim(),
     categoryColor: calendarSelectedColor,
     departmentIds: calendarSelectedDepts.slice(),
+    staffIds: calendarSelectedStaff.slice(),
     notes: calendarNotesInput.value.trim() || null,
   };
   if(!payload.title || !payload.date || !payload.categoryLabel){
