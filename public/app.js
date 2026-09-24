@@ -8065,7 +8065,7 @@ function renderRoomsBoard(){
   var clean = STATE_ROOMS.filter(function(r){ return r.status === "clean"; }).length;
   roomsCountBadge.hidden = total === 0;
   roomsCountBadge.textContent = clean + "/" + total;
-  roomsStepCountEl.textContent = total === 1 ? "1 room" : total + " rooms";
+  roomsStepCountEl.textContent = "";
   roomsStepDownBtn.disabled = total === 0;
   roomsSearchWrap.hidden = total === 0;
   var term = STATE_ROOMS_SEARCH.toLowerCase();
