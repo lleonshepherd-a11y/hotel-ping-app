@@ -8388,6 +8388,19 @@ if("serviceWorker" in navigator){
   window.addEventListener("load", function(){
     navigator.serviceWorker.register("/sw.js").catch(function(){});
   });
+  // A device that already has an old service worker in control won't run
+  // any of today's fixes until that worker is replaced - which normally
+  // needs every open tab/instance of the app closed first. skipWaiting +
+  // clients.claim in sw.js let a new worker take over immediately instead,
+  // but the page that was already loaded under the old one still needs a
+  // reload to actually pick up the new code - this does that automatically,
+  // once, rather than leaving it to a manual close-and-reopen.
+  var reloadedForNewSw = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function(){
+    if(reloadedForNewSw) return;
+    reloadedForNewSw = true;
+    window.location.reload();
+  });
 }
 
 /* ---------------- Push notifications ---------------- */
