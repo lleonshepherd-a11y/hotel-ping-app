@@ -54,7 +54,7 @@ function avatarInnerHtml(deptId){
   // top (later in DOM order) that fully covers the icon underneath - so
   // there's never a gap where the circle is blank/flat.
   if(meta && meta.photoUrl){
-    return icon + '<img src="'+esc(meta.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">';
+    return icon + '<img src="'+esc(mediaUrl(meta.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">';
   }
   return icon;
 }
@@ -264,7 +264,7 @@ function loadHotelProfile(){
     HOTEL_PROFILE = res;
     var sbMarkImg = document.getElementById("sbMarkImg");
     var sbTitle = document.getElementById("sbTitle");
-    if(sbMarkImg) sbMarkImg.src = res.logoUrl || "hotel-ping-logo-tight.png";
+    if(sbMarkImg) sbMarkImg.src = mediaUrl(res.logoUrl) || "hotel-ping-logo-tight.png";
     if(sbTitle) sbTitle.textContent = res.name || "Hotel Ping";
   }).catch(function(){});
 }
@@ -3701,7 +3701,7 @@ function loadHotelProfileSetup(){
   var placeholder = document.getElementById("hotelLogoPlaceholder");
   nameInput.value = HOTEL_PROFILE.name || "";
   if(HOTEL_PROFILE.logoUrl){
-    preview.src = HOTEL_PROFILE.logoUrl;
+    preview.src = mediaUrl(HOTEL_PROFILE.logoUrl);
     preview.hidden = false;
     placeholder.hidden = true;
   } else {
@@ -4464,7 +4464,7 @@ function renderDeptPhotoPreview(){
   // Personal photo, not the department's - a department never has one.
   var photoUrl = AUTH.staff && AUTH.staff.photoUrl;
   if(photoUrl){
-    deptPhotoPreview.style.backgroundImage = "url('"+photoUrl+"')";
+    deptPhotoPreview.style.backgroundImage = "url('"+mediaUrl(photoUrl)+"')";
     deptPhotoPreview.innerHTML = "";
     deptPhotoRemoveBtn.hidden = false;
   } else {
@@ -4480,7 +4480,7 @@ function renderMyProfileCard(){
   // this card represents them personally, not the department they're
   // logged into.
   myProfileAvatar.innerHTML = AUTH.staff.photoUrl
-    ? iconSvg(STATE.self) + '<img src="'+esc(AUTH.staff.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
+    ? iconSvg(STATE.self) + '<img src="'+esc(mediaUrl(AUTH.staff.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
     : avatarInnerHtml(STATE.self);
   myProfileName.textContent = AUTH.staff.name;
   myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
@@ -4756,7 +4756,7 @@ function renderStoriesRow(){
     // last entry is the most recent story to show as the thumbnail.
     var latestStory = reel.length ? reel[reel.length - 1] : null;
     var avatarInner = latestStory && latestStory.photoUrl
-      ? iconSvg(id) + '<img src="'+esc(latestStory.photoUrl)+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
+      ? iconSvg(id) + '<img src="'+esc(mediaUrl(latestStory.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
       : avatarInnerHtml(id);
     btn.innerHTML =
       '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInner+'</span>'+
@@ -4932,7 +4932,7 @@ function renderStoryFrame(){
   storyViewerAvatar.innerHTML = avatarInnerHtml(deptId);
   storyViewerName.textContent = (story.staffName ? story.staffName : (DEPTS[deptId] ? DEPTS[deptId].name : deptId));
   storyViewerSub.textContent = (DEPTS[deptId] ? DEPTS[deptId].name : "") + " · " + fmtStoryAge(story.createdAt);
-  storyViewerImg.src = story.photoUrl;
+  storyViewerImg.src = mediaUrl(story.photoUrl);
   storyViewerCaption.textContent = story.caption || "";
   storyViewerCaption.hidden = !story.caption;
   storyViewerDelete.hidden = !(deptId === STATE.self || (AUTH.staff && AUTH.staff.isAdmin));
@@ -7167,7 +7167,7 @@ function buildMaintCard(t){
   if(t.photoUrl){
     var thumb = document.createElement(isVideo ? "video" : "img");
     thumb.className = "maint-card-thumb";
-    thumb.src = isVideo ? mediaUrl(t.photoUrl) : t.photoUrl;
+    thumb.src = mediaUrl(t.photoUrl);
     if(isVideo){ thumb.muted = true; thumb.setAttribute("preload", "metadata"); }
     else thumb.alt = "Issue photo";
     top.appendChild(thumb);
@@ -7255,7 +7255,7 @@ function renderTicketDetail(){
   if(t.photoUrl && isVideo){
     html += '<video class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" controls playsinline></video>';
   } else if(t.photoUrl){
-    html += '<img class="ticket-detail-media" src="' + t.photoUrl + '" alt="Issue photo">';
+    html += '<img class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" alt="Issue photo">';
   }
   if(t.voiceUrl){
     html += '<audio class="ticket-detail-voice" src="' + mediaUrl(t.voiceUrl) + '" controls preload="none"></audio>';
