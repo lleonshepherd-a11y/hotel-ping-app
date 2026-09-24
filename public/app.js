@@ -8478,9 +8478,33 @@ if(installDismissBtn){
   function setIdleBars(){ bars.forEach(function(b, idx){ b.style.height = REST_HEIGHTS[idx] + 'px'; }); }
   setIdleBars();
   var waveTimer = null;
+  // A short, sharp beep, not a rendered clip - fires the instant a hold is
+  // confirmed (see armConfirm below), so releasing early never plays it.
+  // That makes the beep itself teach the gesture: no beep means it let go
+  // too soon.
+  function playConfirmBeep(){
+    try{
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if(!Ctx) return;
+      var ctx = new Ctx();
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 0.012);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.13);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.14);
+      osc.onended = function(){ ctx.close(); };
+    }catch(e){}
+  }
   function startWaveAnim(){
     pttFloat.classList.add('live');
     if(navigator.vibrate) navigator.vibrate(12);
+    playConfirmBeep();
     waveTimer = setInterval(function(){
       bars.forEach(function(b, idx){
         var center = (BAR_COUNT - 1) / 2;
@@ -8639,13 +8663,27 @@ if(installDismissBtn){
     }catch(e){ clearTimeout(safetyTimer); ptt.recording = false; }
   }
 
+  // Recording itself starts the instant a finger lands, so no speech gets
+  // clipped off the front - but the wave/vibrate/beep "you're live now"
+  // feedback waits for MIN_HOLD_MS, the same line that decides whether the
+  // clip gets kept at all. A quick tap gets a light press-down and nothing
+  // else; only a real hold earns the confirmation, which teaches the
+  // gesture by itself rather than needing to be explained.
+  var confirmTimer = null;
   function startLive(){
     ptt.recording = true;
     ptt.startedAt = Date.now();
-    startWaveAnim();
+    pttFloat.classList.add('pressing');
     pttBeginRecording();
+    confirmTimer = setTimeout(function(){
+      confirmTimer = null;
+      pttFloat.classList.remove('pressing');
+      startWaveAnim();
+    }, MIN_HOLD_MS);
   }
   function stopLive(cancel){
+    if(confirmTimer){ clearTimeout(confirmTimer); confirmTimer = null; }
+    pttFloat.classList.remove('pressing');
     stopWaveAnim();
     pttFinishRecording(cancel);
   }

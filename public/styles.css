@@ -437,8 +437,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;z-index:2;
 }
 
-/* Push-to-talk preview - look only, not wired to anything yet. Floats
-   bottom-left so it never sits over the send button in the composer pill. */
+/* Push-to-talk: floats bottom-left so it never sits over the send button in
+   the composer pill, and is draggable (see setupPtt in app.js) so it can sit
+   wherever a thumb naturally falls. */
 .ptt-float{
   position:absolute;left:20px;bottom:78px;z-index:3;
   width:64px;height:64px;border-radius:50%;
@@ -453,6 +454,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
     inset 0 -1px 2px rgba(20,20,15,.08);
   cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:none;
   transition:transform .12s cubic-bezier(.34,1.56,.64,1),box-shadow .2s ease,background .2s ease;
+}
+.ptt-float.pressing{
+  transform:scale(.93);
+  transition:transform .18s cubic-bezier(.25,.1,.25,1);
 }
 .ptt-float.live{
   transform:scale(1.07);
@@ -486,6 +491,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ptt-float.live .ptt-core{transform:scale(1.04)}
 .ptt-wave-row{display:flex;align-items:center;justify-content:center;gap:2.5px;height:20px}
 .ptt-wave-bar{width:2.6px;border-radius:3px;background:#fff;height:6px;transition:height .09s ease}
+/* A child of the button, not a fixed-position sibling, so it travels along
+   when the button is dragged to wherever a thumb reaches best. */
+.ptt-hint{
+  position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:9px;
+  font-family:'Manrope',sans-serif;font-size:10px;font-weight:700;letter-spacing:.02em;
+  padding:4px 9px;border-radius:20px;white-space:nowrap;pointer-events:none;
+  background:rgba(20,20,22,.85);color:#fff;
+  box-shadow:0 4px 10px -4px rgba(0,0,0,.4);
+  opacity:.92;transition:opacity .18s ease;
+}
+.ptt-float.pressing .ptt-hint,.ptt-float.live .ptt-hint,.ptt-float.dragging .ptt-hint{opacity:0}
 .composer{
   display:flex;align-items:flex-end;gap:8px;
   max-width:640px;margin:0 auto;
