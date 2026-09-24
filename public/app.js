@@ -600,8 +600,14 @@ function previewText(m){
 function contactNameFor(id){
   var realDeptId = headRealDeptId(id);
   if(realDeptId) return DEPT_HEADS[realDeptId] ? DEPT_HEADS[realDeptId].staffName : null;
-  var staff = STAFF_BY_DEPT[id];
-  if(!staff || !staff.length) return null;
+  // The generic placeholder account every department starts with (e.g.
+  // "Housekeeping Team") is a login, not a person - joining it in here
+  // alongside real named staff (e.g. "Housekeeping · Housekeeping Team,
+  // Leon") reads as noise at best and, worse, as a near-duplicate of that
+  // person's own separate head-of-department contact row.
+  var placeholderName = DEPTS[id] ? DEPTS[id].name + " Team" : null;
+  var staff = (STAFF_BY_DEPT[id] || []).filter(function(s){ return s.name !== placeholderName; });
+  if(!staff.length) return null;
   if(staff.length === 1) return staff[0].name;
   return staff.map(function(s){ return s.name; }).join(", ");
 }
