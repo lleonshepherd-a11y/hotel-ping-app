@@ -124,6 +124,13 @@ function extractRoomNumberFromText(text) {
   m = /\b(\d{3,4})\b/.exec(text);
   return m ? m[1] : null;
 }
+// Reporting a fault stays open to every department (that's the whole point
+// of the button), but the board itself - seeing every ticket, how many are
+// open, replying, changing status - is Maintenance's and the GM's job, not
+// whoever happens to be signed in.
+function canManageMaintenance(requester) {
+  return requester.department_id === "maintenance" || requester.department_id === "gm" || !!requester.is_admin;
+}
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -3495,6 +3502,7 @@ export default {
       }
 
       if (method === "GET" && p === "/api/maintenance") {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const rows = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id ORDER BY mt.created_at DESC`
@@ -3671,12 +3679,14 @@ export default {
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
         const rows = await env.NOIR_DB.prepare("SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC").bind(id).all();
         return json({ replies: rows.results.map((r) => rowToTicketReply(noirReplyRow(r))) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
         const existing = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
@@ -3710,6 +3720,7 @@ export default {
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/status")) {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/status".length));
         const body = await readJsonBody(request);
         const status = body.status;
@@ -3755,6 +3766,7 @@ export default {
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/history")) {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/history".length));
         const rows = await env.DB.prepare(
           "SELECT * FROM maintenance_ticket_status_log WHERE ticket_id = ? ORDER BY created_at ASC"
@@ -3795,6 +3807,7 @@ export default {
       }
 
       if (method === "POST" && p === "/api/maintenance/reorder") {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const body = await readJsonBody(request);
         const order = Array.isArray(body.order) ? body.order : [];
         if (!order.length) return json({ error: "order is required" }, 400);
@@ -3814,6 +3827,7 @@ export default {
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/pin")) {
+        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/pin".length));
         const existing = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
@@ -3838,8 +3852,8 @@ export default {
         ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         const requester = request._staff;
-        if (fromNoirDept(existing.creator_dept) !== requester.department_id && !requester.is_admin) {
-          return json({ error: "You can only remove your own department's tickets" }, 403);
+        if (!canManageMaintenance(requester)) {
+          return json({ error: "Not authorized" }, 403);
         }
         if (existing.status !== "reported" && !requester.is_admin) {
           return json({ error: "This job has already been picked up and can't be deleted" }, 400);

@@ -3406,7 +3406,7 @@ function startPolling(){
   pollTimer = setInterval(function(){
     if(document.hidden) return;
     refreshActiveThread().catch(function(){});
-    refreshMaintenanceBadge();
+    if(!tabMaintBtn.hidden) refreshMaintenanceBadge();
     pollMissed();
     pollHelpAlerts();
     pollPriorityBroadcast();
@@ -3497,11 +3497,15 @@ function enterApp(staff){
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
+  // Reporting a fault stays open to everyone (that's the whole point of the
+  // button), but the board itself - every ticket, how many are open,
+  // replying, changing status - is Maintenance's and the GM's job.
+  tabMaintBtn.hidden = staff.departmentId !== "maintenance" && staff.departmentId !== "gm" && !staff.isAdmin;
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
   startPolling();
   setTimeout(function(){
-    refreshMaintenanceBadge();
+    if(!tabMaintBtn.hidden) refreshMaintenanceBadge();
     refreshRequestsBadge();
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(staff.departmentId === "concierge") refreshGuestsBadge();
