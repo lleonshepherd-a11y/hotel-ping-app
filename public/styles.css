@@ -855,8 +855,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:16px 20px 18px}
 
 .sb-menu-list{margin:8px 0 0;background:#fff;flex-shrink:0}
-.sb-menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border)}
-.sb-menu-row:last-child{border-bottom:none}
+.sb-menu-row{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;text-align:left}
 .sb-menu-row:hover{background:var(--surface-3)}
 .sb-menu-row:active{background:var(--active-tint)}
 .sb-menu-icon{flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)}
