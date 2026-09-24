@@ -1,0 +1,47 @@
+# A real, separate copy of the app for trying changes before they reach
+# app.hotelping.co.uk. Deliberately its OWN file, sharing nothing with
+# wrangler.toml - an earlier attempt put this under [env.staging] inside
+# wrangler.toml itself and it briefly inherited production's custom-domain
+# route, taking app.hotelping.co.uk down for about a minute. A separate
+# file with its own `name` and no [[routes]] block at all can't do that:
+# there is nothing here for it to share.
+#
+# Deploy with: wrangler deploy --config wrangler.staging.toml
+# Reachable at: https://hotel-ping-app-staging.<account>.workers.dev
+#
+# Reuses one of the already-provisioned, already-isolated synthetic
+# test-hotel databases/buckets (from the hotel-isolation testing) rather
+# than spinning up new resources - same schema, completely separate data,
+# zero shared state with production.
+name = "hotel-ping-app-staging"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hotel-ping-db-hotelb"
+database_id = "01aa36df-4555-439e-b0f3-5dfdd97a6625"
+
+[[d1_databases]]
+binding = "NOIR_DB"
+database_name = "hotel-ping-db-hotelb"
+database_id = "01aa36df-4555-439e-b0f3-5dfdd97a6625"
+
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "hotel-ping-uploads-hotelb"
+
+[ai]
+binding = "AI"
+
+[vars]
+VAPID_PUBLIC_KEY = "BCaJBvwGIigjmyBzyh3CgYpzpzbbl4rHeTw3hWLRHp1I52D35oKqQsW2k19ZghGh4evavlwqbAzP-CsuJ-xLBkU"
+VAPID_SUBJECT = "mailto:admin@hotelping.co.uk"
+# hotelb's staff rows carry this hotel_id, not the real hotel's - see
+# NOIR_HOTEL_ID_OVERRIDE in worker.js's hotelRegistry().
+NOIR_HOTEL_ID_OVERRIDE = "hotelb-test-tenant"
