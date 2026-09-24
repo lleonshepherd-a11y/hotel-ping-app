@@ -875,6 +875,11 @@ var offDutyBanner = document.getElementById("offDutyBanner");
 var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
+var menuBurgerBtn = document.getElementById("menuBurgerBtn");
+menuBurgerBtn.addEventListener("click", function(){
+  closeThreadView();
+  showTab("profile");
+});
 
 function renderHeader(){
   if(STATE.activeGroupId){
