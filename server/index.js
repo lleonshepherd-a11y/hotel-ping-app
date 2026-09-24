@@ -26,6 +26,7 @@ const HEAD_DEPT_NAMES = {
 Object.assign(DEPT_NAMES, HEAD_DEPT_NAMES);
 const DEFAULT_QUICK_REPLIES = ['On it', 'Done', '5 mins', 'On my way', 'Noted', 'Course away', 'Hold 10 mins', 'Ready for dessert'];
 const EXTERNAL_API_KEY = process.env.EXTERNAL_API_KEY || 'dev-local-key';
+const MESSAGE_PAGE_SIZE = 200;
 // Pre-launch: nobody is paying to use this yet, so PIN checking is off and
 // signing in only needs a real staff member's name - flip this back to
 // true (and unhide the PIN field in index.html) before real staff/guests
@@ -961,12 +962,16 @@ const server = http.createServer(async (req, res) => {
       if (!ALL_DEPT_IDS.has(self) || !(ALL_DEPT_IDS.has(other) || (other === 'dashboard' && self === 'gm'))) return send(res, 400, { error: 'Unknown department' });
       const requester = staffFromToken(req);
       if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's conversations" });
-      const rows = db.prepare(`
-        SELECT * FROM messages
-        WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?)
-        ORDER BY created_at ASC
-      `).all(self, other, other, self);
-      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
+      const before = url.searchParams.get('before');
+      const params = [self, other, other, self];
+      let sql = `SELECT * FROM messages WHERE ((from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?))`;
+      if (before) { sql += ` AND created_at < ?`; params.push(before); }
+      sql += ` ORDER BY created_at DESC LIMIT ?`;
+      params.push(MESSAGE_PAGE_SIZE + 1);
+      const rows = db.prepare(sql).all(...params);
+      const hasMore = rows.length > MESSAGE_PAGE_SIZE;
+      const page = (hasMore ? rows.slice(0, MESSAGE_PAGE_SIZE) : rows).reverse();
+      return send(res, 200, { messages: page.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean), hasMore });
     }
 
     if (req.method === 'GET' && p === '/api/groups') {

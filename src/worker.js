@@ -4,6 +4,10 @@
 // its own phase of the migration happens; only login/session/profile-PIN
 // have moved so far.
 const NOIR_HOTEL_ID = "5ca39253-5d0d-4526-a1e9-ed9a39e91707";
+// How many messages GET /api/messages returns per page (see its handler,
+// below, for why this exists) - generous enough that almost no real
+// conversation ever notices it, small enough to actually bound the fetch.
+const MESSAGE_PAGE_SIZE = 200;
 const NOIR_DEPT_ID_MAP = {
   gm: "53b8a53e-cc3e-4732-8e9a-417c91e1e9b8",
   foh: "04dccc8b-3da8-448f-9be1-8fa68935da92",
@@ -2132,12 +2136,24 @@ export default {
         const other = url.searchParams.get("with");
         if (!ALL_DEPT_IDS.has(self) || !(ALL_DEPT_IDS.has(other) || (other === "dashboard" && self === "gm"))) return json({ error: "Unknown department" }, 400);
         if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's conversations" }, 403);
-        const rows = await env.DB.prepare(
-          `SELECT * FROM messages WHERE (from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?) ORDER BY created_at ASC`
-        ).bind(self, other, other, self).all();
-        const messages = rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
+        // Capped to the most recent MESSAGE_PAGE_SIZE rather than the whole
+        // conversation - unbounded, this refetches every message ever sent
+        // between the two sides on every app refresh (every conversation in
+        // the list preloads its full thread up front), which only gets
+        // slower and heavier as a real hotel's history grows. `before` (an
+        // ISO created_at cursor) fetches the next page further back.
+        const before = url.searchParams.get("before");
+        const params = [self, other, other, self];
+        let sql = `SELECT * FROM messages WHERE ((from_dept = ? AND to_dept = ?) OR (from_dept = ? AND to_dept = ?))`;
+        if (before) { sql += ` AND created_at < ?`; params.push(before); }
+        sql += ` ORDER BY created_at DESC LIMIT ?`;
+        params.push(MESSAGE_PAGE_SIZE + 1);
+        const rows = await env.DB.prepare(sql).bind(...params).all();
+        const hasMore = rows.results.length > MESSAGE_PAGE_SIZE;
+        const page = (hasMore ? rows.results.slice(0, MESSAGE_PAGE_SIZE) : rows.results).reverse();
+        const messages = page.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
         const rMap = await reactionsMap(env, messages.map((m) => m.id));
-        return json({ messages: attachReactions(messages, rMap) });
+        return json({ messages: attachReactions(messages, rMap), hasMore });
       }
 
       // ---- Groups ----
