@@ -160,7 +160,18 @@ function mediaUrl(url){
 function apiGet(path){
   return fetch(path, { headers: authHeaders() }).then(function(r){ return r.json().then(function(body){ return r.ok ? body : Promise.reject(new Error(body.error || 'Request failed')); }); });
 }
+function newClientId(){
+  if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
 function apiSend(path, method, body){
+  // Stamped once per logical message and mutated onto the same payload
+  // object a retry later reuses (see retryFailedMessage) - so a message
+  // that's resent after a network hiccup keeps the same id, and the
+  // server can recognise a duplicate send instead of saving it twice.
+  if(path === '/api/messages' && method === 'POST' && body && typeof body === 'object' && !body.clientMessageId){
+    body.clientMessageId = newClientId();
+  }
   return fetch(path, { method: method, headers: authHeaders({'Content-Type':'application/json'}), body: JSON.stringify(body) })
     .then(function(r){ return r.json().then(function(json){ return r.ok ? json : Promise.reject(new Error(json.error || 'Request failed')); }); });
 }

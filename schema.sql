@@ -49,9 +49,13 @@ CREATE TABLE IF NOT EXISTS messages (
   affects_guest INTEGER NOT NULL DEFAULT 0,
   dashboard_conversation_id TEXT,
   room_clean TEXT,
-  from_staff_name TEXT
+  from_staff_name TEXT,
+  client_message_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
+-- Lets a resent message (e.g. after a dropped connection) be recognised as
+-- the same send rather than creating a duplicate - see client_message_id.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
 

@@ -337,28 +337,39 @@ function insertMessage(opts) {
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
-  db.prepare(`
-    INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, opts.from, opts.to || null, opts.type,
-    opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
-    opts.signoff ? opts.signoff.title : null,
-    opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
-    opts.signoff && opts.signoff.target ? opts.signoff.target : null,
-    opts.signoff && opts.signoff.category ? opts.signoff.category : null,
-    opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
-    opts.signoff ? 'pending' : null,
-    signoffCode,
-    opts.poll ? opts.poll.question : null,
-    pollOptionsJson,
-    opts.poll ? '{}' : null,
-    opts.affectsGuest ? 1 : 0,
-    opts.dashboardConversationId || null,
-    opts.roomClean || null,
-    opts.fromStaffName || null
-  );
+  try {
+    db.prepare(`
+      INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, opts.from, opts.to || null, opts.type,
+      opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
+      opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
+      opts.signoff ? opts.signoff.title : null,
+      opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
+      opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+      opts.signoff && opts.signoff.category ? opts.signoff.category : null,
+      opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
+      opts.signoff ? 'pending' : null,
+      signoffCode,
+      opts.poll ? opts.poll.question : null,
+      pollOptionsJson,
+      opts.poll ? '{}' : null,
+      opts.affectsGuest ? 1 : 0,
+      opts.dashboardConversationId || null,
+      opts.roomClean || null,
+      opts.fromStaffName || null,
+      opts.clientMessageId || null
+    );
+  } catch (err) {
+    // A retried send carries the same clientMessageId as the original -
+    // hand back the message that already exists instead of erroring.
+    if (opts.clientMessageId && String(err && err.message).toLowerCase().includes('unique')) {
+      const existing = db.prepare('SELECT * FROM messages WHERE client_message_id = ?').get(opts.clientMessageId);
+      if (existing) return existing;
+    }
+    throw err;
+  }
   const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
   if (opts.groupId && !opts.silent) {
     const members = db.prepare('SELECT department_id FROM group_members WHERE group_id = ?').all(opts.groupId);
@@ -1809,7 +1820,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
+      const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll, clientMessageId } = body;
       if (!ALL_DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
       const sendRequester = staffFromToken(req);
       const sendingAsOwnHead = HEAD_DEPT_IDS.has(from) && sendRequester.head_depts && sendRequester.head_depts.includes(from);
@@ -1890,6 +1901,7 @@ const server = http.createServer(async (req, res) => {
         signoff: signoffData,
         poll: pollData,
         fromStaffName: sendRequester.name || null,
+        clientMessageId: clientMessageId && String(clientMessageId).trim() ? String(clientMessageId).trim().slice(0, 100) : null,
       });
       return send(res, 201, { message: rowToMessage(row, from, false) });
     }

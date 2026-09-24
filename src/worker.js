@@ -663,28 +663,42 @@ async function insertMessage(env, ctx, opts) {
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
   const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
-  await env.DB.prepare(
-    `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(
-    id, opts.from, opts.to || null, opts.type,
-    opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
-    opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
-    opts.signoff ? opts.signoff.title : null,
-    opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
-    opts.signoff && opts.signoff.target ? opts.signoff.target : null,
-    opts.signoff && opts.signoff.category ? opts.signoff.category : null,
-    opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
-    opts.signoff ? "pending" : null,
-    signoffCode,
-    opts.poll ? opts.poll.question : null,
-    pollOptionsJson,
-    opts.poll ? "{}" : null,
-    opts.affectsGuest ? 1 : 0,
-    opts.dashboardConversationId || null,
-    opts.roomClean || null,
-    opts.fromStaffName || null
-  ).run();
+  try {
+    await env.DB.prepare(
+      `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      id, opts.from, opts.to || null, opts.type,
+      opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
+      opts.duration || null, opts.transcript || null, opts.urgent ? 1 : 0, now, opts.replyToId || null, opts.broadcastId || null, opts.roomNumber || null, opts.taskStatus || null, opts.groupId || null, mentionsJson,
+      opts.signoff ? opts.signoff.title : null,
+      opts.signoff && opts.signoff.amount != null ? opts.signoff.amount : null,
+      opts.signoff && opts.signoff.target ? opts.signoff.target : null,
+      opts.signoff && opts.signoff.category ? opts.signoff.category : null,
+      opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
+      opts.signoff ? "pending" : null,
+      signoffCode,
+      opts.poll ? opts.poll.question : null,
+      pollOptionsJson,
+      opts.poll ? "{}" : null,
+      opts.affectsGuest ? 1 : 0,
+      opts.dashboardConversationId || null,
+      opts.roomClean || null,
+      opts.fromStaffName || null,
+      opts.clientMessageId || null
+    ).run();
+  } catch (err) {
+    // A retried send (e.g. the app resending after a dropped connection)
+    // carries the same clientMessageId as the original - the unique index
+    // on that column turns the second INSERT into this conflict instead of
+    // a duplicate row. Hand back the message that already exists rather
+    // than erroring, so the retry looks like a normal successful send.
+    if (opts.clientMessageId && String(err && err.message).toLowerCase().includes("unique")) {
+      const existing = await env.DB.prepare("SELECT * FROM messages WHERE client_message_id = ?").bind(opts.clientMessageId).first();
+      if (existing) return existing;
+    }
+    throw err;
+  }
 
   // Built straight from the values we just inserted rather than reading
   // the row back - under heavy concurrent write load a read-after-write
@@ -708,6 +722,7 @@ async function insertMessage(env, ctx, opts) {
     poll_question: opts.poll ? opts.poll.question : null, poll_options: pollOptionsJson, poll_votes: opts.poll ? "{}" : null,
     escalation_level: 0, affects_guest: opts.affectsGuest ? 1 : 0,
     dashboard_conversation_id: opts.dashboardConversationId || null, from_staff_name: opts.fromStaffName || null,
+    client_message_id: opts.clientMessageId || null,
   };
   if (opts.silent) return row;
 
@@ -2853,7 +2868,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll } = body;
+        const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll, clientMessageId } = body;
         if (!ALL_DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         const sendingAsOwnHead = HEAD_DEPT_IDS.has(from) && request._staff.head_depts && request._staff.head_depts.includes(from);
         if (from !== request._staff.department_id && !sendingAsOwnHead) {
@@ -2935,6 +2950,7 @@ export default {
           signoff: signoffData,
           poll: pollData,
           fromStaffName: request._staff.name || null,
+          clientMessageId: clientMessageId && String(clientMessageId).trim() ? String(clientMessageId).trim().slice(0, 100) : null,
         });
 
         if (to === "dashboard" && row.body) {

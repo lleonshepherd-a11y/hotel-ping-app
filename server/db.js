@@ -155,6 +155,10 @@ if (!messageColumns.includes('room_clean')) {
 if (!messageColumns.includes('from_staff_name')) {
   db.exec('ALTER TABLE messages ADD COLUMN from_staff_name TEXT');
 }
+if (!messageColumns.includes('client_message_id')) {
+  db.exec('ALTER TABLE messages ADD COLUMN client_message_id TEXT');
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL');
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
 if (toDeptCol && toDeptCol.notnull) {
