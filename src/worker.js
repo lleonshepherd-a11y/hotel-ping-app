@@ -1214,6 +1214,14 @@ function resolveHotel(request, env, url) {
   };
 }
 
+async function pruneErrorLog(env) {
+  // The only thing that ever removes rows from error_log - deliberately
+  // automatic (age-based), not a button anyone can press. See the removed
+  // DELETE /api/admin/errors endpoint's history for why.
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  try { await env.DB.prepare("DELETE FROM error_log WHERE created_at < ?").bind(cutoff).run(); } catch (e) { /* best-effort */ }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -4087,18 +4095,16 @@ export default {
         return json({ escalated: count });
       }
 
+      // Read-only, deliberately - no admin, GM or any other in-app role gets
+      // a way to bulk-clear this (or anything else). Old rows age out on
+      // their own via the cron job's own pruning (see scheduled(), below)
+      // instead of needing a manual "clear" action at all.
       if (method === "GET" && p === "/api/admin/errors") {
         if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
         const rows = await env.DB.prepare("SELECT * FROM error_log ORDER BY created_at DESC LIMIT 100").all();
         return json({
           errors: rows.results.map((r) => ({ id: r.id, method: r.method, path: r.path, message: r.message, stack: r.stack, createdAt: r.created_at })),
         });
-      }
-
-      if (method === "DELETE" && p === "/api/admin/errors") {
-        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
-        await env.DB.prepare("DELETE FROM error_log").run();
-        return json({ ok: true });
       }
 
       return json({ error: "Not found" }, 404);
@@ -4139,6 +4145,7 @@ export default {
       const hotelEnv = Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads });
       ctx.waitUntil(checkEscalations(hotelEnv));
       ctx.waitUntil(checkUnnotifiedTickets(hotelEnv, ctx));
+      ctx.waitUntil(pruneErrorLog(hotelEnv));
     }
     ctx.waitUntil(checkDashboardDepartmentDrift(env));
     ctx.waitUntil(checkPlannerAlerts(env, ctx));

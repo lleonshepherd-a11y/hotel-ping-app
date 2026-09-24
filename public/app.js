@@ -5773,7 +5773,6 @@ var errorLogOverlay = document.getElementById("errorLogOverlay");
 var errorLogClose = document.getElementById("errorLogClose");
 var errorLogList = document.getElementById("errorLogList");
 var errorLogCount = document.getElementById("errorLogCount");
-var errorLogClearBtn = document.getElementById("errorLogClearBtn");
 
 function renderErrorLog(errors){
   if(!errors.length){
@@ -5814,16 +5813,6 @@ errorLogBtn.addEventListener("click", function(){
 });
 errorLogClose.addEventListener("click", function(){ errorLogOverlay.hidden = true; });
 errorLogOverlay.addEventListener("click", function(e){ if(e.target === errorLogOverlay) errorLogOverlay.hidden = true; });
-errorLogClearBtn.addEventListener("click", function(){
-  showConfirm({ title: "Clear the error log?", confirmLabel: "Clear" }).then(function(ok){
-    if(!ok) return;
-    apiSend('/api/admin/errors', 'DELETE', {}).then(function(){
-      renderErrorLog([]);
-      refreshErrorLogBadge();
-      showToast("Error log cleared");
-    }).catch(function(){ showToast("Couldn't clear the log"); });
-  });
-});
 
 /* ---------------- Pending signups (admin): accept or deny self-service signup requests, shown at the top of Hotel setup's Team tab ---------------- */
 var signupsList = document.getElementById("signupsList");
