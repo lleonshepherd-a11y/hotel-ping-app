@@ -1151,13 +1151,17 @@ function canViewAsSelf(requester, self) {
 // this file) so a newly provisioned hotel's overdue messages/tickets get
 // escalated too, not just the main hotel's.
 function hotelRegistry(env) {
-  const registry = {
-    main: { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID, hasDashboardBridge: true },
-  };
+  // Object.create(null) rather than {} - the slug comes straight off an
+  // inbound header, and a plain object literal would resolve a slug like
+  // "__proto__" or "constructor" to a real (inherited) property instead of
+  // undefined, so a malformed lookup crashes the request instead of
+  // cleanly falling through to resolveHotel()'s "Unknown hotel" response.
+  const registry = Object.create(null);
+  registry.main = { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID, hasDashboardBridge: true };
   // Synthetic test tenants (b-f) used for multi-hotel stress testing -
   // each its own DB + bucket, listed here so both resolveHotel() and the
   // cron job automatically pick up every one that's provisioned.
-  ["b", "c", "d", "e", "f"].forEach((letter) => {
+  ["b", "c", "d", "e", "f", "g", "h", "i", "j"].forEach((letter) => {
     const dbBinding = env["DB_HOTEL" + letter.toUpperCase()];
     if (!dbBinding) return;
     const slug = "hotel" + letter;

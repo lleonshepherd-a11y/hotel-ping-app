@@ -46,6 +46,26 @@ binding = "DB_HOTELF"
 database_name = "hotel-ping-db-hotelf"
 database_id = "3dde8147-9bf9-4470-8190-9272eb29eacb"
 
+[[d1_databases]]
+binding = "DB_HOTELG"
+database_name = "hotel-ping-db-hotelg"
+database_id = "6325e59e-7d67-4177-be14-ae24b4ebc719"
+
+[[d1_databases]]
+binding = "DB_HOTELH"
+database_name = "hotel-ping-db-hotelh"
+database_id = "f7f736f9-4a84-4253-ba1c-53230bac5b40"
+
+[[d1_databases]]
+binding = "DB_HOTELI"
+database_name = "hotel-ping-db-hoteli"
+database_id = "fa7b56c2-7aec-473b-9164-6dba9954a281"
+
+[[d1_databases]]
+binding = "DB_HOTELJ"
+database_name = "hotel-ping-db-hotelj"
+database_id = "38cf9d9d-7a54-4489-bd66-152486d4835c"
+
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "hotel-ping-uploads"
@@ -69,6 +89,22 @@ bucket_name = "hotel-ping-uploads-hotele"
 [[r2_buckets]]
 binding = "UPLOADS_HOTELF"
 bucket_name = "hotel-ping-uploads-hotelf"
+
+[[r2_buckets]]
+binding = "UPLOADS_HOTELG"
+bucket_name = "hotel-ping-uploads-hotelg"
+
+[[r2_buckets]]
+binding = "UPLOADS_HOTELH"
+bucket_name = "hotel-ping-uploads-hotelh"
+
+[[r2_buckets]]
+binding = "UPLOADS_HOTELI"
+bucket_name = "hotel-ping-uploads-hoteli"
+
+[[r2_buckets]]
+binding = "UPLOADS_HOTELJ"
+bucket_name = "hotel-ping-uploads-hotelj"
 
 [ai]
 binding = "AI"
