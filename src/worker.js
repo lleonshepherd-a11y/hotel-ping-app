@@ -4059,6 +4059,20 @@ export default {
         return json({ escalated: count });
       }
 
+      if (method === "GET" && p === "/api/admin/errors") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        const rows = await env.DB.prepare("SELECT * FROM error_log ORDER BY created_at DESC LIMIT 100").all();
+        return json({
+          errors: rows.results.map((r) => ({ id: r.id, method: r.method, path: r.path, message: r.message, stack: r.stack, createdAt: r.created_at })),
+        });
+      }
+
+      if (method === "DELETE" && p === "/api/admin/errors") {
+        if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
+        await env.DB.prepare("DELETE FROM error_log").run();
+        return json({ ok: true });
+      }
+
       return json({ error: "Not found" }, 404);
     } catch (err) {
       // The failure detail (SQL error text, stack) goes to the Worker's own
@@ -4067,6 +4081,20 @@ export default {
       // to anyone who can trigger a 500, not just to us debugging via
       // `wrangler tail`.
       console.error("Unhandled error:", err && err.stack || err);
+      // Best-effort - a broken error log must never be why the original
+      // error's response fails to go out. GM/admin can review these from
+      // the app itself (GET /api/admin/errors) instead of only via
+      // `wrangler tail`, which needs a terminal open and watching live.
+      try {
+        await env.DB.prepare(
+          "INSERT INTO error_log (id, method, path, message, stack, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(
+          crypto.randomUUID(), method, p,
+          String(err && err.message || err).slice(0, 500),
+          String(err && err.stack || "").slice(0, 4000),
+          new Date().toISOString()
+        ).run();
+      } catch (logErr) { /* ignore - see above */ }
       return json({ error: "Server error" }, 500);
     }
   },

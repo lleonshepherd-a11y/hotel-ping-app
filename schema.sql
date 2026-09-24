@@ -502,6 +502,19 @@ CREATE TABLE IF NOT EXISTS personal_notes (
 );
 CREATE INDEX IF NOT EXISTS idx_personal_notes_staff ON personal_notes(staff_id, created_at);
 
+-- Every unhandled server error, so a GM can see when something's actually
+-- broken from inside the app itself instead of only via `wrangler tail`
+-- (which needs a terminal open and watching live to catch anything).
+CREATE TABLE IF NOT EXISTS error_log (
+  id TEXT PRIMARY KEY,
+  method TEXT,
+  path TEXT,
+  message TEXT,
+  stack TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_error_log_created ON error_log(created_at);
+
 INSERT OR IGNORE INTO departments (id, name, contact_name, on_duty) VALUES
   ('gm', 'General Manager', 'Dave', 1),
   ('foh', 'Reception', NULL, 1),

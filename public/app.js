@@ -3504,7 +3504,8 @@ function enterApp(staff){
   responseBtn.hidden = !staff.isAdmin;
   opsOverviewBtn.hidden = !staff.isAdmin;
   gmMuteDeptsBtn.hidden = !staff.isAdmin;
-  if(staff.isAdmin) loadGmMuteDepartments();
+  errorLogBtn.hidden = !staff.isAdmin;
+  if(staff.isAdmin){ loadGmMuteDepartments(); refreshErrorLogBadge(); }
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
@@ -5766,6 +5767,63 @@ responseBtn.addEventListener("click", function(){
 });
 responseClose.addEventListener("click", function(){ responseOverlay.hidden = true; });
 responseOverlay.addEventListener("click", function(e){ if(e.target === responseOverlay) responseOverlay.hidden = true; });
+
+var errorLogBtn = document.getElementById("errorLogBtn");
+var errorLogOverlay = document.getElementById("errorLogOverlay");
+var errorLogClose = document.getElementById("errorLogClose");
+var errorLogList = document.getElementById("errorLogList");
+var errorLogCount = document.getElementById("errorLogCount");
+var errorLogClearBtn = document.getElementById("errorLogClearBtn");
+
+function renderErrorLog(errors){
+  if(!errors.length){
+    errorLogList.innerHTML = panelEmptyHtml(PANEL_EMPTY_ICONS.clock, "No errors logged", "Nothing's broken - this list is empty on purpose.");
+    return;
+  }
+  errorLogList.innerHTML = "";
+  errors.forEach(function(e){
+    var row = document.createElement("div");
+    row.className = "resp-row";
+    row.innerHTML =
+      '<span class="resp-dot slow"></span>'+
+      '<span class="resp-body">'+
+        '<span class="resp-name">'+esc(e.method || "")+' '+esc(e.path || "")+'</span>'+
+        '<span class="resp-sub">'+esc(e.message || "")+'</span>'+
+      '</span>'+
+      '<span class="resp-time">'+esc(fmtClock(e.createdAt))+'</span>';
+    errorLogList.appendChild(row);
+  });
+}
+
+function refreshErrorLogBadge(){
+  if(!AUTH.staff || !AUTH.staff.isAdmin) return;
+  apiGet('/api/admin/errors').then(function(res){
+    errorLogCount.hidden = res.errors.length === 0;
+    errorLogCount.textContent = res.errors.length > 99 ? "99+" : String(res.errors.length);
+  }).catch(function(){});
+}
+
+errorLogBtn.addEventListener("click", function(){
+  errorLogList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  errorLogOverlay.hidden = false;
+  apiGet('/api/admin/errors').then(function(res){
+    renderErrorLog(res.errors);
+  }).catch(function(){
+    errorLogList.innerHTML = '<div class="handover-empty">Couldn\'t load the error log.</div>';
+  });
+});
+errorLogClose.addEventListener("click", function(){ errorLogOverlay.hidden = true; });
+errorLogOverlay.addEventListener("click", function(e){ if(e.target === errorLogOverlay) errorLogOverlay.hidden = true; });
+errorLogClearBtn.addEventListener("click", function(){
+  showConfirm({ title: "Clear the error log?", confirmLabel: "Clear" }).then(function(ok){
+    if(!ok) return;
+    apiSend('/api/admin/errors', 'DELETE', {}).then(function(){
+      renderErrorLog([]);
+      refreshErrorLogBadge();
+      showToast("Error log cleared");
+    }).catch(function(){ showToast("Couldn't clear the log"); });
+  });
+});
 
 /* ---------------- Pending signups (admin): accept or deny self-service signup requests, shown at the top of Hotel setup's Team tab ---------------- */
 var signupsList = document.getElementById("signupsList");

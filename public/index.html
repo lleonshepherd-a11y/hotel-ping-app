@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260924c">
+<link rel="stylesheet" href="/styles.css?v=20260924d">
 </head>
 <body>
 
@@ -177,6 +177,12 @@
       <button class="sb-menu-row" id="responseBtn" hidden type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
         <span class="sb-menu-label">Response times</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <button class="sb-menu-row" id="errorLogBtn" hidden type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L2.7 17.3A1.8 1.8 0 0 0 4.3 20h15.4a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
+        <span class="sb-menu-label">Error log</span>
+        <span class="missed-section-count" id="errorLogCount" hidden>0</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <button class="sb-menu-row" id="broadcastBtn" hidden type="button">
@@ -897,6 +903,20 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="errorLogOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Error log</h2>
+      <button class="admin-close" id="errorLogClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">The last 100 server errors, newest first. Nothing here means nothing's broken.</p>
+    <div class="resp-list" id="errorLogList"></div>
+    <button type="button" class="admin-add-btn" id="errorLogClearBtn" style="margin-top:14px">Clear log</button>
+  </div>
+</div>
+
 <div class="admin-overlay" id="opsOverviewOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1325,6 +1345,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260924c"></script>
+<script src="/app.js?v=20260924d"></script>
 </body>
 </html>
