@@ -3478,6 +3478,7 @@ function enterApp(staff){
   loadHotelProfile();
   switcherWrap.hidden = !staff.isAdmin && !(staff.headDepts && staff.headDepts.length);
   switcherLabel.textContent = staff.isAdmin ? "Viewing as" : "Message as";
+  adminGroupBtn.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
   broadcastBtn.hidden = !staff.isAdmin;
   priorityAlertBtn.hidden = !staff.isAdmin;
@@ -4400,6 +4401,18 @@ moreOptionsBtn.addEventListener("click", function(){
   var open = moreOptionsSub.hidden;
   moreOptionsSub.hidden = !open;
   moreOptionsBtn.classList.toggle("open", open);
+});
+
+/* ---- Profile: Admin dropdown (Hotel setup, Activity feed, Response
+   times, Error log, Broadcast messages, Priority alert, Ops overview -
+   grouped so the day-to-day rows above aren't buried under admin-only
+   ones most staff never use) ---- */
+var adminGroupBtn = document.getElementById("adminGroupBtn");
+var adminGroupSub = document.getElementById("adminGroupSub");
+adminGroupBtn.addEventListener("click", function(){
+  var open = adminGroupSub.hidden;
+  adminGroupSub.hidden = !open;
+  adminGroupBtn.classList.toggle("open", open);
 });
 
 var changePinBtn = document.getElementById("changePinBtn");
