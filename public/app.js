@@ -8712,16 +8712,24 @@ if(installDismissBtn){
   // place a drag can start. Splitting by zone (rather than guessing from
   // finger movement) means pressing to talk can never get mistaken for
   // the start of a drag, and dragging can never trigger a stray "talk".
-  var pttCore = pttFloat.querySelector('.ptt-core');
+  // A real finger is much fatter than a mouse pointer, so a touch anywhere
+  // near the edge of the visible 46px core still hit-tests as "inside" it
+  // by DOM containment - leaving the 9px rim nearly impossible to land on
+  // deliberately. Deciding by distance from the button's own centre instead,
+  // with a smaller radius than the core actually draws, gives the rim a
+  // real, reachable width without changing how anything looks.
+  var TALK_ZONE_RADIUS = 18;
   var pressing = false, dragging = false, talkMoved = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
   pttFloat.addEventListener('pointerdown', function(e){
     e.preventDefault();
-    var onRim = !pttCore.contains(e.target);
+    var rect = pttFloat.getBoundingClientRect();
+    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    var distFromCenter = Math.sqrt(Math.pow(e.clientX - cx, 2) + Math.pow(e.clientY - cy, 2));
+    var onRim = distFromCenter > TALK_ZONE_RADIUS;
     pressing = true;
     dragging = onRim;
     talkMoved = false;
     startX = e.clientX; startY = e.clientY;
-    var rect = pttFloat.getBoundingClientRect();
     var hostRect = (pttFloat.offsetParent || document.body).getBoundingClientRect();
     startLeft = rect.left - hostRect.left;
     startTop = rect.top - hostRect.top;
