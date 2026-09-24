@@ -598,18 +598,13 @@ function previewText(m){
 }
 
 function contactNameFor(id){
+  // Only the separate "head_xxx" pseudo-conversation (a 1:1 chat with the
+  // named head of department) shows a person's name - the plain department
+  // conversation (e.g. "housekeeping") always shows just the department
+  // name, even when it happens to have exactly one named staff account.
   var realDeptId = headRealDeptId(id);
   if(realDeptId) return DEPT_HEADS[realDeptId] ? DEPT_HEADS[realDeptId].staffName : null;
-  // The generic placeholder account every department starts with (e.g.
-  // "Housekeeping Team") is a login, not a person - joining it in here
-  // alongside real named staff (e.g. "Housekeeping · Housekeeping Team,
-  // Leon") reads as noise at best and, worse, as a near-duplicate of that
-  // person's own separate head-of-department contact row.
-  var placeholderName = DEPTS[id] ? DEPTS[id].name + " Team" : null;
-  var staff = (STAFF_BY_DEPT[id] || []).filter(function(s){ return s.name !== placeholderName; });
-  if(!staff.length) return null;
-  if(staff.length === 1) return staff[0].name;
-  return staff.map(function(s){ return s.name; }).join(", ");
+  return null;
 }
 
 function findSearchMatch(id, term){
