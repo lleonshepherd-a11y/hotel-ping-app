@@ -1013,10 +1013,13 @@ async function readJsonBody(request) {
 
 // /uploads/:key (see below) is fetched by plain <img>/<video>/<audio> tags,
 // which can't carry an Authorization header - so file access there is
-// proven with an HttpOnly cookie instead, set at login. The cookie is
-// checked against the FILE'S OWN hotel (from its key prefix), not the
-// caller's current hotel context, so a session only ever unlocks files
-// that belong to the same hotel it was issued for.
+// proven with the session token instead, either the HttpOnly login cookie
+// (desktop/normal browsing) or a ?t= query param carrying the same token
+// (iOS, where a home-screen PWA's native media element doesn't reliably
+// send the cookie on its own request - the query param is what actually
+// reaches the server in that case). Checked against the FILE'S OWN hotel
+// (from its key prefix), not the caller's current hotel context, so a
+// session only ever unlocks files belonging to that same hotel.
 function parseCookie(request, name) {
   const header = request.headers.get("cookie") || "";
   for (const part of header.split(";")) {
@@ -1026,8 +1029,8 @@ function parseCookie(request, name) {
   }
   return null;
 }
-async function hasValidSessionCookie(noirDb, request) {
-  const token = parseCookie(request, "hp_session");
+async function hasValidSessionCookie(noirDb, request, url) {
+  const token = parseCookie(request, "hp_session") || (url && url.searchParams.get("t"));
   if (!token) return false;
   const tokenHash = await sha256Hex(token);
   const row = await noirDb.prepare(
@@ -1145,13 +1148,11 @@ export default {
         const owningHotel = (keyPrefixSlug && uploadsRegistry[keyPrefixSlug]) ? uploadsRegistry[keyPrefixSlug] : uploadsRegistry.main;
         const bucket = owningHotel.uploads;
         if (!bucket) return json({ error: "Not found" }, 404);
-        // A signed-in session cookie (set at login, sent automatically by the
-        // browser on this same-origin request - an Authorization header
-        // can't be, since plain <img>/<video>/<audio> tags trigger this) is
-        // required, and checked against the FILE'S OWN hotel specifically -
-        // never the caller's current X-Hotel-Slug context - so a session
-        // only ever unlocks files belonging to that same hotel.
-        if (!(await hasValidSessionCookie(owningHotel.noirDb, request))) {
+        // The cookie alone isn't enough here - see hasValidSessionCookie's
+        // own note on why a ?t= fallback exists (iOS home-screen PWAs don't
+        // reliably send it on the media element's own request) - but a
+        // valid session, one way or the other, is still required.
+        if (!(await hasValidSessionCookie(owningHotel.noirDb, request, url))) {
           return json({ error: "Not signed in" }, 401);
         }
         // Safari's <audio>/<video> won't play an MP4 at all unless the

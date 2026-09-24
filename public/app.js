@@ -147,6 +147,16 @@ function authHeaders(extra){
   if(AUTH.token) h['Authorization'] = 'Bearer ' + AUTH.token;
   return h;
 }
+// A plain <audio>/<video> element makes its own native request for the
+// file, and on iOS - especially once the app is added to the home screen -
+// that request doesn't reliably carry the login cookie, so playback would
+// silently fail even though the session is fine everywhere else. Stamping
+// the same session token into the URL itself sidesteps that; the server
+// accepts either.
+function mediaUrl(url){
+  if(!url || !AUTH.token) return url;
+  return url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + encodeURIComponent(AUTH.token);
+}
 function apiGet(path){
   return fetch(path, { headers: authHeaders() }).then(function(r){ return r.json().then(function(body){ return r.ok ? body : Promise.reject(new Error(body.error || 'Request failed')); }); });
 }
@@ -1065,8 +1075,10 @@ function buildAudioNode(msg, holderIsOut){
 
   function ensureSrc(){
     if(ready) return Promise.resolve();
-    if(msg.url){ audioEl.src = msg.url; ready = true; refreshWaveform(); return Promise.resolve(); }
+    if(msg.url){ audioEl.src = mediaUrl(msg.url); ready = true; refreshWaveform(); return Promise.resolve(); }
     return makeToneVoiceNote(msg.dur, msg.freq).then(function(res){
+      // This is a synthetic local blob: URL, not a server /uploads/ link -
+      // mediaUrl's ?t= suffix would just break it.
       if(res){ msg.url = res.url; audioEl.src = res.url; ready = true; refreshWaveform(); }
     });
   }
@@ -7155,7 +7167,7 @@ function buildMaintCard(t){
   if(t.photoUrl){
     var thumb = document.createElement(isVideo ? "video" : "img");
     thumb.className = "maint-card-thumb";
-    thumb.src = t.photoUrl;
+    thumb.src = isVideo ? mediaUrl(t.photoUrl) : t.photoUrl;
     if(isVideo){ thumb.muted = true; thumb.setAttribute("preload", "metadata"); }
     else thumb.alt = "Issue photo";
     top.appendChild(thumb);
@@ -7241,12 +7253,12 @@ function renderTicketDetail(){
   html += '<div class="ticket-detail-desc">' + esc(t.description) + '</div>';
   var isVideo = isTicketVideo(t);
   if(t.photoUrl && isVideo){
-    html += '<video class="ticket-detail-media" src="' + t.photoUrl + '" controls playsinline></video>';
+    html += '<video class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" controls playsinline></video>';
   } else if(t.photoUrl){
     html += '<img class="ticket-detail-media" src="' + t.photoUrl + '" alt="Issue photo">';
   }
   if(t.voiceUrl){
-    html += '<audio class="ticket-detail-voice" src="' + t.voiceUrl + '" controls preload="none"></audio>';
+    html += '<audio class="ticket-detail-voice" src="' + mediaUrl(t.voiceUrl) + '" controls preload="none"></audio>';
   }
   html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   ticketDetailBody.innerHTML = html;
