@@ -668,7 +668,6 @@ function renderList(){
     var last = lastOf(msgs);
     var unread = unreadCount(id);
     var urgentUnread = hasUrgentUnread(id);
-    var contact = contactNameFor(id);
     var searchHit = matches[id];
 
     var el = document.createElement("button");
@@ -678,7 +677,7 @@ function renderList(){
     el.innerHTML =
       '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+' duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+d.name+(contact ? ' <span class="t-contact">· '+esc(contact)+'</span>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
+        '<div class="t-row1"><span class="t-name">'+d.name+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
