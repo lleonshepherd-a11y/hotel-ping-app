@@ -1167,7 +1167,11 @@ function hotelRegistry(env) {
   // undefined, so a malformed lookup crashes the request instead of
   // cleanly falling through to resolveHotel()'s "Unknown hotel" response.
   const registry = Object.create(null);
-  registry.main = { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: NOIR_HOTEL_ID, hasDashboardBridge: true };
+  // NOIR_HOTEL_ID_OVERRIDE exists for the staging environment (see
+  // wrangler.toml) - it points DB/NOIR_DB at a synthetic test hotel's
+  // database instead of the real one, and that database's staff rows
+  // carry its own test-tenant hotel_id, not the real NOIR_HOTEL_ID.
+  registry.main = { slug: "main", db: env.DB, noirDb: env.NOIR_DB, uploads: env.UPLOADS, hotelId: env.NOIR_HOTEL_ID_OVERRIDE || NOIR_HOTEL_ID, hasDashboardBridge: true };
   // Synthetic test tenants (b-f) used for multi-hotel stress testing -
   // each its own DB + bucket, listed here so both resolveHotel() and the
   // cron job automatically pick up every one that's provisioned.
