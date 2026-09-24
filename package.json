@@ -6,7 +6,8 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node --no-warnings server/index.js",
-    "test": "node --no-warnings tests/hotel-isolation-and-delivery.test.js"
+    "test": "node --no-warnings tests/hotel-isolation-and-delivery.test.js",
+    "check-drift": "node scripts/check-route-drift.js"
   },
   "engines": {
     "node": ">=22.5.0"
