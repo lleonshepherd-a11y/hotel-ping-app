@@ -86,10 +86,16 @@ const GUEST_REQUEST_STATUSES = ["new", "in_progress", "completed"];
 const ASSET_STATUSES = ["requested", "borrowed", "returned"];
 const DEFAULT_QUICK_REPLIES = ["On it", "Done", "5 mins", "On my way", "Noted", "Course away", "Hold 10 mins", "Ready for dessert"];
 
+// Scoped to the app's own origin rather than "*" - nothing here needs to
+// be readable by an arbitrary third-party website, and a wildcard origin
+// is a needlessly wide-open default for an API that carries staff/guest
+// data, even though every endpoint still requires its own valid session
+// token regardless of where the request came from.
+const ALLOWED_ORIGIN = "https://app.hotelping.co.uk";
 function json(data, status, headers) {
   return new Response(JSON.stringify(data), {
     status: status || 200,
-    headers: Object.assign({ "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" }, headers || {}),
+    headers: Object.assign({ "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": ALLOWED_ORIGIN, "Vary": "Origin" }, headers || {}),
   });
 }
 
