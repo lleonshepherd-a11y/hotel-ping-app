@@ -496,10 +496,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ptt-hint{
   position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:9px;
   font-family:'Manrope',sans-serif;font-size:10px;font-weight:700;letter-spacing:.02em;
-  padding:4px 9px;border-radius:20px;white-space:nowrap;pointer-events:none;
-  background:rgba(20,20,22,.85);color:#fff;
-  box-shadow:0 4px 10px -4px rgba(0,0,0,.4);
-  opacity:.92;transition:opacity .18s ease;
+  padding:4px 10px;border-radius:20px;white-space:nowrap;pointer-events:none;
+  background:rgba(77,132,245,.32);
+  backdrop-filter:blur(10px) saturate(1.5);-webkit-backdrop-filter:blur(10px) saturate(1.5);
+  border:1px solid rgba(140,175,250,.55);
+  color:#fff;
+  box-shadow:0 4px 12px -4px rgba(20,20,15,.3), inset 0 1px 1px rgba(255,255,255,.35);
+  opacity:.95;transition:opacity .18s ease;
 }
 .ptt-float.pressing .ptt-hint,.ptt-float.live .ptt-hint,.ptt-float.dragging .ptt-hint{opacity:0}
 .composer{
