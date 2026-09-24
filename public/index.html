@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260924g">
+<link rel="stylesheet" href="/styles.css?v=20260924h">
 </head>
 <body>
 
@@ -163,11 +163,9 @@
     </div>
 
     <div class="sb-menu-list">
-      <button class="sb-menu-row" id="adminGroupBtn" hidden type="button">
-        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6z"/></svg></span>
-        <span class="sb-menu-label sb-menu-label-group">Admin</span>
+      <button class="sb-see-more" id="adminGroupBtn" hidden type="button">
+        <span id="adminGroupLabel">See admin tools</span>
         <span class="sb-menu-group-count" id="adminGroupCount">7</span>
-        <span class="sb-menu-chevron" id="adminGroupChevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       <div id="adminGroupSub" hidden>
       <button class="sb-menu-row sb-menu-row-sub" id="adminBtn" hidden type="button">
@@ -290,6 +288,12 @@
     </div>
 
     <div class="sb-page" id="chatPage" hidden>
+    <div class="chatlist-head">
+      <button class="chatlist-burger" id="chatListBurgerBtn" type="button" aria-label="Open menu" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="chatlist-title">Hotel Ping</div>
+    </div>
     <div class="sb-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input type="text" id="searchInput" placeholder="Search conversations">
@@ -1414,6 +1418,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260924g"></script>
+<script src="/app.js?v=20260924h"></script>
 </body>
 </html>

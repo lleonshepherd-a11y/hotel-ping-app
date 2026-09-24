@@ -191,6 +191,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .duty-knob:active{cursor:grabbing}
 .duty-knob:focus-visible{outline:none}
 
+.chatlist-head{display:flex;align-items:center;gap:12px;padding:16px 16px 4px}
+.chatlist-burger{width:34px;height:34px;border-radius:50%;border:none;background:none;display:flex;align-items:center;justify-content:center;color:var(--text);flex:none}
+.chatlist-burger:active{background:var(--surface-3)}
+.chatlist-title{font-size:16px;font-weight:800;color:var(--text)}
 .sb-search{
   display:flex;align-items:center;gap:8px;margin:14px 16px 0;padding:8px 12px;
   background:var(--surface-2);border-radius:14px;box-shadow:inset 0 0 0 1px var(--border);
@@ -883,11 +887,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #moreOptionsChevron svg{transition:transform .2s ease}
 #moreOptionsBtn.open #moreOptionsChevron svg{transform:rotate(90deg)}
 .sb-menu-row-logout .sb-menu-label{color:var(--urgent)}
-.sb-menu-label-group{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim)}
-.sb-menu-group-count{font-size:11px;font-weight:700;color:var(--text-faint);background:var(--surface-3);padding:2px 8px;border-radius:999px;margin-right:8px}
-#adminGroupBtn.open .sb-menu-label-group,#adminGroupBtn.open .sb-menu-icon,#adminGroupBtn.open #adminGroupChevron{color:var(--accent)}
-#adminGroupChevron svg{transition:transform .2s ease}
-#adminGroupBtn.open #adminGroupChevron svg{transform:rotate(90deg)}
+.sb-see-more{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 14px;padding:11px;border:none;border-radius:11px;background:var(--surface-3);color:var(--text);font-weight:700;font-size:13.5px;width:calc(100% - 28px)}
+.sb-see-more:active{background:var(--active-tint)}
+.sb-menu-group-count{font-size:11px;font-weight:700;color:var(--text-faint);background:var(--surface);padding:2px 8px;border-radius:999px}
 .sb-menu-row-logout .sb-menu-icon{color:var(--urgent)}
 .powered-by-footer{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:auto;padding:22px 20px calc(18px + env(safe-area-inset-bottom));flex-shrink:0;color:var(--text-faint);font-size:11.5px;font-weight:600;letter-spacing:.02em}
 .powered-by-logo{height:24px;width:auto}

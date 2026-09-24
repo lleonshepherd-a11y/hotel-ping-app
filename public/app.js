@@ -880,6 +880,10 @@ menuBurgerBtn.addEventListener("click", function(){
   closeThreadView();
   showTab("profile");
 });
+var chatListBurgerBtn = document.getElementById("chatListBurgerBtn");
+chatListBurgerBtn.addEventListener("click", function(){
+  showTab("profile");
+});
 
 function renderHeader(){
   if(STATE.activeGroupId){
@@ -4414,10 +4418,11 @@ moreOptionsBtn.addEventListener("click", function(){
    ones most staff never use) ---- */
 var adminGroupBtn = document.getElementById("adminGroupBtn");
 var adminGroupSub = document.getElementById("adminGroupSub");
+var adminGroupLabel = document.getElementById("adminGroupLabel");
 adminGroupBtn.addEventListener("click", function(){
   var open = adminGroupSub.hidden;
   adminGroupSub.hidden = !open;
-  adminGroupBtn.classList.toggle("open", open);
+  adminGroupLabel.textContent = open ? "See less" : "See admin tools";
 });
 
 var changePinBtn = document.getElementById("changePinBtn");
