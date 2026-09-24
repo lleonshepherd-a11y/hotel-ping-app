@@ -4482,8 +4482,8 @@ function renderMyProfileCard(){
   myProfileAvatar.innerHTML = AUTH.staff.photoUrl
     ? iconSvg(STATE.self) + '<img src="'+esc(mediaUrl(AUTH.staff.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
     : avatarInnerHtml(STATE.self);
-  myProfileName.textContent = AUTH.staff.name;
-  myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
+  myProfileName.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
+  myProfileRole.hidden = true;
   myProfileStatus.hidden = !AUTH.staff.statusLine;
   myProfileStatus.textContent = AUTH.staff.statusLine || "";
 }
