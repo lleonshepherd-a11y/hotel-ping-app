@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260924j">
+<link rel="stylesheet" href="/styles.css?v=20260924k">
 </head>
 <body>
 
@@ -101,6 +101,9 @@
             <div class="duty-knob" id="dutyKnob" role="switch" aria-checked="true" tabindex="0" aria-label="On duty. Slide or press Enter to turn the board off"></div>
           </div>
         </div>
+        <button class="profile-menu-burger" id="profileMenuBurgerBtn" type="button" aria-label="Open menu" title="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
       </div>
     </div>
 
@@ -162,7 +165,15 @@
       <div class="switcher-row" id="switcherRow"></div>
     </div>
 
-    <div class="sb-menu-list">
+    <div class="nav-drawer-scrim" id="profileMenuScrim" hidden></div>
+    <div class="nav-drawer nav-drawer-right" id="profileMenuDrawer" hidden>
+      <div class="nav-drawer-head">
+        <div class="nav-drawer-title">Menu</div>
+        <button class="admin-close" id="profileMenuCloseBtn" type="button" aria-label="Close menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="sb-menu-list nav-drawer-body">
       <button class="sb-see-more" id="adminGroupBtn" hidden type="button">
         <span id="adminGroupLabel">See admin tools</span>
         <span class="sb-menu-group-count" id="adminGroupCount">7</span>
@@ -275,7 +286,8 @@
           <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
         </button>
       </div>
-      <button class="sb-see-more sb-logout-pill" id="logoutBtn" type="button">
+      </div>
+      <button class="sb-see-more sb-logout-pill nav-drawer-logout" id="logoutBtn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         <span>Log out</span>
       </button>
@@ -1418,6 +1430,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260924j"></script>
+<script src="/app.js?v=20260924k"></script>
 </body>
 </html>

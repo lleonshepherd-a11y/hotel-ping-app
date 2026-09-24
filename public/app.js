@@ -5621,6 +5621,30 @@ tabRequestsBtn.addEventListener("click", function(){ showTab("requests"); });
 tabRoomsBtn.addEventListener("click", function(){ showTab("rooms"); });
 showTab("chat");
 
+var profileMenuBurgerBtn = document.getElementById("profileMenuBurgerBtn");
+var profileMenuDrawer = document.getElementById("profileMenuDrawer");
+var profileMenuScrim = document.getElementById("profileMenuScrim");
+var profileMenuCloseBtn = document.getElementById("profileMenuCloseBtn");
+function openProfileMenuDrawer(){
+  profileMenuDrawer.hidden = false;
+  profileMenuScrim.hidden = false;
+  requestAnimationFrame(function(){
+    profileMenuDrawer.classList.add("open");
+    profileMenuScrim.classList.add("open");
+  });
+}
+function closeProfileMenuDrawer(){
+  profileMenuDrawer.classList.remove("open");
+  profileMenuScrim.classList.remove("open");
+  setTimeout(function(){
+    profileMenuDrawer.hidden = true;
+    profileMenuScrim.hidden = true;
+  }, 280);
+}
+profileMenuBurgerBtn.addEventListener("click", openProfileMenuDrawer);
+profileMenuCloseBtn.addEventListener("click", closeProfileMenuDrawer);
+profileMenuScrim.addEventListener("click", closeProfileMenuDrawer);
+
 (function setupTabBarDrag(){
   var bar = document.querySelector(".bottom-tabs");
   var activePointerId = null;
