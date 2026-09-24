@@ -5,7 +5,8 @@
   "description": "Hotel Ping — department messaging app for hotel staff",
   "main": "server/index.js",
   "scripts": {
-    "start": "node --no-warnings server/index.js"
+    "start": "node --no-warnings server/index.js",
+    "test": "node --no-warnings tests/hotel-isolation-and-delivery.test.js"
   },
   "engines": {
     "node": ">=22.5.0"
