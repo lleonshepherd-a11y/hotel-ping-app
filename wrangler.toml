@@ -17,94 +17,9 @@ binding = "NOIR_DB"
 database_name = "noir-house-db"
 database_id = "e20a018c-4228-4343-856f-9c80bf3cc8dd"
 
-# Synthetic test hotels used to prove multi-hotel isolation under stress
-# (see resolveHotel()/hotelRegistry() in worker.js). Each is a physically
-# separate database from DB/NOIR_DB above - not a hotel_id column inside
-# them.
-[[d1_databases]]
-binding = "DB_HOTELB"
-database_name = "hotel-ping-db-hotelb"
-database_id = "01aa36df-4555-439e-b0f3-5dfdd97a6625"
-
-[[d1_databases]]
-binding = "DB_HOTELC"
-database_name = "hotel-ping-db-hotelc"
-database_id = "b5fd806b-67c5-4d67-a9e4-130b97989811"
-
-[[d1_databases]]
-binding = "DB_HOTELD"
-database_name = "hotel-ping-db-hoteld"
-database_id = "520116b9-f5c6-4dc4-9138-5c38e33b1184"
-
-[[d1_databases]]
-binding = "DB_HOTELE"
-database_name = "hotel-ping-db-hotele"
-database_id = "13009f25-b802-41aa-b24e-b384d3c0fd50"
-
-[[d1_databases]]
-binding = "DB_HOTELF"
-database_name = "hotel-ping-db-hotelf"
-database_id = "3dde8147-9bf9-4470-8190-9272eb29eacb"
-
-[[d1_databases]]
-binding = "DB_HOTELG"
-database_name = "hotel-ping-db-hotelg"
-database_id = "6325e59e-7d67-4177-be14-ae24b4ebc719"
-
-[[d1_databases]]
-binding = "DB_HOTELH"
-database_name = "hotel-ping-db-hotelh"
-database_id = "f7f736f9-4a84-4253-ba1c-53230bac5b40"
-
-[[d1_databases]]
-binding = "DB_HOTELI"
-database_name = "hotel-ping-db-hoteli"
-database_id = "fa7b56c2-7aec-473b-9164-6dba9954a281"
-
-[[d1_databases]]
-binding = "DB_HOTELJ"
-database_name = "hotel-ping-db-hotelj"
-database_id = "38cf9d9d-7a54-4489-bd66-152486d4835c"
-
 [[r2_buckets]]
 binding = "UPLOADS"
 bucket_name = "hotel-ping-uploads"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELB"
-bucket_name = "hotel-ping-uploads-hotelb"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELC"
-bucket_name = "hotel-ping-uploads-hotelc"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELD"
-bucket_name = "hotel-ping-uploads-hoteld"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELE"
-bucket_name = "hotel-ping-uploads-hotele"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELF"
-bucket_name = "hotel-ping-uploads-hotelf"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELG"
-bucket_name = "hotel-ping-uploads-hotelg"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELH"
-bucket_name = "hotel-ping-uploads-hotelh"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELI"
-bucket_name = "hotel-ping-uploads-hoteli"
-
-[[r2_buckets]]
-binding = "UPLOADS_HOTELJ"
-bucket_name = "hotel-ping-uploads-hotelj"
 
 [ai]
 binding = "AI"
