@@ -8102,7 +8102,7 @@ function renderRoomsBoard(){
           if(idx !== -1) STATE_ROOMS[idx] = res.room;
           renderRoomsBoard();
           refreshRoomsBadge();
-          if(!isClean) showToast("Room " + r.label + " is ready");
+          if(!isClean) showToast("Room " + r.label + " marked clean — Reception notified");
         }).catch(function(){
           btn.disabled = false;
           showToast(isClean ? "Couldn't undo that" : "Couldn't mark that room clean");
