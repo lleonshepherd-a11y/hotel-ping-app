@@ -552,6 +552,22 @@ searchClear.addEventListener("click", function(){
   searchInput.focus();
 });
 
+var searchToggleBtn = document.getElementById("searchToggleBtn");
+var headerSearchWrap = document.getElementById("headerSearchWrap");
+if(searchToggleBtn && headerSearchWrap){
+  searchToggleBtn.addEventListener("click", function(){
+    if(!headerSearchWrap.classList.contains("expanded")){
+      headerSearchWrap.classList.add("expanded");
+      searchInput.focus();
+    }
+  });
+  searchInput.addEventListener("blur", function(){
+    if(!searchInput.value){
+      headerSearchWrap.classList.remove("expanded");
+    }
+  });
+}
+
 var chatFilterRow = document.getElementById("chatFilterRow");
 STATE.chatFilter = "all";
 chatFilterRow.addEventListener("click", function(e){
