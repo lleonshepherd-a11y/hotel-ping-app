@@ -8264,10 +8264,11 @@ newMaintForm.addEventListener("submit", function(e){
   e.preventDefault();
   maintError.textContent = "";
   var description = newMaintDesc.value.trim();
-  if(!description) return;
+  var roomNumber = newMaintRoom.value.trim();
+  if(!description || !roomNumber) return;
   var payload = {
     description: description,
-    roomNumber: newMaintRoom.value.trim() || undefined,
+    roomNumber: roomNumber,
     priority: maintSelectedPriority,
     guestPresent: newMaintGuestPresent.checked,
     deadline: newMaintDeadline.value || undefined,

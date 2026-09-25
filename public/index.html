@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260926c">
+<link rel="stylesheet" href="/styles.css?v=20260926e">
 </head>
 <body>
 
@@ -375,8 +375,8 @@
         <span><b>Maintenance</b> is off duty right now. They'll still get this, just not until they're back on.</span>
       </div>
       <form class="maint-new-form" id="newMaintForm">
-        <input type="text" id="newMaintRoom" placeholder="Location (optional), room, corridor, kitchen…" maxlength="40">
-        <textarea id="newMaintDesc" placeholder="What's wrong? e.g. AC not cooling in 214" required maxlength="300" rows="2"></textarea>
+        <input type="text" id="newMaintRoom" placeholder="Location" required maxlength="40">
+        <textarea id="newMaintDesc" placeholder="What's wrong?" required maxlength="300" rows="2"></textarea>
         <div class="maint-priority-row" id="maintPriorityRow">
           <button type="button" class="maint-priority-chip" data-priority="safety">⚠ Safety</button>
           <button type="button" class="maint-priority-chip" data-priority="guest">Guest impact</button>
@@ -471,7 +471,7 @@
       <form class="request-full-form" id="newRequestForm">
         <div class="request-form-section">
           <label class="request-form-label" for="newRequestTitle">What needs approving?</label>
-          <input type="text" id="newRequestTitle" placeholder="e.g. Repair walk-in freezer" required maxlength="120">
+          <input type="text" id="newRequestTitle" required maxlength="120">
         </div>
         <div class="request-form-section">
           <label class="request-form-label" for="newRequestTo">Send to</label>
@@ -1409,6 +1409,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260926c"></script>
+<script src="/app.js?v=20260926e"></script>
 </body>
 </html>
