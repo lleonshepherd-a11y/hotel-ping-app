@@ -1721,10 +1721,6 @@ var pullRefresh = document.getElementById("pullRefresh");
 function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
   var PULL_THRESHOLD = 60, PULL_MAX = 100;
   var startY = null, pulling = false, refreshing = false;
-  var ringEl = spinnerEl.querySelector(".pull-refresh-ring");
-  function setRingPct(pct){
-    ringEl.style.background = "conic-gradient(#18181a " + pct + "%, var(--border) " + pct + "%)";
-  }
   scrollEl.addEventListener("touchstart", function(e){
     if(scrollEl.scrollTop <= 0 && !refreshing){
       startY = e.touches[0].clientY;
@@ -1741,9 +1737,7 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
     e.preventDefault();
     var dist = Math.min(dy * 0.5, PULL_MAX);
     spinnerEl.style.top = (scrollEl.offsetTop - 34 + dist) + "px";
-    var pct = Math.min(dist / PULL_THRESHOLD, 1);
-    spinnerEl.style.opacity = pct;
-    setRingPct(pct * 100);
+    spinnerEl.style.opacity = Math.min(dist / PULL_THRESHOLD, 1);
   }, { passive: false });
   scrollEl.addEventListener("touchend", function(e){
     if(!pulling || startY === null) return;
@@ -1754,16 +1748,15 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
       refreshing = true;
       spinnerEl.style.top = (scrollEl.offsetTop + 14) + "px";
       spinnerEl.style.opacity = "1";
-      setRingPct(100);
+      spinnerEl.classList.add("spinning");
       onRefresh().catch(function(){});
       setTimeout(function(){
         refreshing = false;
         spinnerEl.style.opacity = "0";
-        setRingPct(0);
+        spinnerEl.classList.remove("spinning");
       }, 350);
     } else {
       spinnerEl.style.opacity = "0";
-      setRingPct(0);
     }
   });
 }
