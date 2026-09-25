@@ -763,7 +763,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .plus-opt#optSignoff.active .plus-opt-label{color:#4d84f5}
 .plus-opt#optAffectsGuest.active .plus-opt-ic{color:var(--accent)}
 .plus-opt#optAffectsGuest.active .plus-opt-label{color:var(--accent)}
-#headerMenu .plus-opt-ic{color:#4fa8ff}
+#headerMenu .plus-opt-ic{color:#181818}
 #headerMenu .plus-opt-label{color:#181818}
 #msgInput{
   flex:1;border:none;background:none;resize:none;color:var(--text);
