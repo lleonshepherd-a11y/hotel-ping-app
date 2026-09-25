@@ -901,10 +901,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-caught-up-icon svg{width:19px;height:19px}
 .missed-caught-up-title{font-weight:800;font-size:14px;color:var(--text)}
 .missed-caught-up-sub{font-size:12.5px;color:var(--text-dim)}
-.missed-unified-list{background:var(--surface-2);border-radius:16px;overflow:hidden}
-.missed-row{display:flex;align-items:center;gap:11px;width:100%;padding:11px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border)}
+.missed-unified-list{background:var(--surface-2);border-radius:16px;max-height:171px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.missed-row{display:flex;align-items:center;gap:11px;width:100%;padding:11px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border);transition:transform .15s cubic-bezier(.3,1,.4,1),background .12s ease}
 .missed-row:last-child{border-bottom:none}
-.missed-row:active{background:var(--active-tint)}
+.missed-row:active{background:var(--active-tint);transform:translateX(5px) scale(.98)}
 .missed-row-icon{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
 .missed-row-icon svg{width:16px;height:16px}
 .missed-row-body{flex:1;min-width:0}
