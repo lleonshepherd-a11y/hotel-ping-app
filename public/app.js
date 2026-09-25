@@ -1738,7 +1738,6 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
     var dist = Math.min(dy * 0.5, PULL_MAX);
     spinnerEl.style.top = (scrollEl.offsetTop - 34 + dist) + "px";
     spinnerEl.style.opacity = Math.min(dist / PULL_THRESHOLD, 1);
-    spinnerEl.style.transform = "rotate(" + (dist * 3) + "deg)";
   }, { passive: false });
   scrollEl.addEventListener("touchend", function(e){
     if(!pulling || startY === null) return;
@@ -1753,11 +1752,9 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
       setTimeout(function(){
         refreshing = false;
         spinnerEl.style.opacity = "0";
-        spinnerEl.style.transform = "";
       }, 350);
     } else {
       spinnerEl.style.opacity = "0";
-      spinnerEl.style.transform = "";
     }
   });
 }

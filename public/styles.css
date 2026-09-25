@@ -269,8 +269,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* ---------- Main ---------- */
 .main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);position:relative}
-.pull-refresh{position:absolute;left:50%;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow-soft);display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:none;opacity:0}
-.pull-refresh svg{width:16px;height:16px;color:var(--accent)}
+.pull-refresh{position:absolute;left:50%;transform:translateX(-50%);border-radius:999px;background:var(--surface);box-shadow:var(--shadow-soft);display:flex;align-items:center;justify-content:center;padding:6px 14px;font-size:12px;font-weight:700;color:var(--text-dim);white-space:nowrap;z-index:5;pointer-events:none;opacity:0}
 .thread-head{
   display:flex;align-items:center;gap:13px;
   padding:16px 24px;
