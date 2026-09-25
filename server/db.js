@@ -206,14 +206,16 @@ if (toDeptCol && toDeptCol.notnull) {
       escalation_level INTEGER NOT NULL DEFAULT 0,
       affects_guest INTEGER NOT NULL DEFAULT 0,
       room_clean TEXT,
-      from_staff_name TEXT
+      from_staff_name TEXT,
+      client_message_id TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean, from_staff_name FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean, from_staff_name, client_message_id FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
     CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
     CREATE INDEX IF NOT EXISTS idx_messages_group ON messages(group_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL;
   `);
 }
 
