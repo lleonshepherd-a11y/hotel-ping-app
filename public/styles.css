@@ -133,7 +133,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .bottom-tab{
   flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  padding:3px 2px;border:none;background:none;color:var(--text-faint);border-radius:10px;
+  padding:2px;border:none;background:none;color:#000;border-radius:10px;
   transition:color .18s ease,transform .32s cubic-bezier(.34,1.56,.64,1);
 }
 .bottom-tab-icon{position:relative;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:13px;transition:background .18s ease,width .18s ease}
@@ -142,7 +142,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bottom-tab:active{transform:scale(.86)}
 .bottom-tab.active{color:#4d84f5}
 .bottom-tab.active .bottom-tab-icon{background:rgba(77,132,245,.14);width:46px;height:30px}
-.bottom-tab.active .bottom-tab-label{display:block;font-weight:800}
 .bottom-tab.drag-hover{background:var(--surface-3);color:var(--text)}
 #tabEventsBtn{color:#4d84f5}
 #tabEventsBtn.active .bottom-tab-icon{background:rgba(77,132,245,.14)}
