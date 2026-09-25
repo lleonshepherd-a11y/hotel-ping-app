@@ -623,7 +623,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .stories-row{display:flex;gap:14px;overflow-x:auto;padding:14px 4px 10px 16px;flex-shrink:0}
 .stories-row:empty{display:none}
 .story-item{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;width:60px;background:none;border:none;padding:0}
-.story-ring{width:52px;height:66px;border-radius:13px;padding:2.5px;background:linear-gradient(135deg,var(--border),var(--border));position:relative}
+.story-ring{width:56px;height:80px;border-radius:14px;padding:2.5px;background:linear-gradient(135deg,var(--border),var(--border));position:relative}
 .story-item.unseen .story-ring{background:linear-gradient(135deg,#e0902c,#d6493c,#7c62a8)}
 .story-item.mine .story-ring{background:var(--border)}
 .story-avatar-inner{width:100%;height:100%;border-radius:10px;background:linear-gradient(155deg,#2c2c30,#131315);display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;background-size:cover;background-position:center;position:relative}
