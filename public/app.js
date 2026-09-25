@@ -5294,7 +5294,7 @@ function renderMissedFeed(items){
 }
 
 var MISSED_GROUPS = [
-  { key: "urgent", label: "Urgent", color: "#e0433a", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>' },
+  { key: "urgent", label: "Urgent", color: "#e0433a", icon: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>' },
   { key: "tickets", label: "Tickets", color: "#e0902c", icon: MISSED_ROW_ICONS.ticket },
   { key: "messages", label: "Messages", color: "#3E63C9", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8.5L4 21v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>' }
 ];
