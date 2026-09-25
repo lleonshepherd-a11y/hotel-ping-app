@@ -3411,6 +3411,11 @@ function refreshNow(){
   return refreshNowInFlight;
 }
 function refreshNowImpl(){
+  // Fire this alongside the message fetch below, not after it finishes -
+  // otherwise stories only start loading once messages have already been
+  // fetched AND rendered (two sequential round trips), and visibly pop in
+  // a beat later every time the app comes back from the background.
+  loadStories();
   var prevIds = {};
   Object.keys(STATE.data).forEach(function(id){
     prevIds[id] = {};
@@ -3439,7 +3444,7 @@ function refreshNowImpl(){
     renderList();
     if(STATE.active) renderThread();
     if(hasNew && isOnDuty(STATE.self)) playChime(hasUrgent);
-  }).finally(function(){ flushOfflineQueue(); loadStories(); });
+  }).finally(function(){ flushOfflineQueue(); });
 }
 
 function refreshActiveThread(){
@@ -3566,6 +3571,7 @@ function enterApp(staff){
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
   msgInput.placeholder = "Message as " + staff.name + "…";
   boot();
+  loadStories();
   startPolling();
   setTimeout(function(){
     if(canManageMaintenanceView()) refreshMaintenanceBadge();
@@ -3576,7 +3582,6 @@ function enterApp(staff){
     if(staff.isAdmin) refreshSignupsBadge();
     pollMissed();
     checkPushPrompt();
-    loadStories();
   }, 400);
 }
 
