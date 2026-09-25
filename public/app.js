@@ -5294,9 +5294,9 @@ function renderMissedFeed(items){
 }
 
 var MISSED_GROUPS = [
-  { key: "urgent", label: "Urgent", color: "#d9534f", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>' },
+  { key: "urgent", label: "Urgent", color: "#e0433a", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>' },
   { key: "tickets", label: "Tickets", color: "#e0902c", icon: MISSED_ROW_ICONS.ticket },
-  { key: "messages", label: "Messages", color: "#3E63C9", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' }
+  { key: "messages", label: "Messages", color: "#3E63C9", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8.5L4 21v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>' }
 ];
 
 function categorizeMissed(items){
@@ -5315,7 +5315,7 @@ function buildGroupRow(g, items){
   row.type = "button";
   row.className = "missed-group-row";
   row.innerHTML =
-    '<span class="missed-group-icon" style="background:' + g.color + '">' + g.icon + '</span>' +
+    '<span class="missed-group-icon" style="color:' + g.color + '">' + g.icon + '</span>' +
     '<span class="missed-group-label">' + esc(g.label) + '</span>' +
     '<span class="missed-group-count">' + items.length + '</span>' +
     '<span class="missed-group-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>';
