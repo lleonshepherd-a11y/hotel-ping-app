@@ -5371,6 +5371,7 @@ missedGroupClose.addEventListener("click", closeMissedGroupOverlay);
 missedGroupOverlay.addEventListener("click", function(e){ if(e.target === missedGroupOverlay) closeMissedGroupOverlay(); });
 
 var lastPlannerReminderIds = null;
+var lastGuestRequestIds = null;
 function pollMissed(){
   apiGet('/api/missed').then(function(res){
     var plannerIds = res.items.filter(function(i){ return i.kind === "planner"; }).map(function(i){ return i.id; });
@@ -5379,6 +5380,18 @@ function pollMissed(){
       if(hasNewReminder && isOnDuty(STATE.self)) playPlannerChime();
     }
     lastPlannerReminderIds = plannerIds;
+    // Guest requests don't land as a chat message (no department "sent"
+    // them - a guest scanned a QR code), so unlike a ticket or a sign-off,
+    // nothing about them flows through the normal new-message chime. Ping
+    // for a newly-appeared one here instead, or FOH gets a silent badge
+    // change for the one thing this system's entire premise is "you get a
+    // ping for it".
+    var guestIds = res.items.filter(function(i){ return i.kind === "guestRequest"; }).map(function(i){ return i.id; });
+    if(lastGuestRequestIds !== null){
+      var hasNewGuestRequest = guestIds.some(function(id){ return lastGuestRequestIds.indexOf(id) === -1; });
+      if(hasNewGuestRequest && isOnDuty(STATE.self)) playChime(false);
+    }
+    lastGuestRequestIds = guestIds;
     if(!profilePage.hidden) renderMissedFeed(res.items);
   }).catch(function(){});
 }
