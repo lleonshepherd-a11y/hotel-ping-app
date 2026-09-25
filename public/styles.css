@@ -188,6 +188,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.18), 0 1px 1px rgba(0,0,0,.16);
   cursor:grab;touch-action:none;transition:left .22s cubic-bezier(.3,1.3,.4,1);
 }
+/* Resting "off" position is plain CSS (not a JS-measured pixel value) so it's
+   always correct even if it was toggled while the profile page was hidden -
+   dutyTrack.clientWidth reads 0 on a display:none element, which used to send
+   the knob to a large negative left when off duty was set from off-screen.
+   An inline style (set only during an active drag) still wins over this. */
+.duty-track.off .duty-knob{left:calc(100% - 29px)}
 .duty-knob:active{cursor:grabbing}
 .duty-knob:focus-visible{outline:none}
 

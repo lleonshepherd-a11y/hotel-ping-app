@@ -1432,7 +1432,13 @@ const server = http.createServer(async (req, res) => {
       const items = [];
 
       const msgRows = db.prepare(
-        "SELECT * FROM messages WHERE to_dept = ? AND status != 'read' AND deleted_at IS NULL AND (signoff_status IS NULL OR signoff_status != 'pending') ORDER BY created_at ASC"
+        `SELECT * FROM messages m WHERE m.to_dept = ? AND m.deleted_at IS NULL
+         AND (m.signoff_status IS NULL OR m.signoff_status != 'pending')
+         AND NOT EXISTS (
+           SELECT 1 FROM messages r WHERE r.from_dept = m.to_dept AND r.to_dept = m.from_dept
+             AND r.deleted_at IS NULL AND r.created_at > m.created_at
+         )
+         ORDER BY m.created_at ASC`
       ).all(dept);
       for (const m of msgRows) {
         items.push({ kind: 'message', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });

@@ -2287,7 +2287,10 @@ function dutyMaxLeft(){ return dutyTrack.clientWidth - 27 - 4; }
 function renderDuty(){
   var on = isOnDuty(STATE.self);
   dutyTrack.classList.toggle("off", !on);
-  dutyKnob.style.left = (on ? 2 : dutyMaxLeft() + 2) + "px";
+  // Resting position comes from CSS (see .duty-track.off .duty-knob), not a
+  // clientWidth-based pixel value - dutyTrack can be display:none (a hidden
+  // tab) when this runs, and clientWidth reads 0 on a hidden element.
+  dutyKnob.style.left = "";
   dutyKnob.setAttribute("aria-checked", on ? "true" : "false");
   dutyKnob.setAttribute("aria-label", on ? "On duty. Slide or press Enter to turn the board off" : "Board off. Slide or press Enter to turn it back on");
   dutyCaptionLabel.textContent = on ? "On duty" : "Off duty";
@@ -2303,7 +2306,11 @@ function renderDuty(){
     dutyKnob.setPointerCapture(e.pointerId);
     dutyTrack.classList.add("dragging");
     startX = e.clientX;
-    startLeft = parseFloat(dutyKnob.style.left) || 2;
+    // offsetLeft reads the true rendered position (whether it came from the
+    // CSS resting rule or a leftover inline value) rather than parsing
+    // style.left, which renderDuty() now clears on the resting states.
+    startLeft = dutyKnob.offsetLeft;
+    dutyKnob.style.left = startLeft + "px";
   }
   function onMove(e){
     if(!dragging) return;
