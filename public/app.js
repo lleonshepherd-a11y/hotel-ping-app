@@ -897,11 +897,6 @@ var offDutyBanner = document.getElementById("offDutyBanner");
 var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
-var menuBurgerBtn = document.getElementById("menuBurgerBtn");
-menuBurgerBtn.addEventListener("click", function(){
-  closeThreadView();
-  showTab("profile");
-});
 var chatListBurgerBtn = document.getElementById("chatListBurgerBtn");
 chatListBurgerBtn.addEventListener("click", function(){
   showTab("profile");
@@ -2285,6 +2280,7 @@ function setOnDuty(id, on){
 
 var dutyTrack = document.getElementById("dutyTrack");
 var dutyKnob = document.getElementById("dutyKnob");
+var dutyCaptionLabel = document.getElementById("dutyCaptionLabel");
 
 function dutyMaxLeft(){ return dutyTrack.clientWidth - 27 - 4; }
 
@@ -2294,6 +2290,7 @@ function renderDuty(){
   dutyKnob.style.left = (on ? 2 : dutyMaxLeft() + 2) + "px";
   dutyKnob.setAttribute("aria-checked", on ? "true" : "false");
   dutyKnob.setAttribute("aria-label", on ? "On duty. Slide or press Enter to turn the board off" : "Board off. Slide or press Enter to turn it back on");
+  dutyCaptionLabel.textContent = on ? "On duty" : "Off duty";
 }
 
 (function(){
