@@ -2453,6 +2453,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && p === '/api/stories') {
       const now = new Date().toISOString();
+      db.prepare('DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < ?)').run(now);
       db.prepare('DELETE FROM stories WHERE expires_at < ?').run(now);
       const rows = db.prepare('SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC').all(now);
       const requester = staffFromToken(req);
@@ -2501,8 +2502,8 @@ const server = http.createServer(async (req, res) => {
       if (existing.department_id !== requester.department_id && !requester.is_admin) {
         return send(res, 403, { error: "You can only delete your own department's stories" });
       }
-      db.prepare('DELETE FROM stories WHERE id = ?').run(id);
       db.prepare('DELETE FROM story_views WHERE story_id = ?').run(id);
+      db.prepare('DELETE FROM stories WHERE id = ?').run(id);
       return send(res, 200, { ok: true });
     }
 

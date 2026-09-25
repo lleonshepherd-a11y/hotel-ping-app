@@ -3731,6 +3731,11 @@ export default {
 
       if (method === "GET" && p === "/api/stories") {
         const now = new Date().toISOString();
+        // story_views.story_id references stories(id) with no cascade, so the
+        // views of an expiring story have to go first or this delete 500s
+        // with a foreign key violation - which silently broke every story
+        // fetch (this whole handler) the moment any expired story had a view.
+        await env.NOIR_DB.prepare("DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < ?)").bind(now).run();
         await env.NOIR_DB.prepare("DELETE FROM stories WHERE expires_at < ?").bind(now).run();
         const rows = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC").bind(now).all();
         const viewerDept = request._staff.department_id;
@@ -3780,8 +3785,8 @@ export default {
         if (fromNoirDept(existing.department_id) !== requester.department_id && !requester.is_admin) {
           return json({ error: "You can only delete your own department's stories" }, 403);
         }
-        await env.NOIR_DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
         await env.NOIR_DB.prepare("DELETE FROM story_views WHERE story_id = ?").bind(id).run();
+        await env.NOIR_DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
         return json({ ok: true });
       }
 

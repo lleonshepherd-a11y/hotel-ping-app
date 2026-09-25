@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260925o">
+<link rel="stylesheet" href="/styles.css?v=20260925p">
 </head>
 <body>
 
@@ -265,15 +265,6 @@
       <button class="chatlist-burger" id="chatListBurgerBtn" type="button" aria-label="Open menu" title="Menu">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
-      <div class="sb-search" id="headerSearchWrap">
-        <button class="search-toggle-btn" id="searchToggleBtn" type="button" aria-label="Search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        </button>
-        <input type="text" id="searchInput" placeholder="Search">
-        <button id="searchClear" hidden aria-label="Clear search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
     </div>
     <div class="chatlist-toprow">
       <div class="stories-row" id="storiesRow"></div>
@@ -317,7 +308,18 @@
     </div>
     <div class="list-header-row">
       <div class="list-header-title" id="listLabel">Conversations</div>
-      <div class="list-header-scope" id="listHeaderScope">All Departments</div>
+      <div class="list-header-right">
+        <div class="list-header-scope" id="listHeaderScope">All Departments</div>
+        <div class="sb-search" id="headerSearchWrap">
+          <button class="search-toggle-btn" id="searchToggleBtn" type="button" aria-label="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </button>
+          <input type="text" id="searchInput" placeholder="Search">
+          <button id="searchClear" hidden aria-label="Clear search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
     <nav class="thread-list" id="threadList"></nav>
     <div class="sb-empty" id="searchEmpty" hidden><span id="searchEmptyLoading" hidden>Loading conversations&hellip;</span><span id="searchEmptyUnread" hidden>No unread conversations</span><span id="searchEmptyMatch">No conversations match "<span id="searchEmptyTerm"></span>"</span></div>
@@ -1394,6 +1396,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260925o"></script>
+<script src="/app.js?v=20260925p"></script>
 </body>
 </html>
