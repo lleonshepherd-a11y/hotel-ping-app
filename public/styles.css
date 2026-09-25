@@ -941,11 +941,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-group-count{font-size:14.5px;font-weight:700;color:var(--text-faint);font-variant-numeric:tabular-nums}
 .missed-group-chevron{flex:none;color:var(--text-faint);display:flex}
 .missed-group-chevron svg{width:16px;height:16px}
-.missed-group-modal{padding:22px 0 24px}
-.missed-group-modal-head{padding:0 22px;margin-bottom:18px}
+.missed-group-overlay{align-items:flex-end}
+.missed-group-modal{
+  width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;
+  max-height:78vh;background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none;
+  box-shadow:0 -10px 30px rgba(15,15,20,.2);
+  padding:10px 0 max(20px, calc(14px + env(safe-area-inset-bottom)));
+  transform:translateY(100%);transition:transform .28s cubic-bezier(.32,.9,.3,1);
+}
+.missed-group-overlay.open .missed-group-modal{transform:translateY(0)}
+.missed-group-grabber{width:36px;height:4px;border-radius:2px;background:var(--border);margin:0 auto 14px}
+.missed-group-modal-head{padding:0 22px;margin-bottom:16px}
 .missed-group-modal-head h2{font-size:22px;letter-spacing:-.015em}
 .missed-group-modal-sub{font-size:12.5px;font-weight:600;color:var(--text-faint);margin-top:2px}
-.missed-group-detail-list{background:var(--surface-2);border-radius:16px;max-height:56vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 22px;width:calc(100% - 44px)}
+.missed-group-detail-list{background:var(--surface-2);border-radius:16px;max-height:52vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 22px;width:calc(100% - 44px)}
 .missed-group-detail-list::-webkit-scrollbar{display:none}
 .missed-group-detail-list .missed-empty{padding:36px 20px;text-align:center;font-size:13px}
 .missed-row{display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px 16px;border:none;border-bottom:1px solid var(--border);background:none;text-align:left;transition:background .12s ease}

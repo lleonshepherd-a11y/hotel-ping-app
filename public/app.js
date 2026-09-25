@@ -5322,7 +5322,7 @@ function buildGroupRow(g, items){
   row.addEventListener("click", function(){
     missedGroupTitle.textContent = g.label;
     renderMissedGroupDetail(items);
-    missedGroupOverlay.hidden = false;
+    openMissedGroupOverlay();
   });
   return row;
 }
@@ -5336,8 +5336,16 @@ function renderMissedGroupDetail(items){
   }
   items.forEach(function(item){ missedGroupItemsEl.appendChild(buildMissedRow(item)); });
 }
-missedGroupClose.addEventListener("click", function(){ missedGroupOverlay.hidden = true; });
-missedGroupOverlay.addEventListener("click", function(e){ if(e.target === missedGroupOverlay) missedGroupOverlay.hidden = true; });
+function openMissedGroupOverlay(){
+  missedGroupOverlay.hidden = false;
+  requestAnimationFrame(function(){ missedGroupOverlay.classList.add("open"); });
+}
+function closeMissedGroupOverlay(){
+  missedGroupOverlay.classList.remove("open");
+  setTimeout(function(){ missedGroupOverlay.hidden = true; }, 260);
+}
+missedGroupClose.addEventListener("click", closeMissedGroupOverlay);
+missedGroupOverlay.addEventListener("click", function(e){ if(e.target === missedGroupOverlay) closeMissedGroupOverlay(); });
 
 var lastPlannerReminderIds = null;
 function pollMissed(){
