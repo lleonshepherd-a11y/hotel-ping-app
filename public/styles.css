@@ -389,6 +389,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-pin-btn svg{width:14px;height:14px}
 .msg-pin-btn:active{transform:scale(.82)}
 .msg-pin-btn.pinned{opacity:1;color:#2f5fe0}
+.msg-reply-btn{flex:none;width:26px;height:26px;border:none;background:var(--surface-2);border-radius:50%;color:var(--text-dim);opacity:.85;display:flex;align-items:center;justify-content:center;margin-bottom:3px;transition:opacity .15s ease,transform .1s ease}
+.msg-reply-btn svg{width:14px;height:14px}
+.msg-reply-btn:active{transform:scale(.82);opacity:1}
 .msg-row.group-end{margin-bottom:9px}
 @keyframes bubbleIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .msg-row.out{justify-content:flex-end}

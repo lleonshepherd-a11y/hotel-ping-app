@@ -2221,7 +2221,30 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   pinBtn.title = m.pinned ? "Unpin" : "Pin";
   pinBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>';
   pinBtn.addEventListener("click", function(e){ e.stopPropagation(); togglePinMessage(m); });
-  if(out){ row.appendChild(pinBtn); row.appendChild(wrap); } else { row.appendChild(wrap); row.appendChild(pinBtn); }
+
+  var replyBtn = null;
+  if(!m.deleted && !m.pending && !m.failed){
+    // A visible, always-there reply button - the long-press menu still has
+    // "Reply" in it too, but staff won't reliably discover a hidden gesture
+    // on their own, so replying needs a button they can just see and tap.
+    replyBtn = document.createElement("button");
+    replyBtn.type = "button";
+    replyBtn.className = "msg-reply-btn";
+    replyBtn.setAttribute("aria-label", "Reply to this message");
+    replyBtn.title = "Reply";
+    replyBtn.innerHTML = ACTION_ICONS.reply;
+    replyBtn.addEventListener("click", function(e){ e.stopPropagation(); showReplyBar(m); });
+  }
+
+  if(out){
+    if(replyBtn) row.appendChild(replyBtn);
+    row.appendChild(pinBtn);
+    row.appendChild(wrap);
+  } else {
+    row.appendChild(wrap);
+    row.appendChild(pinBtn);
+    if(replyBtn) row.appendChild(replyBtn);
+  }
   return row;
 }
 
