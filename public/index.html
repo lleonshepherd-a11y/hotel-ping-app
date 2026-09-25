@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260925y">
+<link rel="stylesheet" href="/styles.css?v=20260925z">
 </head>
 <body>
 
@@ -117,12 +117,9 @@
       <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
     </button>
 
+    <div class="missed-section-title">Missed</div>
     <div class="sb-missed" id="missedWrap">
-      <div class="missed-unified-list" id="missedUnifiedList"></div>
-      <div class="missed-caught-up" id="missedEmptyState" hidden>
-        <span class="missed-caught-up-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg></span>
-        <div class="missed-caught-up-title">You're all caught up</div>
-      </div>
+      <div class="missed-group-list" id="missedGroupList"></div>
     </div>
 
     <div class="sb-switcher" id="switcherWrap">
@@ -818,6 +815,18 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="missedGroupOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2 id="missedGroupTitle">Urgent</h2>
+      <button class="admin-close" id="missedGroupClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="missed-group-detail-list" id="missedGroupItems"></div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="broadcastOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1396,6 +1405,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260925y"></script>
+<script src="/app.js?v=20260925z"></script>
 </body>
 </html>

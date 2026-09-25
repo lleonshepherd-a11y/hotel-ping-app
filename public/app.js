@@ -5179,8 +5179,11 @@ myActivityBtn.addEventListener("click", function(){
 myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
 myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
 
-var missedUnifiedList = document.getElementById("missedUnifiedList");
-var missedEmptyState = document.getElementById("missedEmptyState");
+var missedGroupList = document.getElementById("missedGroupList");
+var missedGroupOverlay = document.getElementById("missedGroupOverlay");
+var missedGroupTitle = document.getElementById("missedGroupTitle");
+var missedGroupItemsEl = document.getElementById("missedGroupItems");
+var missedGroupClose = document.getElementById("missedGroupClose");
 
 var MISSED_ROW_ICONS = {
   ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
@@ -5279,11 +5282,60 @@ function renderMissedFeed(items){
     }
   });
 
-  missedUnifiedList.innerHTML = "";
-  visible.forEach(function(item){ missedUnifiedList.appendChild(buildMissedRow(item)); });
-  missedEmptyState.hidden = visible.length > 0;
-  missedUnifiedList.hidden = visible.length === 0;
+  var grouped = categorizeMissed(visible);
+  missedGroupList.innerHTML = "";
+  MISSED_GROUPS.forEach(function(g){ missedGroupList.appendChild(buildGroupRow(g, grouped[g.key])); });
+
+  if(!missedGroupOverlay.hidden){
+    var openGroup = MISSED_GROUPS.find(function(g){ return g.label === missedGroupTitle.textContent; });
+    if(openGroup) renderMissedGroupDetail(grouped[openGroup.key]);
+  }
 }
+
+var MISSED_GROUPS = [
+  { key: "urgent", label: "Urgent", color: "#d9534f", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>' },
+  { key: "tickets", label: "Tickets", color: "#e0902c", icon: MISSED_ROW_ICONS.ticket },
+  { key: "messages", label: "Messages", color: "#3E63C9", icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' }
+];
+
+function categorizeMissed(items){
+  var groups = { urgent: [], tickets: [], messages: [] };
+  items.forEach(function(item){
+    var isUrgent = item.kind === "message" && item.message && item.message.urgent;
+    if(isUrgent) groups.urgent.push(item);
+    else if(item.kind === "ticket" || item.kind === "guestRequest") groups.tickets.push(item);
+    else groups.messages.push(item);
+  });
+  return groups;
+}
+
+function buildGroupRow(g, items){
+  var row = document.createElement("button");
+  row.type = "button";
+  row.className = "missed-group-row";
+  row.innerHTML =
+    '<span class="missed-group-icon" style="background:' + g.color + '">' + g.icon + '</span>' +
+    '<span class="missed-group-label">' + esc(g.label) + '</span>' +
+    '<span class="missed-group-count">' + items.length + '</span>' +
+    '<span class="missed-group-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>';
+  row.addEventListener("click", function(){
+    missedGroupTitle.textContent = g.label;
+    renderMissedGroupDetail(items);
+    missedGroupOverlay.hidden = false;
+  });
+  return row;
+}
+
+function renderMissedGroupDetail(items){
+  missedGroupItemsEl.innerHTML = "";
+  if(!items.length){
+    missedGroupItemsEl.innerHTML = '<div class="missed-empty">Nothing here</div>';
+    return;
+  }
+  items.forEach(function(item){ missedGroupItemsEl.appendChild(buildMissedRow(item)); });
+}
+missedGroupClose.addEventListener("click", function(){ missedGroupOverlay.hidden = true; });
+missedGroupOverlay.addEventListener("click", function(e){ if(e.target === missedGroupOverlay) missedGroupOverlay.hidden = true; });
 
 var lastPlannerReminderIds = null;
 function pollMissed(){
