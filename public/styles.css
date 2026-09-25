@@ -1583,7 +1583,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-action-row{display:flex;align-items:center;gap:10px;border:none;background:none;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--text);text-align:left;-webkit-tap-highlight-color:transparent}
 .msg-action-row:active{background:var(--surface-2)}
 @media (hover:hover){.msg-action-row:hover{background:var(--surface-2)}}
-.msg-action-row svg{width:17px;height:17px;color:var(--text-dim);flex:none}
+.msg-action-row svg{width:23px;height:23px;color:var(--text-dim);flex:none}
 .msg-action-row.danger{color:var(--urgent)}
 .msg-action-row.danger svg{color:var(--urgent)}
 .msg-action-divider{height:1px;background:var(--border);margin:4px 6px}
