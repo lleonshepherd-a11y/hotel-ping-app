@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260925c">
+<link rel="stylesheet" href="/styles.css?v=20260925d">
 </head>
 <body>
 
@@ -118,46 +118,7 @@
     </button>
 
     <div class="sb-missed" id="missedWrap">
-      <div class="missed-inline-box" id="missedApprovalsBox" hidden>
-        <div class="missed-inline-head">
-          <span class="missed-inline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>
-          <span class="missed-inline-title">Action required</span>
-          <span class="missed-section-count" id="missedApprovalsCount">0</span>
-        </div>
-        <div class="missed-list missed-list-inline" id="missedApprovalsList"><div class="missed-empty">Loading&hellip;</div></div>
-      </div>
-      <div class="missed-inline-box" id="missedMsgBox">
-        <div class="missed-inline-head">
-          <span class="missed-inline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>
-          <span class="missed-inline-title">Missed messages</span>
-          <span class="missed-section-count" id="missedMsgCount">0</span>
-        </div>
-        <div class="missed-list missed-list-inline" id="missedMsgList"><div class="missed-empty">Loading&hellip;</div></div>
-      </div>
-      <div class="missed-inline-box" id="missedTicketsBox" hidden>
-        <div class="missed-inline-head">
-          <span class="missed-inline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
-          <span class="missed-inline-title">Missed tickets</span>
-          <span class="missed-section-count" id="missedTicketCount">0</span>
-        </div>
-        <div class="missed-list missed-list-inline" id="missedTicketList"><div class="missed-empty">Loading&hellip;</div></div>
-      </div>
-      <div class="missed-inline-box" id="missedGuestsBox" hidden>
-        <div class="missed-inline-head">
-          <span class="missed-inline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="5"/></svg></span>
-          <span class="missed-inline-title">Missed guest requests</span>
-          <span class="missed-section-count" id="missedGuestCount">0</span>
-        </div>
-        <div class="missed-list missed-list-inline" id="missedGuestList"><div class="missed-empty">Loading&hellip;</div></div>
-      </div>
-      <div class="missed-inline-box" id="missedPlannerBox" hidden>
-        <div class="missed-inline-head">
-          <span class="missed-inline-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg></span>
-          <span class="missed-inline-title">Planner notifications</span>
-          <span class="missed-section-count" id="missedPlannerCount">0</span>
-        </div>
-        <div class="missed-list missed-list-inline" id="missedPlannerList"><div class="missed-empty">Loading&hellip;</div></div>
-      </div>
+      <div class="missed-unified-list" id="missedUnifiedList"></div>
       <div class="missed-caught-up" id="missedEmptyState" hidden>
         <span class="missed-caught-up-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg></span>
         <div class="missed-caught-up-title">You're all caught up</div>
@@ -1427,6 +1388,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260925c"></script>
+<script src="/app.js?v=20260925d"></script>
 </body>
 </html>

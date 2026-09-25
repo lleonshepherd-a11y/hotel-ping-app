@@ -901,20 +901,22 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-caught-up-icon svg{width:19px;height:19px}
 .missed-caught-up-title{font-weight:800;font-size:14px;color:var(--text)}
 .missed-caught-up-sub{font-size:12.5px;color:var(--text-dim)}
-.missed-inline-box{background:var(--surface-2);border-radius:16px;padding:12px 14px 10px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
-.missed-inline-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-.missed-inline-icon{flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)}
-.missed-inline-icon svg{width:15px;height:15px}
-.missed-inline-title{flex:1;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim)}
+.missed-unified-list{background:var(--surface-2);border-radius:16px;overflow:hidden}
+.missed-row{display:flex;align-items:center;gap:11px;width:100%;padding:11px 14px;border:none;background:none;text-align:left;border-bottom:1px solid var(--border)}
+.missed-row:last-child{border-bottom:none}
+.missed-row:active{background:var(--active-tint)}
+.missed-row-icon{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
+.missed-row-icon svg{width:16px;height:16px}
+.missed-row-body{flex:1;min-width:0}
+.missed-row-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+.missed-row-sub{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.missed-row-time{font-size:10.5px;color:var(--text-faint);flex:none;font-variant-numeric:tabular-nums}
+.missed-row-urgent-dot{width:6px;height:6px;border-radius:50%;background:var(--urgent);flex:none}
 .missed-section-count{background:var(--urgent-tint);color:var(--urgent);font-size:11px;font-weight:800;min-width:20px;height:20px;padding:0 6px;border-radius:10px;display:flex;align-items:center;justify-content:center;animation:missedPulse 2.4s ease-in-out infinite}
 @keyframes missedPulse{
   0%,100%{box-shadow:0 0 0 0 rgba(163,34,26,.4)}
   50%{box-shadow:0 0 0 5px rgba(163,34,26,0)}
 }
-.missed-list{display:flex;flex-direction:column;gap:8px}
-.missed-list-inline{max-height:216px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-right:2px;margin:0 -2px}
-.missed-list-inline::-webkit-scrollbar{width:5px}
-.missed-list-inline::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:3px}
 .missed-empty{font-size:12.5px;color:var(--text-faint);padding:6px 2px 10px}
 .missed-msg-card{display:flex;gap:10px;background:var(--surface-3);border-radius:12px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;border:1px solid var(--border);border-left:4px solid var(--accent);transition:transform .12s ease,background .12s ease,opacity .18s ease}
 .missed-msg-card:active{background:var(--active-tint);transform:scale(.97)}

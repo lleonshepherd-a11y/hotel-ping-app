@@ -5157,157 +5157,110 @@ myActivityBtn.addEventListener("click", function(){
 myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
 myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
 
-var missedApprovalsBox = document.getElementById("missedApprovalsBox");
-var missedApprovalsList = document.getElementById("missedApprovalsList");
-var missedApprovalsCount = document.getElementById("missedApprovalsCount");
-var missedMsgBox = document.getElementById("missedMsgBox");
-var missedMsgList = document.getElementById("missedMsgList");
-var missedMsgCount = document.getElementById("missedMsgCount");
-var missedTicketsBox = document.getElementById("missedTicketsBox");
-var missedTicketList = document.getElementById("missedTicketList");
-var missedTicketCount = document.getElementById("missedTicketCount");
-var missedGuestsBox = document.getElementById("missedGuestsBox");
-var missedGuestList = document.getElementById("missedGuestList");
-var missedGuestCount = document.getElementById("missedGuestCount");
-var missedPlannerBox = document.getElementById("missedPlannerBox");
-var missedPlannerList = document.getElementById("missedPlannerList");
-var missedPlannerCount = document.getElementById("missedPlannerCount");
+var missedUnifiedList = document.getElementById("missedUnifiedList");
 var missedEmptyState = document.getElementById("missedEmptyState");
 
-function buildMissedMessageCard(item){
-  var m = item.message;
-  var dept = DEPTS[m.from] || { name: m.from, initials: "?", color: "#888" };
-  var preview = m.type === "text" ? m.body : (m.type === "image" ? "📷 Photo" : m.type === "file" ? "📎 " + (m.fileName || "File") : "🎤 Voice message");
-  var card = document.createElement("div");
-  card.className = "missed-msg-card";
-  card.innerHTML =
-    '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
-    '<div class="missed-msg-body">' +
-      '<div class="missed-msg-top"><span class="missed-msg-from">' + esc(dept.name) + '</span>' + (m.urgent ? '<span class="missed-msg-urgent">Urgent</span>' : '') + '</div>' +
-      '<div class="missed-msg-preview">' + esc(preview) + '</div>' +
-      '<div class="missed-msg-time">' + fmtNoteTime(item.createdAt) + '</div>' +
-    '</div>';
-  card.addEventListener("click", function(){
-    showTab("chat");
-    openThread(m.from);
-  });
-  return card;
-}
+var MISSED_ROW_ICONS = {
+  ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+  guestRequest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="5"/></svg>',
+  planner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
+  approval: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>'
+};
+var MISSED_ROW_COLORS = { ticket: "#d9534f", guestRequest: "#7a5cff", planner: "#3E63C9", approval: "#e0902c" };
 
-function buildMissedApprovalCard(item){
-  var m = item.message;
-  var s = m.signoff;
-  var dept = DEPTS[m.from] || { name: m.from, initials: "?", color: "#888" };
-  var card = document.createElement("div");
-  card.className = "missed-msg-card missed-approval-card";
-  card.innerHTML =
-    '<span class="missed-msg-avatar" style="' + avatarStyleAttr(m.from) + '">' + avatarInnerHtml(m.from) + '</span>' +
-    '<div class="missed-msg-body">' +
-      (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '<div class="request-amount-hero no-amount">No amount given</div>') +
-      '<div class="missed-msg-top">' +
-        (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
-        '<span class="missed-msg-from">' + esc(dept.name) + '</span>' +
-      '</div>' +
-      '<div class="missed-msg-preview">' + esc(s.title) + '</div>' +
-      '<div class="missed-approval-actions">' +
-        '<button type="button" class="missed-approval-decline">Decline</button>' +
-        '<button type="button" class="missed-approval-approve">Approve</button>' +
-      '</div>' +
-    '</div>';
-  card.querySelector(".missed-msg-body").addEventListener("click", function(e){
-    if(e.target.closest(".missed-approval-actions")) return;
-    showTab("chat");
-    openThread(m.from);
-  });
-  function decide(decision, btn){
-    btn.disabled = true;
-    apiSend('/api/messages/' + encodeURIComponent(m.id) + '/signoff-decision', 'POST', { decision: decision }).then(function(res){
-      var msgs = STATE.data[m.from];
-      if(msgs){
-        var idx = msgs.findIndex(function(x){ return x.id === m.id; });
-        if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-      }
-      if(STATE.active === m.from) renderThread();
-      showToast(decision === "approved" ? "Approved" : "Declined");
-      pollMissed();
-    }).catch(function(){
-      showToast("Couldn't record that decision");
-      btn.disabled = false;
-    });
+function buildMissedRow(item){
+  var row = document.createElement("button");
+  row.type = "button";
+  row.className = "missed-row";
+  var title, sub, urgent = false, iconHtml, iconStyle;
+
+  if(item.kind === "message"){
+    var m = item.message;
+    var dept = DEPTS[m.from] || { name: m.from };
+    title = dept.name;
+    sub = m.type === "text" ? m.body : (m.type === "image" ? "Photo" : m.type === "file" ? (m.fileName || "File") : "Voice message");
+    urgent = !!m.urgent;
+    iconStyle = avatarStyleAttr(m.from);
+    iconHtml = avatarInnerHtml(m.from);
+  } else if(item.kind === "approval"){
+    var am = item.message;
+    var s = am.signoff;
+    var adept = DEPTS[am.from] || { name: am.from };
+    title = "Approval needed — " + adept.name;
+    sub = s.title + (s.amount != null ? " · " + fmtSignoffAmount(s.amount) : "");
+    iconStyle = "background:" + MISSED_ROW_COLORS.approval;
+    iconHtml = MISSED_ROW_ICONS.approval;
+  } else if(item.kind === "ticket"){
+    title = "New maintenance ticket";
+    sub = item.ticket.description || item.ticket.location || "";
+    iconStyle = "background:" + MISSED_ROW_COLORS.ticket;
+    iconHtml = MISSED_ROW_ICONS.ticket;
+  } else if(item.kind === "guestRequest"){
+    title = "Guest request";
+    sub = item.request.text || item.request.roomNumber || "";
+    iconStyle = "background:" + MISSED_ROW_COLORS.guestRequest;
+    iconHtml = MISSED_ROW_ICONS.guestRequest;
+  } else if(item.kind === "planner"){
+    title = item.planner.title;
+    sub = item.planner.startsAt || item.planner.details || "";
+    iconStyle = "background:" + MISSED_ROW_COLORS.planner;
+    iconHtml = MISSED_ROW_ICONS.planner;
   }
-  card.querySelector(".missed-approval-approve").addEventListener("click", function(e){ e.stopPropagation(); decide("approved", e.target); });
-  card.querySelector(".missed-approval-decline").addEventListener("click", function(e){ e.stopPropagation(); decide("declined", e.target); });
-  return card;
-}
 
-function buildMissedPlannerCard(item){
-  var p = item.planner;
-  var card = document.createElement("div");
-  card.className = "missed-msg-card missed-planner-card";
-  card.innerHTML =
-    '<div class="missed-msg-body">' +
-      '<div class="missed-msg-preview">' + esc(p.title) + (p.startsAt ? ' — ' + esc(p.startsAt) : '') + '</div>' +
-      (p.details ? '<div class="missed-msg-time">' + esc(p.details) + '</div>' : '') +
-    '</div>';
-  card.addEventListener("click", function(){
-    card.classList.add("dismissing");
-    apiSend('/api/planner-notifications/' + encodeURIComponent(p.id) + '/read', 'POST', {}).then(function(){
-      pollMissed();
-    }).catch(function(){
-      card.classList.remove("dismissing");
-      showToast("Couldn't dismiss that");
-    });
+  row.innerHTML =
+    '<span class="missed-row-icon" style="' + iconStyle + '">' + iconHtml + '</span>' +
+    '<span class="missed-row-body">' +
+      '<span class="missed-row-title">' + (urgent ? '<span class="missed-row-urgent-dot"></span>' : '') + esc(title) + '</span>' +
+      '<span class="missed-row-sub">' + esc(sub) + '</span>' +
+    '</span>' +
+    '<span class="missed-row-time">' + fmtNoteTime(item.createdAt) + '</span>';
+
+  row.addEventListener("click", function(){
+    if(item.kind === "message" || item.kind === "approval"){
+      showTab("chat");
+      openThread(item.message.from);
+    } else if(item.kind === "ticket"){
+      showTab("maintenance");
+      openTicketDetail(item.ticket.id);
+    } else if(item.kind === "guestRequest"){
+      showTab("guests");
+    } else if(item.kind === "planner"){
+      row.classList.add("dismissing");
+      apiSend('/api/planner-notifications/' + encodeURIComponent(item.planner.id) + '/read', 'POST', {}).then(function(){
+        pollMissed();
+      }).catch(function(){
+        row.classList.remove("dismissing");
+        showToast("Couldn't dismiss that");
+      });
+    }
   });
-  return card;
+  return row;
 }
 
 function renderMissedFeed(items){
-  var approvals = items.filter(function(i){ return i.kind === "approval"; });
-  missedApprovalsBox.hidden = approvals.length === 0;
-  missedApprovalsCount.textContent = String(approvals.length);
-  missedApprovalsList.innerHTML = "";
-  approvals.forEach(function(item){ missedApprovalsList.appendChild(buildMissedApprovalCard(item)); });
+  var showTickets = STATE.self === "maintenance";
+  var showGuests = STATE.self === "foh";
+  var visible = items.filter(function(i){
+    if(i.kind === "ticket") return showTickets;
+    if(i.kind === "guestRequest") return showGuests;
+    return true;
+  });
 
-  var messages = items.filter(function(i){ return i.kind === "message"; });
-  var tickets = items.filter(function(i){ return i.kind === "ticket"; });
-  var guests = items.filter(function(i){ return i.kind === "guestRequest"; });
-
-  missedMsgBox.hidden = messages.length === 0;
-  missedMsgCount.textContent = String(messages.length);
-  missedMsgList.innerHTML = "";
-  messages.forEach(function(item){ missedMsgList.appendChild(buildMissedMessageCard(item)); });
-
-  var showTickets = STATE.self === "maintenance" && tickets.length > 0;
-  missedTicketsBox.hidden = !showTickets;
-  if(showTickets){
-    missedTicketCount.textContent = String(tickets.length);
-    missedTicketList.innerHTML = "";
-    tickets.forEach(function(item){
+  visible.forEach(function(item){
+    if(item.kind === "ticket"){
       STATE.tickets = STATE.tickets || [];
       if(!STATE.tickets.some(function(x){ return x.id === item.ticket.id; })) STATE.tickets.push(item.ticket);
-      missedTicketList.appendChild(buildMaintCard(item.ticket));
-    });
-  }
-
-  var showGuests = STATE.self === "foh" && guests.length > 0;
-  missedGuestsBox.hidden = !showGuests;
-  if(showGuests){
-    missedGuestCount.textContent = String(guests.length);
-    missedGuestList.innerHTML = "";
-    guests.forEach(function(item){
+    }
+    if(item.kind === "guestRequest"){
       STATE.guestRequests = STATE.guestRequests || [];
       if(!STATE.guestRequests.some(function(x){ return x.id === item.request.id; })) STATE.guestRequests.push(item.request);
-      missedGuestList.appendChild(buildGuestCard(item.request));
-    });
-  }
+    }
+  });
 
-  var planners = items.filter(function(i){ return i.kind === "planner"; });
-  missedPlannerBox.hidden = planners.length === 0;
-  missedPlannerCount.textContent = String(planners.length);
-  missedPlannerList.innerHTML = "";
-  planners.forEach(function(item){ missedPlannerList.appendChild(buildMissedPlannerCard(item)); });
-
-  missedEmptyState.hidden = !(missedApprovalsBox.hidden && missedMsgBox.hidden && missedTicketsBox.hidden && missedGuestsBox.hidden && missedPlannerBox.hidden);
+  missedUnifiedList.innerHTML = "";
+  visible.forEach(function(item){ missedUnifiedList.appendChild(buildMissedRow(item)); });
+  missedEmptyState.hidden = visible.length > 0;
+  missedUnifiedList.hidden = visible.length === 0;
 }
 
 var lastPlannerReminderIds = null;
