@@ -5182,6 +5182,7 @@ myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActiv
 var missedGroupList = document.getElementById("missedGroupList");
 var missedGroupOverlay = document.getElementById("missedGroupOverlay");
 var missedGroupTitle = document.getElementById("missedGroupTitle");
+var missedGroupSub = document.getElementById("missedGroupSub");
 var missedGroupItemsEl = document.getElementById("missedGroupItems");
 var missedGroupClose = document.getElementById("missedGroupClose");
 
@@ -5237,8 +5238,8 @@ function buildMissedRow(item){
     '<span class="missed-row-body">' +
       '<span class="missed-row-title">' + (urgent ? '<span class="missed-row-urgent-dot"></span>' : '') + esc(title) + '</span>' +
       '<span class="missed-row-sub">' + esc(sub) + '</span>' +
-    '</span>' +
-    '<span class="missed-row-time">' + fmtNoteTime(item.createdAt) + '</span>';
+      '<span class="missed-row-time">' + fmtNoteTime(item.createdAt) + '</span>' +
+    '</span>';
 
   row.addEventListener("click", function(){
     if(item.kind === "message" || item.kind === "approval"){
@@ -5327,6 +5328,7 @@ function buildGroupRow(g, items){
 }
 
 function renderMissedGroupDetail(items){
+  missedGroupSub.textContent = items.length === 0 ? "Nothing missed" : items.length + (items.length === 1 ? " item" : " items");
   missedGroupItemsEl.innerHTML = "";
   if(!items.length){
     missedGroupItemsEl.innerHTML = '<div class="missed-empty">Nothing here</div>';

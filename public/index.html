@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260925z">
+<link rel="stylesheet" href="/styles.css?v=20260926a">
 </head>
 <body>
 
@@ -816,9 +816,12 @@
 </div>
 
 <div class="admin-overlay" id="missedGroupOverlay" hidden>
-  <div class="admin-modal">
-    <div class="admin-modal-head">
-      <h2 id="missedGroupTitle">Urgent</h2>
+  <div class="admin-modal missed-group-modal">
+    <div class="admin-modal-head missed-group-modal-head">
+      <div>
+        <h2 id="missedGroupTitle">Urgent</h2>
+        <div class="missed-group-modal-sub" id="missedGroupSub"></div>
+      </div>
       <button class="admin-close" id="missedGroupClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -1405,6 +1408,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260925z"></script>
+<script src="/app.js?v=20260926a"></script>
 </body>
 </html>
