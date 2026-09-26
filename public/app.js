@@ -525,6 +525,9 @@ var filterCountAll = document.getElementById("filterCountAll");
 var filterCountUnread = document.getElementById("filterCountUnread");
 var filterCountUrgent = document.getElementById("filterCountUrgent");
 var filterCountTasks = document.getElementById("filterCountTasks");
+var filterCountRooms = document.getElementById("filterCountRooms");
+var jobsChipBtn = document.getElementById("jobsChipBtn");
+var filterCountJobs = document.getElementById("filterCountJobs");
 var searchInput = document.getElementById("searchInput");
 var searchClear = document.getElementById("searchClear");
 var searchEmpty = document.getElementById("searchEmpty");
@@ -572,6 +575,11 @@ function applyChatFilter(filter){
 chatFilterRow.addEventListener("click", function(e){
   var btn = e.target.closest(".chat-filter-chip");
   if(!btn) return;
+  // Jobs isn't a conversation filter - a maintenance ticket has no thread of
+  // its own, so tapping it jumps straight to the Maintenance board instead
+  // of narrowing this list, same reasoning as the old Missed section's
+  // Tickets row.
+  if(btn.dataset.filter === "jobs"){ showTab("maintenance"); return; }
   applyChatFilter(btn.dataset.filter);
 });
 
@@ -630,6 +638,9 @@ function hasUrgentUnread(deptId){
 function hasOutstandingTask(deptId){
   return (STATE.data[deptId] || []).some(function(m){ return m.from !== "self" && m.taskStatus && m.taskStatus !== "completed"; });
 }
+function hasOutstandingRoomClean(deptId){
+  return (STATE.data[deptId] || []).some(function(m){ return m.from !== "self" && m.roomClean && !m.completed; });
+}
 
 function fmtClockDuration(seconds){
   seconds = Math.max(0, Math.round(seconds || 0));
@@ -679,6 +690,7 @@ function renderList(){
     if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
     if(STATE.chatFilter === "urgent" && !hasUrgentUnread(id)) return false;
     if(STATE.chatFilter === "tasks" && !hasOutstandingTask(id)) return false;
+    if(STATE.chatFilter === "rooms" && !hasOutstandingRoomClean(id)) return false;
     var r = findSearchMatch(id, term);
     if(r.match) matches[id] = r.message;
     return r.match;
@@ -688,10 +700,17 @@ function renderList(){
   var unreadIds = allIds.filter(function(id){ return unreadCount(id) > 0; });
   var urgentIds = allIds.filter(function(id){ return hasUrgentUnread(id); });
   var taskIds = allIds.filter(hasOutstandingTask);
+  var roomIds = allIds.filter(hasOutstandingRoomClean);
   filterCountAll.textContent = allIds.length ? String(allIds.length) : "";
   filterCountUnread.textContent = unreadIds.length ? String(unreadIds.length) : "";
   filterCountUrgent.textContent = urgentIds.length ? String(urgentIds.length) : "";
   filterCountTasks.textContent = taskIds.length ? String(taskIds.length) : "";
+  filterCountRooms.textContent = roomIds.length ? String(roomIds.length) : "";
+  jobsChipBtn.hidden = STATE.self !== "maintenance";
+  if(STATE.self === "maintenance"){
+    var openJobs = (STATE.tickets || []).filter(function(t){ return t.status !== "fixed"; }).length;
+    filterCountJobs.textContent = openJobs ? String(openJobs) : "";
+  }
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
   if(ids.length === 0){
@@ -702,10 +721,10 @@ function renderList(){
       searchEmptyMatch.hidden = true;
       return;
     }
-    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent" || STATE.chatFilter === "tasks") && !term;
+    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent" || STATE.chatFilter === "tasks" || STATE.chatFilter === "rooms") && !term;
     searchEmptyUnread.hidden = !filterEmpty;
     searchEmptyMatch.hidden = filterEmpty;
-    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : STATE.chatFilter === "tasks" ? "No outstanding tasks" : "No unread conversations";
+    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : STATE.chatFilter === "tasks" ? "No outstanding tasks" : STATE.chatFilter === "rooms" ? "No rooms marked clean yet" : "No unread conversations";
     searchEmptyTerm.textContent = STATE.searchTerm;
     return;
   }
@@ -8072,6 +8091,7 @@ function refreshMaintenanceBadge(){
     tabMaintBadge.hidden = n === 0;
     tabMaintBadge.textContent = n > 99 ? "99+" : String(n);
     if(!maintenancePage.hidden) renderMaintenanceBoard();
+    if(!chatPage.hidden) renderList();
   }).catch(function(){});
 }
 
