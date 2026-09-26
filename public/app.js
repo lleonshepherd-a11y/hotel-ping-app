@@ -5293,8 +5293,12 @@ function buildMissedRow(item){
     title = dept.name;
     sub = m.type === "text" ? m.body : (m.type === "image" ? "Photo" : m.type === "file" ? (m.fileName || "File") : "Voice message");
     urgent = !!m.urgent;
-    iconStyle = avatarStyleAttr(m.from);
-    iconHtml = avatarInnerHtml(m.from);
+    // A flat dark circle for every sender makes the whole list read as one
+    // undifferentiated block - each department's real brand color (the same
+    // one used on its thread-list avatar) lets you tell at a glance who a
+    // row is from before reading the text.
+    iconStyle = "background:" + (dept.color || "#6c6d78");
+    iconHtml = iconSvg(m.from);
   } else if(item.kind === "approval"){
     var am = item.message;
     var s = am.signoff;
@@ -5405,7 +5409,7 @@ function buildGroupRow(g, items){
   row.type = "button";
   row.className = "missed-group-row";
   row.innerHTML =
-    '<span class="missed-group-icon" style="color:' + g.color + '">' + g.icon + '</span>' +
+    '<span class="missed-group-icon" style="background:' + g.color + '">' + g.icon + '</span>' +
     '<span class="missed-group-label">' + esc(g.label) + '</span>' +
     '<span class="missed-group-count">' + items.length + '</span>' +
     '<span class="missed-group-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>';
@@ -5421,7 +5425,11 @@ function renderMissedGroupDetail(items){
   missedGroupSub.textContent = items.length === 0 ? "Nothing missed" : items.length + (items.length === 1 ? " item" : " items");
   missedGroupItemsEl.innerHTML = "";
   if(!items.length){
-    missedGroupItemsEl.innerHTML = '<div class="missed-empty">Nothing here</div>';
+    missedGroupItemsEl.innerHTML =
+      '<div class="missed-empty">'+
+        '<span class="missed-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'+
+        '<span class="missed-empty-text">All caught up</span>'+
+      '</div>';
     return;
   }
   items.forEach(function(item){ missedGroupItemsEl.appendChild(buildMissedRow(item)); });
