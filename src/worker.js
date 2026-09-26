@@ -24,7 +24,7 @@ const NOIR_SESSION_MINUTES = 60 * 24 * 30;
 // signing in only needs a real staff member's name - flip this back to
 // true (and unhide the PIN field in index.html) before real staff/guests
 // start using it.
-const LOGIN_REQUIRE_PIN = false;
+const LOGIN_REQUIRE_PIN = true;
 
 // Builds the shape the rest of this Worker expects a "staff" object to have,
 // from a row out of the dashboard's own staff table. status_line/phone have
@@ -3790,6 +3790,59 @@ export default {
         return json({ ok: true });
       }
 
+      // Sends a story's own photo onward as a real message - e.g. housekeeping
+      // posts a photo of a finished wedding set-up to Stories, then also
+      // "pings" that same photo straight to the GM as proof the job's done,
+      // instead of the GM having to happen to catch the story before it
+      // expires. Rides the same insertMessage/notifyDepartment path as any
+      // other ping, per the "everything is a ping" rule elsewhere in here.
+      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/ping")) {
+        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/ping".length));
+        const story = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        if (!story) return json({ error: "Story not found" }, 404);
+        const requester = request._staff;
+        const to = String((await readJsonBody(request)).to || "").trim();
+        if (!DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
+        if (to === requester.department_id) return json({ error: "Pick a different department" }, 400);
+        const row = await insertMessage(env, ctx, {
+          from: requester.department_id, to, type: "image",
+          body: "📌 " + requester.name + " pinged an update" + (story.caption ? ": " + story.caption : ""),
+          fileName: "Update photo", filePath: story.photo_path,
+          fromStaffName: requester.name || null,
+        });
+        const notifyPromise = notifyDepartment(env, to, {
+          title: "📌 " + requester.name + " pinged you",
+          body: story.caption || "Sent an update photo",
+          url: "/",
+          tag: "hotel-ping-story-ping-" + id,
+        }, requester.department_id).catch((e) => console.error("notifyDepartment (story ping) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+        return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
+      }
+
+      // A quick one-tap acknowledgement on someone else's story - lets a
+      // department head say "seen, nice work" without opening the thread.
+      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/like")) {
+        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/like".length));
+        const story = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
+        if (!story) return json({ error: "Story not found" }, 404);
+        const requester = request._staff;
+        const to = fromNoirDept(story.department_id);
+        const row = await insertMessage(env, ctx, {
+          from: requester.department_id, to, type: "text",
+          body: "👍 " + requester.name + " liked your update" + (story.caption ? ": " + story.caption : ""),
+          fromStaffName: requester.name || null,
+        });
+        const notifyPromise = notifyDepartment(env, to, {
+          title: "👍 " + requester.name + " liked your update",
+          body: story.caption || "Nice work",
+          url: "/",
+          tag: "hotel-ping-story-like-" + id,
+        }, requester.department_id).catch((e) => console.error("notifyDepartment (story like) error:", e && e.stack || e));
+        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+        return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
+      }
+
       if (method === "GET" && p === "/api/handover") {
         const dept = url.searchParams.get("department");
         if (!DEPT_IDS.has(dept)) return json({ error: "Unknown department" }, 400);
@@ -4072,8 +4125,8 @@ export default {
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
         ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
-        if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
-          return json({ error: "Only Maintenance can update a ticket's status" }, 403);
+        if (!canManageMaintenance(request._staff)) {
+          return json({ error: "Only Maintenance or the GM can update a ticket's status" }, 403);
         }
         const now = new Date().toISOString();
         const newOwner = !existing.owner_staff_id && status !== "reported" ? request._staff.id : existing.owner_staff_id;
@@ -4129,8 +4182,8 @@ export default {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/owner".length));
         const existing = await env.NOIR_DB.prepare("SELECT id FROM maintenance_tickets WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
-        if (request._staff.department_id !== "maintenance" && !request._staff.is_admin) {
-          return json({ error: "Only Maintenance can assign a ticket's owner" }, 403);
+        if (!canManageMaintenance(request._staff)) {
+          return json({ error: "Only Maintenance or the GM can assign a ticket's owner" }, 403);
         }
         const body = await readJsonBody(request);
         const staffId = body.staffId || null;

@@ -14,12 +14,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260926l">
+<link rel="stylesheet" href="/styles.css?v=20260926aa">
 </head>
 <body>
 
 <div class="login-screen" id="loginScreen" hidden>
-  <div class="login-brand-tag">Noir House Hotel</div>
+  <div class="login-brand-tag">Velaris Boutique Hotel</div>
   <div class="login-glow"></div>
   <div class="login-card">
     <div class="login-mark"><img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo"></div>
@@ -31,11 +31,9 @@
           <label for="loginName">Name</label>
           <input type="text" id="loginName" autocomplete="username" placeholder="e.g. Dave" required>
         </div>
-        <!-- PIN check is off pre-launch (see LOGIN_REQUIRE_PIN in worker.js/server/index.js) - remove
-             this hidden attribute and the required attribute below once real staff are signing in. -->
-        <div class="login-field" hidden>
+        <div class="login-field">
           <label for="loginPin">PIN</label>
-          <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••">
+          <input type="password" id="loginPin" class="login-pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="••••" required>
         </div>
         <button type="submit" class="login-btn" id="loginBtn">Sign in</button>
         <div class="login-error" id="loginError"></div>
@@ -63,7 +61,7 @@
 </div>
 
 <div class="login-screen" id="setupScreen" hidden>
-  <div class="login-brand-tag">Noir House Hotel</div>
+  <div class="login-brand-tag">Velaris Boutique Hotel</div>
   <div class="login-glow"></div>
   <div class="login-card">
     <div class="login-mark"><img src="hotel-ping-logo-tight.png" alt="Hotel Ping logo"></div>
@@ -117,14 +115,14 @@
       <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
     </button>
 
-    <div class="missed-section-title">Missed</div>
-    <div class="sb-missed" id="missedWrap">
-      <div class="missed-group-list" id="missedGroupList"></div>
-    </div>
-
     <div class="sb-switcher" id="switcherWrap">
       <div class="sb-switcher-label" id="switcherLabel">Viewing as</div>
       <div class="switcher-row" id="switcherRow"></div>
+    </div>
+
+    <div class="missed-section-title">Missed</div>
+    <div class="sb-missed" id="missedWrap">
+      <div class="missed-group-list" id="missedGroupList"></div>
     </div>
 
     <div class="sb-menu-list sb-menu-list-page">
@@ -444,7 +442,7 @@
         </div>
         <div class="guests-header-text">
           <div class="sb-title">Guest requests</div>
-          <div class="sb-sub">Noir House &middot; Reception</div>
+          <div class="sb-sub">Velaris Boutique Hotel &middot; Reception</div>
         </div>
       </div>
       <div class="sb-search">
@@ -1281,14 +1279,22 @@
   </div>
   <div class="story-viewer-footer">
     <div class="story-viewer-caption" id="storyViewerCaption"></div>
-    <div class="story-viewer-visibility"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg> Visible to all Department Heads</div>
+    <div class="story-viewer-actions">
+      <button type="button" class="story-ping-btn" id="storyPingBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l6-6m0 0l-6-6M21 9H9a6 6 0 0 0-6 6v3"/></svg>
+        <span>Ping</span>
+      </button>
+      <button type="button" class="story-like-btn" id="storyLikeBtn" aria-label="Like this update">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
 <div class="admin-overlay" id="forwardOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
-      <h2>Forward to…</h2>
+      <h2 id="forwardTitle">Forward to…</h2>
       <button class="admin-close" id="forwardClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -1409,6 +1415,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260926l"></script>
+<script src="/app.js?v=20260926aa"></script>
 </body>
 </html>

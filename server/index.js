@@ -2507,6 +2507,38 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/ping')) {
+      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/ping'.length));
+      const story = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
+      if (!story) return send(res, 404, { error: 'Story not found' });
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const to = String(body.to || '').trim();
+      if (!DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
+      if (to === requester.department_id) return send(res, 400, { error: "Pick a different department" });
+      const row = insertMessage({
+        from: requester.department_id, to, type: 'image',
+        body: '📌 ' + requester.name + ' pinged an update' + (story.caption ? ': ' + story.caption : ''),
+        fileName: 'Update photo', filePath: story.photo_path,
+        fromStaffName: requester.name || null,
+      });
+      return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/like')) {
+      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/like'.length));
+      const story = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
+      if (!story) return send(res, 404, { error: 'Story not found' });
+      const requester = staffFromToken(req);
+      const to = story.department_id;
+      const row = insertMessage({
+        from: requester.department_id, to, type: 'text',
+        body: '👍 ' + requester.name + ' liked your update' + (story.caption ? ': ' + story.caption : ''),
+        fromStaffName: requester.name || null,
+      });
+      return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
+    }
+
     if (req.method === 'GET' && p === '/api/handover') {
       const dept = url.searchParams.get('department');
       if (!DEPT_IDS.has(dept)) return send(res, 400, { error: 'Unknown department' });
@@ -2657,8 +2689,8 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
       const maintRequester = staffFromToken(req);
-      if (maintRequester.department_id !== 'maintenance' && !maintRequester.is_admin) {
-        return send(res, 403, { error: "Only Maintenance can update a ticket's status" });
+      if (maintRequester.department_id !== 'maintenance' && maintRequester.department_id !== 'gm' && !maintRequester.is_admin) {
+        return send(res, 403, { error: "Only Maintenance or the GM can update a ticket's status" });
       }
       const now = new Date().toISOString();
       const newOwner = !existing.owner_staff_id && status !== 'reported' ? maintRequester.id : existing.owner_staff_id;
@@ -2682,8 +2714,8 @@ const server = http.createServer(async (req, res) => {
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
       const requester = staffFromToken(req);
-      if (requester.department_id !== 'maintenance' && !requester.is_admin) {
-        return send(res, 403, { error: "Only Maintenance can assign a ticket's owner" });
+      if (requester.department_id !== 'maintenance' && requester.department_id !== 'gm' && !requester.is_admin) {
+        return send(res, 403, { error: "Only Maintenance or the GM can assign a ticket's owner" });
       }
       const body = await readJsonBody(req);
       const staffId = body.staffId || null;

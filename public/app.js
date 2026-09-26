@@ -32,13 +32,6 @@ var ICONS = {
 function iconSvg(deptId){
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+ICONS[deptId]+'</svg>';
 }
-function shadeColor(hex, pct){
-  var n = parseInt(hex.slice(1), 16);
-  var r = Math.max(0, Math.min(255, ((n>>16)&255) + Math.round(255*pct/100)));
-  var g = Math.max(0, Math.min(255, ((n>>8)&255) + Math.round(255*pct/100)));
-  var b = Math.max(0, Math.min(255, (n&255) + Math.round(255*pct/100)));
-  return "#" + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
-}
 function avatarGradient(deptId){
   return "linear-gradient(155deg, #2c2c30, #131315)";
 }
@@ -899,10 +892,6 @@ window.addEventListener("popstate", function(){
   closeThreadView();
 });
 
-function hexToRgba(hex, a){
-  var n = parseInt(hex.slice(1), 16);
-  return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";
-}
 var hContactWrap = document.getElementById("hContactWrap");
 var hGroupAvatars = document.getElementById("hGroupAvatars");
 hGroupAvatars.addEventListener("click", function(){
@@ -1542,7 +1531,7 @@ function showMessageActionMenu(m, x, y){
 
   var myReaction = (m.reactions || []).filter(function(r){ return r.from === "self"; })[0];
   var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' +
-    '<button type="button" class="msg-action-react-btn'+(myReaction ? ' active' : '')+'" data-emoji="'+THUMB_REACTION+'">'+THUMB_ICON+'</button>' +
+    '<button type="button" class="msg-action-react-btn'+(myReaction ? ' active' : '')+'" data-emoji="'+THUMB_REACTION+'" aria-label="'+(myReaction ? 'Remove reaction' : 'React with thumbs up')+'">'+THUMB_ICON+'</button>' +
     '</div>' : '';
 
   var html = rows.map(function(r){
@@ -1660,10 +1649,12 @@ function cycleTaskStatus(m){
 
 var forwardOverlay = document.getElementById("forwardOverlay");
 var forwardClose = document.getElementById("forwardClose");
+var forwardTitle = document.getElementById("forwardTitle");
 var forwardDeptList = document.getElementById("forwardDeptList");
 var forwardError = document.getElementById("forwardError");
 function openForwardPicker(m){
   forwardError.textContent = "";
+  forwardTitle.textContent = "Forward to…";
   var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self && id !== STATE.active; });
   forwardDeptList.innerHTML = targets.map(function(id){
     return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
@@ -1679,14 +1670,42 @@ function openForwardPicker(m){
         renderList();
         if(STATE.active === to) renderThread();
         forwardOverlay.hidden = true;
+        resumeStoryProgress();
         showToast("Forwarded to " + DEPTS[to].name);
       }).catch(function(e){ forwardError.textContent = e.message || "Couldn't forward that message."; });
     });
   });
   forwardOverlay.hidden = false;
 }
-forwardClose.addEventListener("click", function(){ forwardOverlay.hidden = true; });
-forwardOverlay.addEventListener("click", function(e){ if(e.target === forwardOverlay) forwardOverlay.hidden = true; });
+// forwardOverlay is reused for both message-forward and story-ping - either
+// can be opened while a story is mid-playback (openStoryPingPicker pauses it),
+// so every way this overlay closes has to resume it too, or the story behind
+// it freezes on that frame forever. resumeStoryProgress() is a no-op when
+// there's no story open/paused, so this is always safe to call.
+forwardClose.addEventListener("click", function(){ forwardOverlay.hidden = true; resumeStoryProgress(); });
+forwardOverlay.addEventListener("click", function(e){ if(e.target === forwardOverlay){ forwardOverlay.hidden = true; resumeStoryProgress(); } });
+
+function openStoryPingPicker(story){
+  forwardError.textContent = "";
+  forwardTitle.textContent = "Ping to…";
+  var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
+  forwardDeptList.innerHTML = targets.map(function(id){
+    return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
+      '<span class="fwd-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      DEPTS[id].name+'</button>';
+  }).join("");
+  forwardDeptList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var to = btn.getAttribute("data-dept");
+      apiSend('/api/stories/' + encodeURIComponent(story.id) + '/ping', 'POST', { to: to }).then(function(){
+        forwardOverlay.hidden = true;
+        resumeStoryProgress();
+        showToast("Pinged " + DEPTS[to].name);
+      }).catch(function(e){ forwardError.textContent = e.message || "Couldn't send that ping."; });
+    });
+  });
+  forwardOverlay.hidden = false;
+}
 
 function attachLongPress(el, onLongPress){
   var LONG_PRESS_MS = 300, MOVE_TOLERANCE = 30;
@@ -2059,19 +2078,26 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     var origMsg = msgsById[m.replyTo];
     var quote = document.createElement("div");
     quote.className = "reply-quote";
+    quote.setAttribute("role", "button");
+    quote.setAttribute("tabindex", "0");
+    quote.setAttribute("aria-label", "Jump to original message from " + replySenderName(origMsg));
     quote.innerHTML =
       '<div class="reply-quote-accent"></div>'+
       '<div class="reply-quote-body">'+
         '<div class="reply-quote-name">'+esc(replySenderName(origMsg))+'</div>'+
         '<div class="reply-quote-text">'+esc(messagePreviewLabel(origMsg))+'</div>'+
       '</div>';
-    quote.addEventListener("click", function(){
+    var jumpToQuoted = function(){
       var target = threadScroll.querySelector('[data-msg-id="'+origMsg.id+'"]');
       if(target){
         target.scrollIntoView({ behavior: "smooth", block: "center" });
         target.classList.add("flash-highlight");
         setTimeout(function(){ target.classList.remove("flash-highlight"); }, 1200);
       }
+    };
+    quote.addEventListener("click", jumpToQuoted);
+    quote.addEventListener("keydown", function(e){
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); jumpToQuoted(); }
     });
     wrap.appendChild(quote);
   }
@@ -2177,7 +2203,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     var pills = document.createElement("div");
     pills.className = "msg-reactions-row" + (out ? " out" : "");
     pills.innerHTML =
-      '<button type="button" class="msg-reaction-pill'+(mine ? ' mine' : '')+'">'+THUMB_ICON+(m.reactions.length>1 ? ' <span>'+m.reactions.length+'</span>' : '')+'</button>';
+      '<button type="button" class="msg-reaction-pill'+(mine ? ' mine' : '')+'" aria-label="'+m.reactions.length+' thumbs up reaction'+(m.reactions.length===1?'':'s')+(mine ? ', tap to remove yours' : ', tap to add yours')+'">'+THUMB_ICON+(m.reactions.length>1 ? ' <span>'+m.reactions.length+'</span>' : '')+'</button>';
     pills.querySelector(".msg-reaction-pill").addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(m, THUMB_REACTION); });
     wrap.appendChild(pills);
   }
@@ -4837,6 +4863,7 @@ function renderStoriesRow(){
     btn.innerHTML =
       '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInner+'</span>'+
         (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
+        (hasUnseen && !isMine ? '<span class="story-unseen-dot"></span>' : '') +
       '</span>' +
       '<span class="story-item-label">'+(isMine ? "Your story" : esc(d ? d.name : id))+'</span>';
     btn.addEventListener("click", function(e){
@@ -4958,6 +4985,8 @@ var storyViewerImg = document.getElementById("storyViewerImg");
 var storyViewerCaption = document.getElementById("storyViewerCaption");
 var storyViewerClose = document.getElementById("storyViewerClose");
 var storyViewerDelete = document.getElementById("storyViewerDelete");
+var storyPingBtn = document.getElementById("storyPingBtn");
+var storyLikeBtn = document.getElementById("storyLikeBtn");
 var storyTapLeft = document.getElementById("storyTapLeft");
 var storyTapRight = document.getElementById("storyTapRight");
 var storyViewerStage = document.getElementById("storyViewerStage");
@@ -5012,6 +5041,8 @@ function renderStoryFrame(){
   storyViewerCaption.textContent = story.caption || "";
   storyViewerCaption.hidden = !story.caption;
   storyViewerDelete.hidden = !(deptId === STATE.self || (AUTH.staff && AUTH.staff.isAdmin));
+  storyLikeBtn.classList.remove("liked");
+  storyLikeBtn.disabled = false;
 
   if(!story.viewed){
     story.viewed = true;
@@ -5085,16 +5116,39 @@ storyViewerDelete.addEventListener("click", function(){
   var reel = currentReel();
   var story = reel[storyViewState.storyIdx];
   if(!story) return;
+  pauseStoryProgress();
   showConfirm({ title: "Delete this update?" }).then(function(ok){
-    if(!ok) return;
+    if(!ok){ resumeStoryProgress(); return; }
     apiDelete('/api/stories/' + encodeURIComponent(story.id)).then(function(){
       STATE.stories = STATE.stories.filter(function(s){ return s.id !== story.id; });
       var newReel = currentReel();
       if(!newReel.length){ storyAdvance(1); return; }
       if(storyViewState.storyIdx >= newReel.length) storyViewState.storyIdx = newReel.length - 1;
       renderStoryFrame();
-    }).catch(function(){ showToast("Couldn't delete that update"); });
+    }).catch(function(){ showToast("Couldn't delete that update"); resumeStoryProgress(); });
   });
+});
+storyPingBtn.addEventListener("click", function(){
+  if(!storyViewState) return;
+  var reel = currentReel();
+  var story = reel[storyViewState.storyIdx];
+  if(!story) return;
+  pauseStoryProgress();
+  openStoryPingPicker(story);
+});
+storyLikeBtn.addEventListener("click", function(){
+  if(!storyViewState || storyLikeBtn.disabled) return;
+  var reel = currentReel();
+  var story = reel[storyViewState.storyIdx];
+  if(!story) return;
+  storyLikeBtn.disabled = true;
+  storyLikeBtn.classList.add("liked");
+  apiSend('/api/stories/' + encodeURIComponent(story.id) + '/like', 'POST', {}).then(function(){
+    showToast("Liked");
+  }).catch(function(e){
+    storyLikeBtn.classList.remove("liked");
+    showToast(e.message || "Couldn't like that");
+  }).finally(function(){ storyLikeBtn.disabled = false; });
 });
 
 var notifSettingsBtn = document.getElementById("notifSettingsBtn");
