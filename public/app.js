@@ -524,6 +524,7 @@ var hSub = document.getElementById("hSub");
 var filterCountAll = document.getElementById("filterCountAll");
 var filterCountUnread = document.getElementById("filterCountUnread");
 var filterCountUrgent = document.getElementById("filterCountUrgent");
+var filterCountTasks = document.getElementById("filterCountTasks");
 var searchInput = document.getElementById("searchInput");
 var searchClear = document.getElementById("searchClear");
 var searchEmpty = document.getElementById("searchEmpty");
@@ -626,6 +627,9 @@ function unreadCount(deptId){
 function hasUrgentUnread(deptId){
   return (STATE.data[deptId] || []).some(function(m){ return !m.read && m.urgent && m.from !== "self"; });
 }
+function hasOutstandingTask(deptId){
+  return (STATE.data[deptId] || []).some(function(m){ return m.from !== "self" && m.taskStatus && m.taskStatus !== "completed"; });
+}
 
 function fmtClockDuration(seconds){
   seconds = Math.max(0, Math.round(seconds || 0));
@@ -674,6 +678,7 @@ function renderList(){
   var ids = sortedDeptIds().filter(function(id){
     if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
     if(STATE.chatFilter === "urgent" && !hasUrgentUnread(id)) return false;
+    if(STATE.chatFilter === "tasks" && !hasOutstandingTask(id)) return false;
     var r = findSearchMatch(id, term);
     if(r.match) matches[id] = r.message;
     return r.match;
@@ -682,9 +687,11 @@ function renderList(){
   var allIds = sortedDeptIds();
   var unreadIds = allIds.filter(function(id){ return unreadCount(id) > 0; });
   var urgentIds = allIds.filter(function(id){ return hasUrgentUnread(id); });
+  var taskIds = allIds.filter(hasOutstandingTask);
   filterCountAll.textContent = allIds.length ? String(allIds.length) : "";
   filterCountUnread.textContent = unreadIds.length ? String(unreadIds.length) : "";
   filterCountUrgent.textContent = urgentIds.length ? String(urgentIds.length) : "";
+  filterCountTasks.textContent = taskIds.length ? String(taskIds.length) : "";
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
   if(ids.length === 0){
@@ -695,10 +702,10 @@ function renderList(){
       searchEmptyMatch.hidden = true;
       return;
     }
-    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent") && !term;
+    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent" || STATE.chatFilter === "tasks") && !term;
     searchEmptyUnread.hidden = !filterEmpty;
     searchEmptyMatch.hidden = filterEmpty;
-    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : "No unread conversations";
+    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : STATE.chatFilter === "tasks" ? "No outstanding tasks" : "No unread conversations";
     searchEmptyTerm.textContent = STATE.searchTerm;
     return;
   }

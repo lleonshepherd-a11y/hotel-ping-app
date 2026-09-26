@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260926af">
+<link rel="stylesheet" href="/styles.css?v=20260926ah">
 </head>
 <body>
 
@@ -296,6 +296,10 @@
       <button type="button" class="chat-filter-chip chat-filter-chip-urgent" data-filter="urgent">
         <span class="chat-filter-dot"></span>
         Urgent<span class="chat-filter-count" id="filterCountUrgent"></span>
+      </button>
+      <button type="button" class="chat-filter-chip" data-filter="tasks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2"/></svg>
+        Tasks<span class="chat-filter-count" id="filterCountTasks"></span>
       </button>
     </div>
     <div class="pull-refresh" id="listPullRefresh">
@@ -1415,6 +1419,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260926ag"></script>
+<script src="/app.js?v=20260926ah"></script>
 </body>
 </html>
