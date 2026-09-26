@@ -2778,6 +2778,7 @@ export default {
           `SELECT * FROM messages m WHERE m.to_dept = ? AND m.deleted_at IS NULL
            AND m.status != 'read'
            AND (m.signoff_status IS NULL OR m.signoff_status != 'pending')
+           AND (m.task_status IS NULL OR m.task_status = 'completed')
            AND NOT EXISTS (
              SELECT 1 FROM messages r WHERE r.from_dept = m.to_dept AND r.to_dept = m.from_dept
                AND r.deleted_at IS NULL AND r.created_at > m.created_at
@@ -2786,6 +2787,16 @@ export default {
         ).bind(dept).all();
         for (const m of msgRows.results) {
           items.push({ kind: "message", id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+        }
+
+        // A task stays in its own list regardless of read/reply status, same
+        // reasoning as a pending sign-off - it's not "handled" until it's
+        // actually marked done, not just looked at.
+        const taskRows = await env.DB.prepare(
+          "SELECT * FROM messages WHERE to_dept = ? AND task_status IN ('not_started','in_progress') AND deleted_at IS NULL ORDER BY created_at ASC"
+        ).bind(dept).all();
+        for (const m of taskRows.results) {
+          items.push({ kind: "task", id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
         }
 
         // Pending sign-off requests stay in "needs a decision" regardless of read

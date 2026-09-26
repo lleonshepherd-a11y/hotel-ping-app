@@ -1435,6 +1435,7 @@ const server = http.createServer(async (req, res) => {
         `SELECT * FROM messages m WHERE m.to_dept = ? AND m.deleted_at IS NULL
          AND m.status != 'read'
          AND (m.signoff_status IS NULL OR m.signoff_status != 'pending')
+         AND (m.task_status IS NULL OR m.task_status = 'completed')
          AND NOT EXISTS (
            SELECT 1 FROM messages r WHERE r.from_dept = m.to_dept AND r.to_dept = m.from_dept
              AND r.deleted_at IS NULL AND r.created_at > m.created_at
@@ -1443,6 +1444,13 @@ const server = http.createServer(async (req, res) => {
       ).all(dept);
       for (const m of msgRows) {
         items.push({ kind: 'message', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
+      }
+
+      const taskRows = db.prepare(
+        "SELECT * FROM messages WHERE to_dept = ? AND task_status IN ('not_started','in_progress') AND deleted_at IS NULL ORDER BY created_at ASC"
+      ).all(dept);
+      for (const m of taskRows) {
+        items.push({ kind: 'task', id: m.id, createdAt: m.created_at, message: rowToMessage(m, dept, false) });
       }
 
       const pendingSignoffRows = db.prepare(
