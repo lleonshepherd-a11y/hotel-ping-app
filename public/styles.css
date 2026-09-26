@@ -544,11 +544,44 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .mention-tag{font-weight:700;text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:2px}
 .bubble.mentioned-for-me{box-shadow:0 0 0 2px #ff9f0a}
 .room-msg-tag{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--accent);margin-bottom:2px}
-.task-msg-tag{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 9px 3px 7px;border-radius:20px;margin-bottom:5px;border:none;color:var(--text-dim);background:var(--surface-3)}
-.task-msg-tag.in_progress{color:#3b82c4;background:rgba(59,130,196,.14)}
-.task-msg-tag.completed{color:#2f9a5c;background:rgba(47,154,92,.12)}
-.task-msg-tag svg{width:11px;height:11px}
-.task-msg-tag.readonly{cursor:default;opacity:.85}
+/* Task card - deliberately its own design, not a reuse of the sign-off or
+   maintenance-ticket look. The 3-segment track is the whole point: someone
+   scanning the thread should be able to tell "not started / started / done"
+   from the fill alone, before reading a word of text. Color reinforces the
+   same three stages: neutral (new), amber (in motion), green (done) -
+   the same status-equals-color convention already used for maintenance
+   priority and duty state elsewhere in the app. */
+.task-card{
+  margin-top:2px;margin-bottom:4px;width:min(300px,80vw);border-radius:16px;padding:12px 14px 13px;
+  background:var(--surface);border:1px solid var(--border);
+  box-shadow:0 3px 14px -6px rgba(15,15,20,.16);
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+.task-card-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.task-card-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-faint)}
+.task-card-label svg{width:12px;height:12px}
+.task-track{display:inline-flex;align-items:center;gap:3px;flex:1}
+.task-seg{display:block;width:16px;height:5px;border-radius:3px;background:var(--surface-3)}
+.task-card-chip{flex:none;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:20px;background:var(--surface-3);color:var(--text-dim)}
+.task-card-body{font-size:14.5px;font-weight:600;line-height:1.38;color:var(--text);margin-bottom:6px}
+.task-card-meta{font-size:11px;color:var(--text-faint);margin-bottom:10px}
+.task-card-btn{width:100%;border:none;border-radius:12px;padding:9px 10px;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;background:var(--accent)}
+.task-card-reopen-btn{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer}
+.task-card-done-row{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#2f9a5c}
+.task-card-done-row svg{width:13px;height:13px}
+.task-card-waiting-row{font-size:11.5px;font-weight:600;color:var(--text-faint)}
+
+.task-card.new .task-seg.filled{background:var(--accent)}
+.task-card.new .task-card-chip{color:var(--accent);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border)}
+
+.task-card.started{border-color:rgba(224,144,44,.35)}
+.task-card.started .task-seg.filled{background:#e0902c}
+.task-card.started .task-card-chip{color:#b3760f;background:rgba(224,144,44,.14)}
+.task-card.started .task-card-btn{background:linear-gradient(150deg,#e0902c,#b3760f)}
+
+.task-card.done{border-color:rgba(47,154,92,.35)}
+.task-card.done .task-seg.filled{background:#2f9a5c}
+.task-card.done .task-card-chip{color:#2f9a5c;background:rgba(47,154,92,.14)}
 
 .signoff-card{margin-top:2px;margin-bottom:4px;width:min(300px,78vw);border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,rgba(77,132,245,.16),rgba(77,132,245,.05));border:1px solid rgba(77,132,245,.4);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 .signoff-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}

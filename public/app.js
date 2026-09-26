@@ -1937,6 +1937,67 @@ function buildSignoffCard(m){
   return card;
 }
 
+var TASK_STAGE_INDEX = { not_started: 0, in_progress: 1, completed: 2 };
+var TASK_STAGE_CLASS = { not_started: "new", in_progress: "started", completed: "done" };
+function buildTaskCard(m){
+  var status = m.taskStatus || "not_started";
+  var stageIdx = TASK_STAGE_INDEX[status] || 0;
+  var card = document.createElement("div");
+  card.className = "task-card " + TASK_STAGE_CLASS[status];
+
+  var top = document.createElement("div");
+  top.className = "task-card-top";
+  var track = '<span class="task-track">' +
+    [0,1,2].map(function(i){ return '<span class="task-seg' + (i <= stageIdx ? ' filled' : '') + '"></span>'; }).join('') +
+    '</span>';
+  top.innerHTML =
+    '<span class="task-card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg> TASK</span>' +
+    track +
+    '<span class="task-card-chip">' + TASK_LABELS[status] + '</span>';
+  card.appendChild(top);
+
+  var body = document.createElement("div");
+  body.className = "task-card-body";
+  body.textContent = m.text || "";
+  card.appendChild(body);
+
+  var fromDept = DEPTS[m.from] || { name: m.from };
+  var meta = document.createElement("div");
+  meta.className = "task-card-meta";
+  meta.textContent = "From " + fromDept.name + " · " + fmtNoteTime(m.createdAt);
+  card.appendChild(meta);
+
+  var canAction = m.to === AUTH.staff.departmentId;
+  if(canAction && status !== "completed"){
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "task-card-btn";
+    btn.textContent = status === "not_started" ? "Start task" : "Mark as done";
+    btn.addEventListener("click", function(){ cycleTaskStatus(m); });
+    card.appendChild(btn);
+  } else if(canAction && status === "completed"){
+    var reopenBtn = document.createElement("button");
+    reopenBtn.type = "button";
+    reopenBtn.className = "task-card-reopen-btn";
+    reopenBtn.textContent = "Reopen";
+    reopenBtn.addEventListener("click", function(){ cycleTaskStatus(m); });
+    card.appendChild(reopenBtn);
+  } else if(status === "completed"){
+    var doneRow = document.createElement("div");
+    doneRow.className = "task-card-done-row";
+    doneRow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Completed';
+    card.appendChild(doneRow);
+  } else {
+    var waitingRow = document.createElement("div");
+    waitingRow.className = "task-card-waiting-row";
+    var toName = DEPTS[m.to] ? DEPTS[m.to].name : m.to;
+    waitingRow.textContent = "Assigned to " + toName;
+    card.appendChild(waitingRow);
+  }
+
+  return card;
+}
+
 function voteOnPoll(m, index){
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/vote', 'POST', { optionIndex: index }).then(function(res){
     var msgs = currentMessagesArray();
@@ -2090,16 +2151,6 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     wrap.appendChild(guestTag);
   }
 
-  if(m.taskStatus){
-    var canActionTask = m.to === AUTH.staff.departmentId;
-    var taskTag = document.createElement(canActionTask ? "button" : "div");
-    if(canActionTask) taskTag.type = "button";
-    taskTag.className = "task-msg-tag " + m.taskStatus + (canActionTask ? "" : " readonly");
-    taskTag.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.3 2.3L16 9.5"/></svg> ' + TASK_LABELS[m.taskStatus];
-    if(canActionTask) taskTag.addEventListener("click", function(){ cycleTaskStatus(m); });
-    wrap.appendChild(taskTag);
-  }
-
   if(m.pinned){
     var pinTag = document.createElement("div");
     pinTag.className = "pin-indicator";
@@ -2198,7 +2249,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     bubble = buildAudioNode(m);
   }
   var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
-  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text") || (m.roomClean && m.type === "text");
+  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text") || (m.roomClean && m.type === "text") || (m.taskStatus && m.type === "text");
   if(!hideTextBubble){
     if(!m.deleted && !m.pending && !m.failed) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(bubble);
@@ -2237,6 +2288,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   }
   if(m.poll) wrap.appendChild(buildPollCard(m));
   if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
+  if(m.taskStatus) wrap.appendChild(buildTaskCard(m));
 
   if(m.reactions && m.reactions.length){
     var mine = m.reactions.filter(function(r){ return r.from === "self"; })[0];
