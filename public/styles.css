@@ -910,12 +910,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .mute-row button{flex:none;border:none;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:700;background:var(--surface-3);color:var(--text-dim);cursor:pointer}
 .sb-missed{padding:0 20px 10px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
 .missed-section-title{padding:18px 20px 6px;font-family:Manrope,sans-serif;font-weight:800;font-size:19px;letter-spacing:-.01em;color:var(--text)}
-.missed-group-list{background:var(--surface-2);border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,15,20,.05)}
-.missed-group-row{display:flex;align-items:center;gap:13px;width:100%;padding:15px 16px;border:none;border-bottom:1px solid var(--border);background:none;text-align:left;transition:background .12s ease}
+.missed-group-list{background:none}
+.missed-group-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 2px;border:none;border-bottom:1px solid var(--border);background:none;text-align:left;transition:background .12s ease}
 .missed-group-row:last-child{border-bottom:none}
 .missed-group-row:active{background:var(--active-tint)}
-.missed-group-icon{flex:none;width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 2px 5px rgba(15,15,20,.16)}
-.missed-group-icon svg{width:17px;height:17px;stroke-width:2.1}
+.missed-group-icon{flex:none;width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--text-dim)}
+.missed-group-icon svg{width:19px;height:19px;stroke-width:1.9}
 .missed-group-label{flex:1;min-width:0;font-size:15.5px;font-weight:700;color:var(--text);letter-spacing:-.005em}
 .missed-group-count{font-size:14.5px;font-weight:700;color:var(--text-faint);font-variant-numeric:tabular-nums}
 .missed-group-chevron{flex:none;color:var(--text-faint);display:flex}
@@ -933,16 +933,16 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .missed-group-modal-head{padding:0 18px;margin-bottom:10px}
 .missed-group-modal-head h2{font-size:18px;letter-spacing:-.01em}
 .missed-group-modal-sub{font-size:12px;font-weight:600;color:var(--text-faint);margin-top:1px}
-.missed-group-detail-list{background:var(--surface-2);border-radius:14px;max-height:52vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 18px;width:calc(100% - 36px)}
+.missed-group-detail-list{background:none;max-height:52vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0}
 .missed-group-detail-list::-webkit-scrollbar{display:none}
 .missed-group-detail-list .missed-empty{padding:28px 18px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
-.missed-empty-icon{width:34px;height:34px;border-radius:50%;background:var(--surface-3);color:var(--text-faint);display:flex;align-items:center;justify-content:center}
+.missed-empty-icon{width:34px;height:34px;border-radius:50%;background:var(--surface-2);color:var(--text-faint);display:flex;align-items:center;justify-content:center}
 .missed-empty-icon svg{width:16px;height:16px}
 .missed-empty-text{font-size:12.5px;font-weight:600;color:var(--text-faint)}
-.missed-row{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 13px;border:none;border-bottom:1px solid var(--border);background:none;text-align:left;transition:background .12s ease}
+.missed-row{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px 22px;border:none;border-bottom:1px solid var(--border);background:none;text-align:left;transition:background .12s ease}
 .missed-row:last-child{border-bottom:none}
 .missed-row:active{background:var(--active-tint)}
-.missed-row-icon{flex:none;width:29px;height:29px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 2px 5px rgba(15,15,20,.14)}
+.missed-row-icon{flex:none;width:29px;height:29px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;margin-top:1px}
 .missed-row-icon svg{width:14px;height:14px}
 .missed-row-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:0}
 .missed-row-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:5px;line-height:1.25}
