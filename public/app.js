@@ -739,16 +739,17 @@ function renderList(){
     var last = lastOf(msgs);
     var unread = unreadCount(id);
     var urgentUnread = hasUrgentUnread(id);
+    var hasTask = hasOutstandingTask(id);
     var searchHit = matches[id];
 
     var el = document.createElement("button");
     var showActive = STATE.threadOpened || window.innerWidth > 720;
-    el.className = "thread-item" + (showActive && id === STATE.active ? " active" : "") + (unread ? " unread" : "") + (urgentUnread ? " urgent-row" : "");
+    el.className = "thread-item" + (showActive && id === STATE.active ? " active" : "") + (unread ? " unread" : "");
     el.setAttribute("data-dept-id", id);
     el.innerHTML =
-      '<div class="t-avatar'+(urgentUnread?' urgent-ring':'')+' duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
+      '<div class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+d.name+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
+        '<div class="t-row1"><span class="t-name">'+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
@@ -5300,209 +5301,6 @@ myActivityBtn.addEventListener("click", function(){
 myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
 myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
 
-var missedGroupList = document.getElementById("missedGroupList");
-var missedGroupOverlay = document.getElementById("missedGroupOverlay");
-var missedGroupTitle = document.getElementById("missedGroupTitle");
-var missedGroupSub = document.getElementById("missedGroupSub");
-var missedGroupItemsEl = document.getElementById("missedGroupItems");
-var missedGroupClose = document.getElementById("missedGroupClose");
-
-var MISSED_ROW_ICONS = {
-  ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
-  guestRequest: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="5"/></svg>',
-  planner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>',
-  approval: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>'
-};
-var MISSED_ROW_COLORS = { ticket: "#d9534f", guestRequest: "#7a5cff", planner: "#3E63C9", approval: "#e0902c" };
-
-function buildMissedRow(item){
-  var row = document.createElement("button");
-  row.type = "button";
-  row.className = "missed-row";
-  var title, sub, urgent = false, iconHtml, iconStyle;
-
-  if(item.kind === "message"){
-    var m = item.message;
-    var dept = DEPTS[m.from] || { name: m.from };
-    title = dept.name;
-    sub = m.type === "text" ? m.body : (m.type === "image" ? "Photo" : m.type === "file" ? (m.fileName || "File") : "Voice message");
-    urgent = !!m.urgent;
-    iconStyle = avatarStyleAttr(m.from);
-    iconHtml = avatarInnerHtml(m.from);
-  } else if(item.kind === "task"){
-    var tm = item.message;
-    var tdept = DEPTS[tm.from] || { name: tm.from };
-    title = tdept.name;
-    var tbody = tm.type === "text" ? tm.body : (tm.type === "image" ? "Photo" : tm.type === "file" ? (tm.fileName || "File") : "Voice message");
-    sub = (TASK_LABELS[tm.taskStatus] || "New") + " · " + tbody;
-    iconStyle = avatarStyleAttr(tm.from);
-    iconHtml = avatarInnerHtml(tm.from);
-  } else if(item.kind === "approval"){
-    var am = item.message;
-    var s = am.signoff;
-    var adept = DEPTS[am.from] || { name: am.from };
-    title = "Approval needed — " + adept.name;
-    sub = s.title + (s.amount != null ? " · " + fmtSignoffAmount(s.amount) : "");
-    iconStyle = "background:" + MISSED_ROW_COLORS.approval;
-    iconHtml = MISSED_ROW_ICONS.approval;
-  } else if(item.kind === "ticket"){
-    title = "New maintenance ticket";
-    sub = item.ticket.description || item.ticket.location || "";
-    iconStyle = "background:" + MISSED_ROW_COLORS.ticket;
-    iconHtml = MISSED_ROW_ICONS.ticket;
-  } else if(item.kind === "guestRequest"){
-    title = "Guest request";
-    sub = item.request.text || item.request.roomNumber || "";
-    iconStyle = "background:" + MISSED_ROW_COLORS.guestRequest;
-    iconHtml = MISSED_ROW_ICONS.guestRequest;
-  } else if(item.kind === "planner"){
-    title = item.planner.title;
-    sub = item.planner.startsAt || item.planner.details || "";
-    iconStyle = "background:" + MISSED_ROW_COLORS.planner;
-    iconHtml = MISSED_ROW_ICONS.planner;
-  }
-
-  row.innerHTML =
-    '<span class="missed-row-icon" style="' + iconStyle + '">' + iconHtml + '</span>' +
-    '<span class="missed-row-body">' +
-      '<span class="missed-row-title">' + (urgent ? '<span class="missed-row-urgent-dot"></span>' : '') + esc(title) + '</span>' +
-      '<span class="missed-row-sub">' + esc(sub) + '</span>' +
-      '<span class="missed-row-time">' + fmtNoteTime(item.createdAt) + '</span>' +
-    '</span>';
-
-  row.addEventListener("click", function(){
-    if(item.kind === "message" || item.kind === "approval" || item.kind === "task"){
-      closeMissedGroupOverlay();
-      showTab("chat");
-      openThread(item.message.from);
-    } else if(item.kind === "ticket"){
-      closeMissedGroupOverlay();
-      showTab("maintenance");
-      openTicketDetail(item.ticket.id);
-    } else if(item.kind === "guestRequest"){
-      closeMissedGroupOverlay();
-      showTab("guests");
-    } else if(item.kind === "planner"){
-      row.classList.add("dismissing");
-      apiSend('/api/planner-notifications/' + encodeURIComponent(item.planner.id) + '/read', 'POST', {}).then(function(){
-        pollMissed();
-      }).catch(function(){
-        row.classList.remove("dismissing");
-        showToast("Couldn't dismiss that");
-      });
-    }
-  });
-  return row;
-}
-
-// Urgent and Messages used to open their own little summary list here, but
-// that was a second, weaker copy of the real inbox - the chat list's own
-// Unread/Urgent filters already do this properly (real threads, real reply
-// box, no separate view to get stuck in). So those two rows now just jump
-// straight into the chat list with that filter applied. Tickets and Tasks
-// stay as their own drill-down here since they're not conversations - a
-// ticket lives on the Maintenance board and a task lives inside whatever
-// thread it was sent in, so they need their own "what's outstanding" list.
-function renderMissedFeed(items){
-  var showTickets = STATE.self === "maintenance";
-  var showGuests = STATE.self === "foh";
-  var visible = items.filter(function(i){
-    if(i.kind === "ticket") return showTickets;
-    if(i.kind === "guestRequest") return showGuests;
-    if(i.kind === "task") return false;
-    return true;
-  });
-  var taskItems = items.filter(function(i){ return i.kind === "task"; });
-
-  visible.forEach(function(item){
-    if(item.kind === "ticket"){
-      STATE.tickets = STATE.tickets || [];
-      if(!STATE.tickets.some(function(x){ return x.id === item.ticket.id; })) STATE.tickets.push(item.ticket);
-    }
-    if(item.kind === "guestRequest"){
-      STATE.guestRequests = STATE.guestRequests || [];
-      if(!STATE.guestRequests.some(function(x){ return x.id === item.request.id; })) STATE.guestRequests.push(item.request);
-    }
-  });
-  var ticketItems = visible.filter(function(i){ return i.kind === "ticket" || i.kind === "guestRequest"; });
-
-  var totalUnread = sortedDeptIds().filter(function(id){ return unreadCount(id) > 0; }).length;
-  var totalUrgentUnread = sortedDeptIds().filter(hasUrgentUnread).length;
-
-  missedGroupList.innerHTML = "";
-  missedGroupList.appendChild(buildInboxRow("Urgent", MISSED_ICONS.urgent, totalUrgentUnread, "urgent"));
-  missedGroupList.appendChild(buildInboxRow("Messages", MISSED_ICONS.messages, totalUnread, "unread"));
-  if(showTickets) missedGroupList.appendChild(buildGroupRow("Tickets", MISSED_ROW_ICONS.ticket, ticketItems));
-  missedGroupList.appendChild(buildGroupRow("Tasks", MISSED_ICONS.tasks, taskItems));
-
-  if(!missedGroupOverlay.hidden){
-    if(missedGroupTitle.textContent === "Tickets") renderMissedGroupDetail(ticketItems);
-    else if(missedGroupTitle.textContent === "Tasks") renderMissedGroupDetail(taskItems);
-  }
-}
-
-var MISSED_ICONS = {
-  urgent: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
-  messages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H8.5L4 21v-4H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/></svg>',
-  tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/><path d="M8.5 18h7" stroke-width="2.2"/></svg>'
-};
-var MISSED_CHEVRON = '<span class="missed-group-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>';
-
-function buildInboxRow(label, icon, count, chatFilter){
-  var row = document.createElement("button");
-  row.type = "button";
-  row.className = "missed-group-row";
-  row.innerHTML =
-    '<span class="missed-group-icon">' + icon + '</span>' +
-    '<span class="missed-group-label">' + esc(label) + '</span>' +
-    '<span class="missed-group-count">' + count + '</span>' + MISSED_CHEVRON;
-  row.addEventListener("click", function(){
-    showTab("chat");
-    applyChatFilter(chatFilter);
-  });
-  return row;
-}
-
-function buildGroupRow(label, icon, items){
-  var row = document.createElement("button");
-  row.type = "button";
-  row.className = "missed-group-row";
-  row.innerHTML =
-    '<span class="missed-group-icon">' + icon + '</span>' +
-    '<span class="missed-group-label">' + esc(label) + '</span>' +
-    '<span class="missed-group-count">' + items.length + '</span>' + MISSED_CHEVRON;
-  row.addEventListener("click", function(){
-    missedGroupTitle.textContent = label;
-    renderMissedGroupDetail(items);
-    openMissedGroupOverlay();
-  });
-  return row;
-}
-
-function renderMissedGroupDetail(items){
-  missedGroupSub.textContent = items.length === 0 ? "Nothing missed" : items.length + (items.length === 1 ? " item" : " items");
-  missedGroupItemsEl.innerHTML = "";
-  if(!items.length){
-    missedGroupItemsEl.innerHTML =
-      '<div class="missed-empty">'+
-        '<span class="missed-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>'+
-        '<span class="missed-empty-text">All caught up</span>'+
-      '</div>';
-    return;
-  }
-  items.forEach(function(item){ missedGroupItemsEl.appendChild(buildMissedRow(item)); });
-}
-function openMissedGroupOverlay(){
-  missedGroupOverlay.hidden = false;
-  requestAnimationFrame(function(){ missedGroupOverlay.classList.add("open"); });
-}
-function closeMissedGroupOverlay(){
-  missedGroupOverlay.classList.remove("open");
-  setTimeout(function(){ missedGroupOverlay.hidden = true; }, 260);
-}
-missedGroupClose.addEventListener("click", closeMissedGroupOverlay);
-missedGroupOverlay.addEventListener("click", function(e){ if(e.target === missedGroupOverlay) closeMissedGroupOverlay(); });
-
 var lastPlannerReminderIds = null;
 var lastGuestRequestIds = null;
 function pollMissed(){
@@ -5525,7 +5323,6 @@ function pollMissed(){
       if(hasNewGuestRequest && isOnDuty(STATE.self)) playChime(false);
     }
     lastGuestRequestIds = guestIds;
-    if(!profilePage.hidden) renderMissedFeed(res.items);
   }).catch(function(e){ console.error("pollMissed failed:", e && e.stack || e); });
 }
 
