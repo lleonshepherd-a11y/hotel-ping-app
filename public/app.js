@@ -526,6 +526,7 @@ var filterCountUnread = document.getElementById("filterCountUnread");
 var filterCountUrgent = document.getElementById("filterCountUrgent");
 var filterCountTasks = document.getElementById("filterCountTasks");
 var filterCountRooms = document.getElementById("filterCountRooms");
+var roomsChipBtn = document.getElementById("roomsChipBtn");
 var jobsChipBtn = document.getElementById("jobsChipBtn");
 var filterCountJobs = document.getElementById("filterCountJobs");
 var searchInput = document.getElementById("searchInput");
@@ -706,6 +707,10 @@ function renderList(){
   filterCountUrgent.textContent = urgentIds.length ? String(urgentIds.length) : "";
   filterCountTasks.textContent = taskIds.length ? String(taskIds.length) : "";
   filterCountRooms.textContent = roomIds.length ? String(roomIds.length) : "";
+  // Only Reception ever receives a room-clean notice (see the /clean route
+  // in the worker - it always posts to "foh"), so nobody else has a use
+  // for this chip, same reasoning as Jobs being maintenance-only.
+  roomsChipBtn.hidden = STATE.self !== "foh";
   jobsChipBtn.hidden = STATE.self !== "maintenance";
   if(STATE.self === "maintenance"){
     var openJobs = (STATE.tickets || []).filter(function(t){ return t.status !== "fixed"; }).length;
