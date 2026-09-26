@@ -1433,6 +1433,7 @@ const server = http.createServer(async (req, res) => {
 
       const msgRows = db.prepare(
         `SELECT * FROM messages m WHERE m.to_dept = ? AND m.deleted_at IS NULL
+         AND m.status != 'read'
          AND (m.signoff_status IS NULL OR m.signoff_status != 'pending')
          AND NOT EXISTS (
            SELECT 1 FROM messages r WHERE r.from_dept = m.to_dept AND r.to_dept = m.from_dept

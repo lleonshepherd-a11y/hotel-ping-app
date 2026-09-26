@@ -2769,8 +2769,14 @@ export default {
         const dept = request._staff.department_id;
         const items = [];
 
+        // Opening the thread (which marks its messages read) counts as
+        // handling a missed message just as much as sending a reply does -
+        // otherwise it sits in Missed until you type something back, even
+        // though you already looked at it and it's not a decision you're
+        // pending on the way a sign-off request is.
         const msgRows = await env.DB.prepare(
           `SELECT * FROM messages m WHERE m.to_dept = ? AND m.deleted_at IS NULL
+           AND m.status != 'read'
            AND (m.signoff_status IS NULL OR m.signoff_status != 'pending')
            AND NOT EXISTS (
              SELECT 1 FROM messages r WHERE r.from_dept = m.to_dept AND r.to_dept = m.from_dept
