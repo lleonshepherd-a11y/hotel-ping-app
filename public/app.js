@@ -5495,7 +5495,7 @@ function pollMissed(){
     }
     lastGuestRequestIds = guestIds;
     if(!profilePage.hidden) renderMissedFeed(res.items);
-  }).catch(function(){});
+  }).catch(function(e){ console.error("pollMissed failed:", e && e.stack || e); });
 }
 
 /* ---- Hold-for-help safety alert ---- */
