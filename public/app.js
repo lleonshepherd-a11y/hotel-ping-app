@@ -1216,7 +1216,7 @@ function fmtDur(s){
 
 function renderThread(){
   threadScroll.innerHTML = "";
-  var msgs = STATE.activeGroupId ? (STATE.groupMessages[STATE.activeGroupId] || []) : STATE.data[STATE.active];
+  var msgs = STATE.activeGroupId ? (STATE.groupMessages[STATE.activeGroupId] || []) : (STATE.data[STATE.active] || []);
   if(!msgs.length){
     threadScroll.innerHTML =
       '<div class="thread-empty-state">'+
@@ -1509,7 +1509,8 @@ var ACTION_ICONS = {
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
-  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  speak: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>'
 };
 
 function hideMessageActionMenu(){
@@ -1521,6 +1522,16 @@ function hideMessageActionMenu(){
 var THUMB_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22V11l5-9a2.5 2.5 0 0 1 2.5 3l-1 5h5.5a2 2 0 0 1 2 2.4l-1.7 7A2 2 0 0 1 17.4 22H7z"/><path d="M7 22H4a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1h3"/></svg>';
 var THUMB_REACTION = "thumbsup";
 function showMessageActionMenu(m, x, y){
+  // The menu opens the instant the long-press timer fires, which is often
+  // still *during* the same touch/click that triggered it (finger/mouse
+  // button not yet released). If a row ends up positioned right under that
+  // still-down pointer, its release fires a synthetic click straight onto
+  // the row - "selecting" whatever action happens to be there before the
+  // user ever consciously tapped it. Every row (and the reaction button)
+  // ignores clicks for a brief window after opening so only a deliberate,
+  // later tap can trigger anything.
+  var openedAt = Date.now();
+  var MENU_CLICK_GUARD_MS = 400;
   var rows = [];
   rows.push({ key:"reply", label:"Reply", icon:ACTION_ICONS.reply });
   if(!m.deleted && m.from === "self" && m.type === "text") rows.push({ key:"edit", label:"Edit", icon:ACTION_ICONS.edit });
@@ -1528,6 +1539,7 @@ function showMessageActionMenu(m, x, y){
   rows.push({ key:"copy", label:"Copy", icon:ACTION_ICONS.copy });
   rows.push({ key:"pin", label: m.pinned ? "Unpin" : "Pin", icon:ACTION_ICONS.pin });
   if(!m.deleted) rows.push({ key:"complete", label: m.completed ? "Mark as not done" : "Mark as done", icon:ACTION_ICONS.check });
+  if(!m.deleted && m.type === "text" && m.text && window.speechSynthesis) rows.push({ key:"speak", label:"Read aloud", icon:ACTION_ICONS.speak });
 
   var myReaction = (m.reactions || []).filter(function(r){ return r.from === "self"; })[0];
   var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' +
@@ -1545,6 +1557,7 @@ function showMessageActionMenu(m, x, y){
   if(!m.deleted){
     msgActionMenu.querySelectorAll(".msg-action-react-btn").forEach(function(btn){
       btn.addEventListener("click", function(){
+        if(Date.now() - openedAt < MENU_CLICK_GUARD_MS) return;
         hideMessageActionMenu();
         toggleReaction(m, btn.getAttribute("data-emoji"));
       });
@@ -1563,6 +1576,7 @@ function showMessageActionMenu(m, x, y){
 
   msgActionMenu.querySelectorAll(".msg-action-row").forEach(function(btn){
     btn.addEventListener("click", function(){
+      if(Date.now() - openedAt < MENU_CLICK_GUARD_MS) return;
       var action = btn.getAttribute("data-action");
       hideMessageActionMenu();
       if(action === "reply") showReplyBar(m);
@@ -1571,6 +1585,15 @@ function showMessageActionMenu(m, x, y){
       else if(action === "copy") copyMessageContent(m);
       else if(action === "pin") togglePinMessage(m);
       else if(action === "complete") toggleCompleteMessage(m);
+      else if(action === "speak"){
+        showConfirm({
+          title: "Read this message aloud?",
+          body: "Anyone nearby will be able to hear it.",
+          confirmLabel: "Read aloud",
+          neutral: true,
+          icon: ACTION_ICONS.speak
+        }).then(function(ok){ if(ok) speakText(m.text); });
+      }
     });
   });
 }
@@ -2111,24 +2134,6 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
       bubble.innerHTML = highlightMentions(m.text, m.mentions);
     } else {
       bubble.textContent = m.text;
-    }
-    if(window.speechSynthesis && m.text){
-      var speakBtn = document.createElement("button");
-      speakBtn.type = "button";
-      speakBtn.className = "read-aloud-btn";
-      speakBtn.setAttribute("aria-label", "Read this message aloud");
-      speakBtn.title = "Read aloud";
-      speakBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
-      speakBtn.addEventListener("click", function(){
-        showConfirm({
-          title: "Read this message aloud?",
-          body: "Anyone nearby will be able to hear it.",
-          confirmLabel: "Read aloud",
-          neutral: true,
-          icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>'
-        }).then(function(ok){ if(ok) speakText(m.text); });
-      });
-      bubble.appendChild(speakBtn);
     }
   } else if(m.type === "image"){
     bubble = document.createElement("div");
@@ -5325,12 +5330,15 @@ function buildMissedRow(item){
 
   row.addEventListener("click", function(){
     if(item.kind === "message" || item.kind === "approval"){
+      closeMissedGroupOverlay();
       showTab("chat");
       openThread(item.message.from);
     } else if(item.kind === "ticket"){
+      closeMissedGroupOverlay();
       showTab("maintenance");
       openTicketDetail(item.ticket.id);
     } else if(item.kind === "guestRequest"){
+      closeMissedGroupOverlay();
       showTab("guests");
     } else if(item.kind === "planner"){
       row.classList.add("dismissing");

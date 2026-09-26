@@ -3828,6 +3828,11 @@ export default {
         if (!story) return json({ error: "Story not found" }, 404);
         const requester = request._staff;
         const to = fromNoirDept(story.department_id);
+        // Liking your own story would otherwise insert a message from your
+        // department to itself - there's no such conversation, so it can
+        // never be opened or replied to once it shows up as a missed
+        // message. Just acknowledge the tap; nothing to notify yourself of.
+        if (to === requester.department_id) return json({ message: null }, 201);
         const row = await insertMessage(env, ctx, {
           from: requester.department_id, to, type: "text",
           body: "👍 " + requester.name + " liked your update" + (story.caption ? ": " + story.caption : ""),

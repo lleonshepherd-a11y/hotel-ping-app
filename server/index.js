@@ -2531,6 +2531,7 @@ const server = http.createServer(async (req, res) => {
       if (!story) return send(res, 404, { error: 'Story not found' });
       const requester = staffFromToken(req);
       const to = story.department_id;
+      if (to === requester.department_id) return send(res, 201, { message: null });
       const row = insertMessage({
         from: requester.department_id, to, type: 'text',
         body: '👍 ' + requester.name + ' liked your update' + (story.caption ? ': ' + story.caption : ''),
