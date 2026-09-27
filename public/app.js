@@ -1386,6 +1386,7 @@ function renderThread(){
         '<div class="thread-empty-title">No messages yet</div>'+
         '<div class="thread-empty-sub">Say hello to start the conversation.</div>'+
       '</div>';
+    if(!STATE.activeGroupId && STATE.typingFrom[STATE.active]) threadScroll.appendChild(buildTypingBubble());
     return;
   }
   var prevDay = null;
@@ -1406,7 +1407,18 @@ function renderThread(){
     var groupStart = !prev || prev.from !== m.from || !sameDay(prev.t, m.t);
     threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById, groupStart));
   });
+  if(!STATE.activeGroupId && STATE.typingFrom[STATE.active]) threadScroll.appendChild(buildTypingBubble());
   threadScroll.scrollTop = threadScroll.scrollHeight;
+}
+
+function buildTypingBubble(){
+  var row = document.createElement("div");
+  row.className = "msg-row in typing-row";
+  row.innerHTML =
+    '<div class="bubble-wrap"><div class="bubble typing-bubble">'+
+      '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>'+
+    '</div></div>';
+  return row;
 }
 
 var broadcastStatusCache = {};
@@ -2978,6 +2990,42 @@ optAssetRequest.addEventListener("click", function(){
   openAssetsOverlay(true);
 });
 
+/* ---------------- Team feed (MOCK-UP ONLY - client-side demo, nothing
+   here is saved or sent anywhere; for showing the concept before we
+   decide whether to build it for real) ---------------- */
+var teamFeedMenuBtn = document.getElementById("teamFeedMenuBtn");
+var teamFeedOverlay = document.getElementById("teamFeedOverlay");
+var teamFeedClose = document.getElementById("teamFeedClose");
+var teamFeedTitle = document.getElementById("teamFeedTitle");
+var teamFeedList = document.getElementById("teamFeedList");
+var teamFeedInput = document.getElementById("teamFeedInput");
+var teamFeedSendBtn = document.getElementById("teamFeedSendBtn");
+teamFeedMenuBtn.addEventListener("click", function(){
+  var d = DEPTS[STATE.self];
+  teamFeedTitle.textContent = (d ? d.name : "Team") + " · Team feed";
+  teamFeedOverlay.hidden = false;
+});
+teamFeedClose.addEventListener("click", function(){ teamFeedOverlay.hidden = true; });
+teamFeedOverlay.addEventListener("click", function(e){ if(e.target === teamFeedOverlay) teamFeedOverlay.hidden = true; });
+function postMockFeedUpdate(){
+  var text = teamFeedInput.value.trim();
+  if(!text) return;
+  var myName = (AUTH.staff && AUTH.staff.name) || "Me";
+  var post = document.createElement("div");
+  post.className = "feed-post";
+  post.innerHTML =
+    '<div class="feed-post-avatar">'+esc(myName.slice(0,2).toUpperCase())+'</div>'+
+    '<div class="feed-post-body">'+
+      '<div class="feed-post-head"><span class="feed-post-name">'+esc(myName)+'</span><span class="feed-post-time">Just now</span></div>'+
+      '<div class="feed-post-text">'+esc(text)+'</div>'+
+    '</div>';
+  teamFeedList.appendChild(post);
+  teamFeedList.scrollTop = teamFeedList.scrollHeight;
+  teamFeedInput.value = "";
+}
+teamFeedSendBtn.addEventListener("click", postMockFeedUpdate);
+teamFeedInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); postMockFeedUpdate(); } });
+
 var optPoll = document.getElementById("optPoll");
 var pollComposeOverlay = document.getElementById("pollComposeOverlay");
 var pollComposeClose = document.getElementById("pollComposeClose");
@@ -3820,7 +3868,7 @@ function startTypingPoll(){
       (res.typing || []).forEach(function(id){ next[id] = true; });
       var changed = JSON.stringify(next) !== JSON.stringify(STATE.typingFrom);
       STATE.typingFrom = next;
-      if(changed && STATE.active) renderHeader();
+      if(changed && STATE.active){ renderHeader(); renderThread(); }
     }).catch(function(){});
   }, 2500);
 }

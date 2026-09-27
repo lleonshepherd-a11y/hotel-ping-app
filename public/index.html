@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260927h">
+<link rel="stylesheet" href="/styles.css?v=20260927i">
 </head>
 <body>
 
@@ -145,6 +145,11 @@
       <button class="sb-menu-row" id="notesBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0M12 19v3"/></svg></span>
         <span class="sb-menu-label">My Notes</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
+      <button class="sb-menu-row" id="teamFeedMenuBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H8l-4 4z"/></svg></span>
+        <span class="sb-menu-label">Team feed <span class="mock-tag">Mock-up</span></span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
     </div>
@@ -954,6 +959,61 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="teamFeedOverlay" hidden>
+  <div class="admin-modal admin-modal-wide feed-modal">
+    <div class="admin-modal-head">
+      <h2 id="teamFeedTitle">Restaurant · Team feed</h2>
+      <button class="admin-close" id="teamFeedClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="feed-sub">
+      <div class="feed-sub-avatars">
+        <span class="feed-sub-avatar">SA</span>
+        <span class="feed-sub-avatar">MK</span>
+        <span class="feed-sub-avatar">JD</span>
+      </div>
+      <span class="feed-sub-text">3 people in Restaurant can see and post here</span>
+    </div>
+    <div class="feed-list" id="teamFeedList">
+      <div class="feed-post">
+        <div class="feed-post-avatar">SA</div>
+        <div class="feed-post-body">
+          <div class="feed-post-head"><span class="feed-post-name">Sarah</span><span class="feed-post-time">10:12am</span></div>
+          <div class="feed-post-text">Room 8's set up for the wedding - chairs and tables done ✅</div>
+        </div>
+      </div>
+      <div class="feed-post">
+        <div class="feed-post-avatar">MK</div>
+        <div class="feed-post-body">
+          <div class="feed-post-head"><span class="feed-post-name">Mike</span><span class="feed-post-time">10:14am</span></div>
+          <div class="feed-post-text">Nice one. I'll start on Room 7 for the conference now</div>
+        </div>
+      </div>
+      <div class="feed-post">
+        <div class="feed-post-avatar">SA</div>
+        <div class="feed-post-body">
+          <div class="feed-post-head"><span class="feed-post-name">Sarah</span><span class="feed-post-time">10:15am</span></div>
+          <div class="feed-post-text">Sounds good, I'll come help once I'm done with the linens</div>
+        </div>
+      </div>
+      <div class="feed-post">
+        <div class="feed-post-avatar">JD</div>
+        <div class="feed-post-body">
+          <div class="feed-post-head"><span class="feed-post-name">Jamie</span><span class="feed-post-time">10:31am</span></div>
+          <div class="feed-post-text">Room 6 conference is all done, projector's tested and working</div>
+        </div>
+      </div>
+    </div>
+    <div class="feed-composer">
+      <input type="text" id="teamFeedInput" placeholder="Post an update to the team...">
+      <button class="icon-btn in-pill" id="teamFeedSendBtn" type="button" aria-label="Post">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="operationalOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1491,6 +1551,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260927h"></script>
+<script src="/app.js?v=20260927i"></script>
 </body>
 </html>
