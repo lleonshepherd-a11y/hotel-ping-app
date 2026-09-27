@@ -3048,7 +3048,7 @@ var teamFeedRemovePopoverList = document.getElementById("teamFeedRemovePopoverLi
 var teamFeedBinSuppressClick = false;
 function renderTeamFeedRemovePopover(){
   if(!teamFeedMembers.length){
-    teamFeedRemovePopoverList.innerHTML = '<div class="tfeed-remove-popover-empty">No one\'s been added yet - drop someone in first.</div>';
+    teamFeedRemovePopoverList.innerHTML = '<div class="tfeed-remove-popover-empty">No one\'s been added yet.</div>';
     return;
   }
   teamFeedRemovePopoverList.innerHTML = "";
