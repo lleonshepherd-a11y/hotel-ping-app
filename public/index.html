@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260927o">
+<link rel="stylesheet" href="/styles.css?v=20260927p">
 </head>
 <body>
 
@@ -968,11 +968,17 @@
       <h2 id="teamFeedTitle">Restaurant · Team feed</h2>
     </div>
     <div class="tfeed-add-row">
-      <span class="tfeed-add-label">Drop someone in</span>
+      <span class="tfeed-add-label">Tap someone in</span>
       <div class="tfeed-add-chips" id="teamFeedAddChips"></div>
-      <button type="button" class="tfeed-bin-btn" id="teamFeedRemoveZone" aria-label="Drop a member here to remove them" title="Drag a member here to remove them">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/><path d="M10 11v6M14 11v6"/></svg>
-      </button>
+      <div class="tfeed-bin-wrap">
+        <button type="button" class="tfeed-bin-btn" id="teamFeedRemoveZone" aria-label="Remove people from the feed" title="Drag a member here, or tap to pick who to remove">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14z"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+        <div class="tfeed-remove-popover" id="teamFeedRemovePopover" hidden>
+          <div class="tfeed-remove-popover-title">Tap someone to remove them</div>
+          <div class="tfeed-remove-popover-list" id="teamFeedRemovePopoverList"></div>
+        </div>
+      </div>
     </div>
     <div class="tfeed-sub" id="teamFeedMemberRow">
       <div class="tfeed-sub-avatars" id="teamFeedMemberAvatars">
@@ -1581,6 +1587,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260927o"></script>
+<script src="/app.js?v=20260927p"></script>
 </body>
 </html>

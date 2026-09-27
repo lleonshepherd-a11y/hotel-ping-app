@@ -3037,7 +3037,47 @@ function renderTeamFeedMembers(){
   var base = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "the team");
   teamFeedMemberText.textContent = (3 + teamFeedMembers.length) + " people, including " + base +
     (extraNames.length ? " and " + extraNames.join(", ") : "") + ", can see and post here";
+  renderTeamFeedRemovePopover();
 }
+
+/* Tap-to-remove list - a simpler alternative to dragging someone onto
+   the bin: tap the bin to see everyone who's been added, tap a name
+   to take them back out. */
+var teamFeedRemovePopover = document.getElementById("teamFeedRemovePopover");
+var teamFeedRemovePopoverList = document.getElementById("teamFeedRemovePopoverList");
+var teamFeedBinSuppressClick = false;
+function renderTeamFeedRemovePopover(){
+  if(!teamFeedMembers.length){
+    teamFeedRemovePopoverList.innerHTML = '<div class="tfeed-remove-popover-empty">No one\'s been added yet - drop someone in first.</div>';
+    return;
+  }
+  teamFeedRemovePopoverList.innerHTML = "";
+  teamFeedMembers.forEach(function(id){
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "tfeed-remove-popover-row";
+    row.innerHTML =
+      '<span class="tfeed-remove-popover-avatar">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="tfeed-remove-popover-name">'+esc(DEPTS[id] ? DEPTS[id].name : id)+'</span>'+
+      '<span class="tfeed-remove-popover-x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>';
+    row.addEventListener("click", function(){
+      teamFeedMembers = teamFeedMembers.filter(function(x){ return x !== id; });
+      renderTeamFeedMembers();
+      showToast((DEPTS[id] ? DEPTS[id].name : id) + " taken out of the feed");
+    });
+    teamFeedRemovePopoverList.appendChild(row);
+  });
+}
+teamFeedRemoveZone.addEventListener("click", function(){
+  if(teamFeedBinSuppressClick){ teamFeedBinSuppressClick = false; return; }
+  teamFeedRemovePopover.hidden = !teamFeedRemovePopover.hidden;
+});
+document.addEventListener("click", function(e){
+  if(teamFeedRemovePopover.hidden) return;
+  if(e.target === teamFeedRemoveZone || teamFeedRemoveZone.contains(e.target)) return;
+  if(teamFeedRemovePopover.contains(e.target)) return;
+  teamFeedRemovePopover.hidden = true;
+});
 
 function attachFeedRemoveChip(chipEl, deptId){
   var pointerId = null, dragging = false, ghost = null;
@@ -3075,6 +3115,7 @@ function attachFeedRemoveChip(chipEl, deptId){
     endVisuals();
     if(over){
       if(navigator.vibrate) navigator.vibrate(18);
+      teamFeedBinSuppressClick = true;
       teamFeedMembers = teamFeedMembers.filter(function(id){ return id !== deptId; });
       renderTeamFeedMembers();
       showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " taken out of the feed");
@@ -3132,13 +3173,7 @@ function attachFeedAddChip(chipEl, deptId){
     endVisuals();
     if(over){
       if(navigator.vibrate) navigator.vibrate(18);
-      if(teamFeedMembers.indexOf(deptId) === -1){
-        teamFeedMembers.push(deptId);
-        renderTeamFeedMembers();
-        showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " added to the feed");
-      } else {
-        showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " is already in this feed");
-      }
+      addTeamFeedMember(deptId);
     }
   }
   chipEl.addEventListener("pointerdown", function(e){
@@ -3155,6 +3190,18 @@ function attachFeedAddChip(chipEl, deptId){
     document.addEventListener("pointerup", onUp);
     document.addEventListener("pointercancel", onCancel);
   });
+  // Dragging is nice, but a plain tap is easier - either way gets you in.
+  chipEl.addEventListener("click", function(){ addTeamFeedMember(deptId); });
+}
+
+function addTeamFeedMember(deptId){
+  if(teamFeedMembers.indexOf(deptId) === -1){
+    teamFeedMembers.push(deptId);
+    renderTeamFeedMembers();
+    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " added to the feed");
+  } else {
+    showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " is already in this feed");
+  }
 }
 
 teamFeedMenuBtn.addEventListener("click", function(){

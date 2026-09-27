@@ -1042,7 +1042,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   border-radius:0;background:var(--surface);box-shadow:none;
   padding:calc(env(safe-area-inset-top) + 14px) 16px 16px;
 }
-.tfeed-modal{display:flex;flex-direction:column;height:78vh;max-height:640px}
+.tfeed-modal{display:flex;flex-direction:column;height:78vh;max-height:640px;position:relative}
 .tfeed-modal .admin-modal-head{justify-content:flex-start}
 .tfeed-back-btn{flex:none;width:34px;height:34px;border-radius:50%;border:none;background:none;color:var(--text);display:flex;align-items:center;justify-content:center;margin-right:2px}
 .tfeed-back-btn:active{background:var(--surface-3)}
@@ -1060,6 +1060,25 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .tfeed-bin-btn svg{width:16px;height:16px}
 .tfeed-bin-btn.drag-over{background:var(--urgent);color:#fff;transform:scale(1.15)}
+.tfeed-bin-wrap{position:relative;flex:none}
+.tfeed-remove-popover{
+  position:absolute;top:calc(100% + 8px);right:0;z-index:20;width:220px;
+  background:#fff;border-radius:16px;padding:10px;
+  box-shadow:0 10px 28px -8px rgba(20,20,16,.32), 0 2px 8px rgba(20,20,16,.1), inset 0 0 0 1px var(--border);
+}
+.tfeed-remove-popover-title{font-size:11px;font-weight:700;color:var(--text-faint);text-transform:uppercase;letter-spacing:.03em;padding:4px 6px 8px}
+.tfeed-remove-popover-list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto}
+.tfeed-remove-popover-empty{font-size:12.5px;color:var(--text-faint);padding:8px 6px}
+.tfeed-remove-popover-row{
+  display:flex;align-items:center;gap:10px;width:100%;padding:8px 6px;border-radius:10px;
+  border:none;background:none;text-align:left;color:inherit;cursor:pointer;
+}
+.tfeed-remove-popover-row:hover,.tfeed-remove-popover-row:active{background:var(--urgent-tint)}
+.tfeed-remove-popover-avatar{width:26px;height:26px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;background:linear-gradient(155deg,#2c2c30,#131315)}
+.tfeed-remove-popover-avatar svg{width:12px;height:12px}
+.tfeed-remove-popover-name{flex:1;font-size:13.5px;font-weight:700;color:var(--text)}
+.tfeed-remove-popover-x{flex:none;color:var(--urgent)}
+.tfeed-remove-popover-x svg{width:15px;height:15px}
 .tfeed-sub-avatar-removable{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .tfeed-sub-avatar-removable.dragging{opacity:.3}
 .tfeed-sub-avatar-removable.pressing{transform:scale(.85);transition:transform .1s ease}
