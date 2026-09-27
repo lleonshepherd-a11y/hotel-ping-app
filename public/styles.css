@@ -1309,7 +1309,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* .sb-search/.chat-filter-row/.maint-feed all set an explicit display,
    which otherwise beats the [hidden] attribute at equal specificity. */
 #maintSearchWrap[hidden],#maintFilterRow[hidden],#maintFeed[hidden]{display:none}
-.maint-card{position:relative;background:var(--surface-2);border-radius:16px;padding:8px 34px 8px 40px;box-shadow:0 1px 3px rgba(0,0,0,.3);border-left:4px solid var(--surface-3);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.maint-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px 14px 13px 40px;box-shadow:0 3px 14px -6px rgba(15,15,20,.16);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:none;cursor:grab}
 .maint-card-handle::before{content:"";position:absolute;left:5px;top:50%;transform:translateY(-50%);width:22px;height:36px;border-radius:10px;background:var(--surface-3)}
 .maint-card-handle svg{position:relative;width:16px;height:20px}
@@ -1318,9 +1318,19 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer}
 .maint-pin-btn svg{width:11px;height:11px}
 .maint-pin-btn.pinned{background:rgba(47,95,224,.18);color:#2f5fe0}
-.maint-card.status-reported{border-left-color:var(--urgent)}
-.maint-card.status-in_progress{border-left-color:#e0902c}
-.maint-card.status-fixed{border-left-color:#2f9a5c}
+.maint-card.status-reported{border-color:rgba(163,34,26,.3)}
+.maint-card.status-reported .task-seg.filled{background:var(--urgent)}
+.maint-card.status-reported .task-card-chip{color:var(--urgent);background:var(--urgent-tint)}
+.maint-card.status-in_progress{border-color:rgba(224,144,44,.35)}
+.maint-card.status-in_progress .task-seg.filled{background:#e0902c}
+.maint-card.status-in_progress .task-card-chip{color:#b3760f;background:rgba(224,144,44,.14)}
+.maint-card.status-fixed{border-color:rgba(47,154,92,.35)}
+.maint-card.status-fixed .task-seg.filled{background:#2f9a5c}
+.maint-card.status-fixed .task-card-chip{color:#2f9a5c;background:rgba(47,154,92,.14)}
+.maint-card-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.maint-card-head .task-card-label{white-space:nowrap}
+.maint-card-stale-tag{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:2px 7px;border-radius:6px;background:var(--urgent-tint);color:var(--urgent);white-space:nowrap;flex:none}
+.maint-card-stale-tag svg{width:10px;height:10px}
 .maint-card-top{display:flex;align-items:center;gap:9px;margin-bottom:6px}
 .maint-card-thumb{width:38px;height:38px;border-radius:10px;object-fit:cover;flex:none;background:#000;cursor:pointer}
 .maint-card-info{flex:1;min-width:0}
@@ -1337,7 +1347,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .tag-overdue{background:rgba(224,44,44,.14);color:#c62828}
 .ticket-detail-tags{margin-bottom:10px}
 .maint-card-actions{display:flex;gap:6px}
-.maint-card-btn{flex:1;border:none;border-radius:10px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
+.maint-card-btn{flex:1;border:none;border-radius:12px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-3);color:var(--text-dim)}
 .maint-card-btn.primary{background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
 .maint-card-btn.fixed-btn{background:rgba(47,154,92,.14);color:#2f9a5c}
 .maint-card{cursor:pointer}
@@ -1465,6 +1475,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ops-row-sub{font-size:11px;color:var(--text-dim)}
 .ops-guest-tag{flex:none;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);background:var(--active-tint);padding:3px 7px;border-radius:8px}
 .ops-empty-line{font-size:12.5px;color:var(--text-faint);padding:6px 2px}
+.ops-row.clickable{cursor:pointer}
+.ops-row.clickable:active{background:var(--surface-3)}
 .blocker-add-form{display:flex;flex-direction:column;gap:8px;margin-top:14px}
 .blocker-add-form select,.blocker-add-form input{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:14px;color:var(--text);font-family:inherit}
 .blocker-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}

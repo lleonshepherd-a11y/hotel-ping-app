@@ -450,6 +450,7 @@ const URGENT_ESCALATION_L2_MINUTES = 20;
 const NORMAL_ESCALATION_L2_MINUTES = 50;
 const TICKET_AT_RISK_MINUTES = 15;
 const TICKET_BREACH_MINUTES = 35;
+const TASK_START_REMINDER_MINUTES = 30;
 
 // Hotel Ping's 8 departments are hardcoded (DEPT_IDS/NOIR_DEPT_ID_MAP) rather
 // than read live from the dashboard, since that roster is deeply baked into
@@ -727,6 +728,15 @@ async function checkEscalations(env) {
         url: "/",
         tag: "hotel-ping-ticket-escalation-" + row.id + "-" + nextLevel,
       });
+      // Admins get told something's slipping, but the people who can
+      // actually start the job need their own direct nudge too - not
+      // just a management-side alert they may never see.
+      await notifyDepartment(env, "maintenance", {
+        title: nextLevel === 2 ? "🔴 Job still not started" : "⏰ Job needs starting",
+        body: row.description,
+        url: "/",
+        tag: "hotel-ping-ticket-reminder-" + row.id + "-" + nextLevel,
+      }, null).catch((e) => console.error("notifyDepartment (ticket reminder) error:", e && e.stack || e));
       await env.DB.prepare(
         `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
          ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = excluded.escalation_level, escalated_at = excluded.escalated_at`
@@ -736,6 +746,39 @@ async function checkEscalations(env) {
   }
 
   return escalatedCount;
+}
+
+// A task can sit "not started" indefinitely without ever going through the
+// unread-message escalation path above - the recipient may have already
+// opened and read it, they just haven't actually started the work. This
+// is a single one-shot nudge (task_reminder_sent), separate from that
+// read-based escalation, so a task that was read five seconds after
+// arriving but never started still gets chased up.
+async function checkTaskReminders(env, ctx) {
+  let remindedCount = 0;
+  try {
+    const cutoff = new Date(Date.now() - TASK_START_REMINDER_MINUTES * 60 * 1000).toISOString();
+    const rows = await env.DB.prepare(
+      `SELECT id, from_dept, to_dept, body, created_at FROM messages
+       WHERE task_status = 'not_started' AND task_reminder_sent = 0 AND deleted_at IS NULL
+         AND to_dept IS NOT NULL AND created_at < ?
+         AND (SELECT on_duty FROM departments WHERE id = to_dept) = 1`
+    ).bind(cutoff).all();
+    for (const row of rows.results) {
+      const notifyPromise = notifyDepartment(env, row.to_dept, {
+        title: "⏰ Task not started yet",
+        body: row.body || "A task is waiting on you",
+        url: "/",
+        tag: "hotel-ping-task-reminder-" + row.id,
+      }, row.from_dept).catch((e) => console.error("notifyDepartment (task reminder) error:", e && e.stack || e));
+      if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+      await env.DB.prepare("UPDATE messages SET task_reminder_sent = 1 WHERE id = ?").bind(row.id).run();
+      remindedCount++;
+    }
+  } catch (e) {
+    console.error("Task reminder check error:", e && e.stack || e);
+  }
+  return remindedCount;
 }
 
 async function nextSignoffCode(env) {
@@ -4403,10 +4446,11 @@ export default {
       if (method === "POST" && p === "/api/escalations/check") {
         if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
         const count = await checkEscalations(env);
+        const taskRemindersSent = await checkTaskReminders(env, ctx);
         await checkUnnotifiedTickets(env, ctx);
         await checkPlannerAlerts(env, ctx);
         await checkOpsPlannerReminders(env, ctx);
-        return json({ escalated: count });
+        return json({ escalated: count, taskRemindersSent });
       }
 
       // Read-only, deliberately - no admin, GM or any other in-app role gets
@@ -4458,6 +4502,7 @@ export default {
     for (const hotel of Object.values(hotelRegistry(env))) {
       const hotelEnv = Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads });
       ctx.waitUntil(checkEscalations(hotelEnv));
+      ctx.waitUntil(checkTaskReminders(hotelEnv, ctx));
       ctx.waitUntil(checkUnnotifiedTickets(hotelEnv, ctx));
       ctx.waitUntil(checkOpsPlannerReminders(hotelEnv, ctx));
       ctx.waitUntil(pruneErrorLog(hotelEnv));

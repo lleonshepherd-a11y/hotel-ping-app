@@ -158,6 +158,9 @@ if (!messageColumns.includes('from_staff_name')) {
 if (!messageColumns.includes('client_message_id')) {
   db.exec('ALTER TABLE messages ADD COLUMN client_message_id TEXT');
 }
+if (!messageColumns.includes('task_reminder_sent')) {
+  db.exec('ALTER TABLE messages ADD COLUMN task_reminder_sent INTEGER NOT NULL DEFAULT 0');
+}
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL');
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');

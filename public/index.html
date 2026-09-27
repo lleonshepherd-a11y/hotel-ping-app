@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260926ao">
+<link rel="stylesheet" href="/styles.css?v=20260927a">
 </head>
 <body>
 
@@ -121,6 +121,12 @@
     </div>
 
     <div class="sb-menu-list sb-menu-list-page">
+      <button class="sb-menu-row" id="operationalBtn" type="button">
+        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <span class="sb-menu-label">Operational</span>
+        <span class="sb-menu-group-count" id="operationalCount" hidden>0</span>
+        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
+      </button>
       <button class="sb-menu-row" id="blockersBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M4.9 4.9l14.2 14.2"/></svg></span>
         <span class="sb-menu-label">Blockers</span>
@@ -930,6 +936,19 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="operationalOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Operational</h2>
+      <button class="admin-close" id="operationalClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Everything waiting on a decision or action - tasks, sign-offs, and item requests. Tap one to jump straight to it.</p>
+    <div class="ops-overview-body" id="operationalBody"><div class="handover-empty">Loading…</div></div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="blockersOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1407,6 +1426,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260926ao"></script>
+<script src="/app.js?v=20260927a"></script>
 </body>
 </html>

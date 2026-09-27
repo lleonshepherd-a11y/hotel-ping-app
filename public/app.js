@@ -3607,6 +3607,7 @@ function startPolling(){
     if(!tabEventsBtn.hidden) refreshEventsBadge();
     if(!tabGuestsBtn.hidden) refreshGuestsBadge();
     if(AUTH.staff && AUTH.staff.isAdmin) refreshSignupsBadge();
+    loadOperational();
   }, 6000);
   startTypingPoll();
 }
@@ -3699,6 +3700,7 @@ function enterApp(staff){
     if(!tabRoomsBtn.hidden) refreshRoomsBadge();
     if(staff.isAdmin) refreshSignupsBadge();
     pollMissed();
+    loadOperational();
     checkPushPrompt();
   }, 400);
 }
@@ -6078,6 +6080,105 @@ opsOverviewBtn.addEventListener("click", function(){
 opsOverviewClose.addEventListener("click", function(){ opsOverviewOverlay.hidden = true; });
 opsOverviewOverlay.addEventListener("click", function(e){ if(e.target === opsOverviewOverlay) opsOverviewOverlay.hidden = true; });
 
+/* ---------------- Operational (my tasks, sign-offs, item requests) ---------------- */
+var operationalBtn = document.getElementById("operationalBtn");
+var operationalOverlay = document.getElementById("operationalOverlay");
+var operationalClose = document.getElementById("operationalClose");
+var operationalBody = document.getElementById("operationalBody");
+var operationalCount = document.getElementById("operationalCount");
+
+var STALE_TASK_MS = 60 * 60 * 1000;
+function isTaskStale(m){
+  return m.taskStatus === "not_started" && (Date.now() - m.t) > STALE_TASK_MS;
+}
+
+function openOperationalItem(m){
+  operationalOverlay.hidden = true;
+  var targetOther = m.from === "self" ? m.to : m.from;
+  var homeDept = AUTH.staff.departmentId;
+  if(STATE.self === homeDept){ openThread(targetOther); return; }
+  STATE.self = homeDept;
+  STATE.loading = true;
+  renderSwitcher();
+  updateComposerLock();
+  buildData(homeDept).then(function(data){
+    STATE.data = mergePendingIntoData(data);
+    renderList();
+    renderDuty();
+    openThread(targetOther);
+  }).finally(function(){ STATE.loading = false; });
+}
+
+function opsClickRow(name, sub, riskClass, onClick){
+  var row = document.createElement("div");
+  row.className = "ops-row clickable" + (riskClass ? " " + riskClass : "");
+  row.setAttribute("role", "button");
+  row.setAttribute("tabindex", "0");
+  row.innerHTML = '<span class="ops-row-dot'+(riskClass ? "" : " none")+'"></span><span class="ops-row-body"><span class="ops-row-name">'+esc(name)+'</span><span class="ops-row-sub">'+esc(sub)+'</span></span>';
+  row.addEventListener("click", onClick);
+  row.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); onClick(); } });
+  return row;
+}
+
+function renderOperational(missedItems, assetRequests){
+  var homeDept = AUTH.staff.departmentId;
+  var tasks = missedItems.filter(function(i){ return i.kind === "task"; }).map(function(i){ return mapServerMessage(i.message, homeDept); });
+  var signoffs = missedItems.filter(function(i){ return i.kind === "approval"; }).map(function(i){ return mapServerMessage(i.message, homeDept); });
+  var openRequests = (assetRequests || []).filter(function(r){ return r.status === "requested"; });
+
+  operationalCount.hidden = !(tasks.length + signoffs.length + openRequests.length);
+  operationalCount.textContent = tasks.length + signoffs.length + openRequests.length;
+
+  operationalBody.innerHTML =
+    '<div class="ops-section-label">Tasks</div>' +
+    '<div class="ops-list" id="opTasksList"></div>' +
+    '<div class="ops-section-label">Sign-offs</div>' +
+    '<div class="ops-list" id="opSignoffsList"></div>' +
+    '<div class="ops-section-label">Item requests</div>' +
+    '<div class="ops-list" id="opRequestsList"></div>';
+
+  var tasksList = document.getElementById("opTasksList");
+  if(!tasks.length){ tasksList.outerHTML = '<div class="ops-empty-line">Nothing outstanding.</div>'; }
+  else tasks.forEach(function(m){
+    var stale = isTaskStale(m);
+    var sub = (DEPTS[m.from] ? DEPTS[m.from].name : m.from) + ' · ' + (TASK_LABELS[m.taskStatus] || "New") + (stale ? ' · Not started yet' : '');
+    tasksList.appendChild(opsClickRow(m.text || "Task", sub, stale ? "breach" : (m.taskStatus === "in_progress" ? "risk" : null), function(){ openOperationalItem(m); }));
+  });
+
+  var signoffsList = document.getElementById("opSignoffsList");
+  if(!signoffs.length){ signoffsList.outerHTML = '<div class="ops-empty-line">Nothing waiting on a decision.</div>'; }
+  else signoffs.forEach(function(m){
+    var sub = (DEPTS[m.from] ? DEPTS[m.from].name : m.from) + ' · Awaiting your decision';
+    signoffsList.appendChild(opsClickRow(m.signoff ? m.signoff.title : "Sign-off request", sub, "risk", function(){ openOperationalItem(m); }));
+  });
+
+  var requestsList = document.getElementById("opRequestsList");
+  if(!openRequests.length){ requestsList.outerHTML = '<div class="ops-empty-line">No open item requests.</div>'; }
+  else openRequests.forEach(function(r){
+    var sub = (DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy) + ' needs this';
+    requestsList.appendChild(opsClickRow(r.itemName, sub, "risk", function(){
+      operationalOverlay.hidden = true;
+      assetsBtn.click();
+    }));
+  });
+}
+
+function loadOperational(){
+  Promise.all([apiGet('/api/missed'), apiGet('/api/assets')]).then(function(results){
+    renderOperational(results[0].items, results[1].requests);
+  }).catch(function(){
+    operationalBody.innerHTML = '<div class="handover-empty">Couldn\'t load this.</div>';
+  });
+}
+
+operationalBtn.addEventListener("click", function(){
+  operationalBody.innerHTML = '<div class="handover-empty">Loading…</div>';
+  operationalOverlay.hidden = false;
+  loadOperational();
+});
+operationalClose.addEventListener("click", function(){ operationalOverlay.hidden = true; });
+operationalOverlay.addEventListener("click", function(e){ if(e.target === operationalOverlay) operationalOverlay.hidden = true; });
+
 /* ---------------- Blockers ("waiting on" chains) ---------------- */
 var blockersBtn = document.getElementById("blockersBtn");
 var blockersOverlay = document.getElementById("blockersOverlay");
@@ -7626,11 +7727,30 @@ function enableTicketDrag(card, handle){
     holdTimer = setTimeout(beginDrag, MAINT_DRAG_HOLD_MS);
   });
 }
+var MAINT_STAGE_INDEX = { reported: 0, in_progress: 1, fixed: 2 };
+var MAINT_STALE_MS = 60 * 60 * 1000;
+function isTicketStale(t){
+  return t.status === "reported" && (Date.now() - new Date(t.createdAt).getTime()) > MAINT_STALE_MS;
+}
 function buildMaintCard(t){
   var card = document.createElement("div");
   card.className = "maint-card status-" + t.status + (t.pinned ? " pinned" : "");
   card.dataset.ticketId = t.id;
   var isVideo = isTicketVideo(t);
+
+  var stageIdx = MAINT_STAGE_INDEX[t.status] || 0;
+  var head = document.createElement("div");
+  head.className = "maint-card-head";
+  var track = '<span class="task-track">' +
+    [0,1,2].map(function(i){ return '<span class="task-seg' + (i <= stageIdx ? ' filled' : '') + '"></span>'; }).join('') +
+    '</span>';
+  head.innerHTML =
+    '<span class="task-card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg> ' + (t.ticketNumber ? 'JOB #' + t.ticketNumber : 'JOB') + '</span>' +
+    track +
+    '<span class="task-card-chip">' + MAINT_STATUS_LABEL[t.status] + '</span>' +
+    (isTicketStale(t) ? '<span class="maint-card-stale-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Not started</span>' : '');
+  card.appendChild(head);
+
   var top = document.createElement("div");
   top.className = "maint-card-top";
   if(t.photoUrl){
@@ -7653,7 +7773,7 @@ function buildMaintCard(t){
   if(t.guestPresent) tagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
   if(t.deadline) tagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
   if(tagsHtml) infoHtml += '<div class="maint-card-tags">' + tagsHtml + '</div>';
-  infoHtml += '<div class="maint-card-meta">' + (t.ticketNumber ? '#' + t.ticketNumber + ' · ' : '') + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + (t.voiceUrl ? ' · 🎤' : '') + '</div>';
+  infoHtml += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + (t.voiceUrl ? ' · 🎤' : '') + '</div>';
   info.innerHTML = infoHtml;
   top.appendChild(info);
   card.appendChild(top);

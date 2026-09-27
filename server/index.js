@@ -324,11 +324,28 @@ function checkEscalations() {
     const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : (row.escalation_level || 0));
     if (nextLevel <= (row.escalation_level || 0)) continue;
     console.log('[escalation] unclaimed ticket', row.id, 'level', nextLevel, row.description);
+    console.log('[reminder] job needs starting (maintenance dept)', row.id, row.description);
     db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?').run(nowIso, nextLevel, row.id);
     escalatedCount++;
   }
 
   return escalatedCount;
+}
+
+const TASK_START_REMINDER_MINUTES = 30;
+function checkTaskReminders() {
+  const cutoff = new Date(Date.now() - TASK_START_REMINDER_MINUTES * 60 * 1000).toISOString();
+  const rows = db.prepare(`
+    SELECT id, from_dept, to_dept, body, created_at FROM messages
+    WHERE task_status = 'not_started' AND task_reminder_sent = 0 AND deleted_at IS NULL
+      AND to_dept IS NOT NULL AND created_at < ?
+      AND (SELECT on_duty FROM departments WHERE id = to_dept) = 1
+  `).all(cutoff);
+  for (const row of rows) {
+    console.log('[reminder] task not started yet', row.id, row.to_dept, row.body);
+    db.prepare('UPDATE messages SET task_reminder_sent = 1 WHERE id = ?').run(row.id);
+  }
+  return rows.length;
 }
 
 const OPS_PLANNER_REMINDER_DAYS = [7, 3, 1];
@@ -2873,8 +2890,9 @@ const server = http.createServer(async (req, res) => {
       const requester = staffFromToken(req);
       if (!requester.is_admin) return send(res, 403, { error: 'Admin access required' });
       const count = checkEscalations();
+      const taskRemindersSent = checkTaskReminders();
       const remindersSent = checkOpsPlannerReminders();
-      return send(res, 200, { escalated: count, plannerRemindersSent: remindersSent });
+      return send(res, 200, { escalated: count, taskRemindersSent, plannerRemindersSent: remindersSent });
     }
 
     return send(res, 404, { error: 'Not found' });

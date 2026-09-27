@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS messages (
   dashboard_conversation_id TEXT,
   room_clean TEXT,
   from_staff_name TEXT,
-  client_message_id TEXT
+  client_message_id TEXT,
+  task_reminder_sent INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_messages_broadcast ON messages(broadcast_id);
 -- Lets a resent message (e.g. after a dropped connection) be recognised as
