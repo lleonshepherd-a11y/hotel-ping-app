@@ -2990,9 +2990,9 @@ optAssetRequest.addEventListener("click", function(){
   openAssetsOverlay(true);
 });
 
-/* ---------------- Team feed (MOCK-UP ONLY - client-side demo, nothing
-   here is saved or sent anywhere; for showing the concept before we
-   decide whether to build it for real) ---------------- */
+/* ---------------- Team feed (still a client-side demo - posts and
+   attachments here aren't saved or shared with anyone else yet, this
+   is for trying out the concept before we wire it to a real backend) ---------------- */
 var teamFeedMenuBtn = document.getElementById("teamFeedMenuBtn");
 var teamFeedOverlay = document.getElementById("teamFeedOverlay");
 var teamFeedClose = document.getElementById("teamFeedClose");
@@ -3000,31 +3000,207 @@ var teamFeedTitle = document.getElementById("teamFeedTitle");
 var teamFeedList = document.getElementById("teamFeedList");
 var teamFeedInput = document.getElementById("teamFeedInput");
 var teamFeedSendBtn = document.getElementById("teamFeedSendBtn");
+var teamFeedAddChips = document.getElementById("teamFeedAddChips");
+var teamFeedMemberRow = document.getElementById("teamFeedMemberRow");
+var teamFeedMemberAvatars = document.getElementById("teamFeedMemberAvatars");
+var teamFeedMemberText = document.getElementById("teamFeedMemberText");
+var teamFeedMembers = [];
+
+function renderTeamFeedAddChips(){
+  teamFeedAddChips.innerHTML = "";
+  DEPT_ORDER.forEach(function(id){
+    if(id === STATE.self) return;
+    var chip = document.createElement("div");
+    chip.className = "event-detail-hod-chip";
+    chip.setAttribute("data-dept-id", id);
+    chip.innerHTML =
+      '<div class="event-detail-hod-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</div>'+
+      '<div class="event-detail-hod-label">'+esc(DEPTS[id] ? DEPTS[id].initials : id)+'</div>';
+    attachFeedAddChip(chip, id);
+    teamFeedAddChips.appendChild(chip);
+  });
+}
+
+function renderTeamFeedMembers(){
+  var extra = teamFeedMembers.map(function(id){
+    return '<span class="tfeed-sub-avatar" style="'+avatarStyleAttr(id)+'" title="'+esc(DEPTS[id] ? DEPTS[id].name : id)+'">'+avatarInnerHtml(id)+'</span>';
+  }).join("");
+  teamFeedMemberAvatars.innerHTML =
+    '<span class="tfeed-sub-avatar">SA</span><span class="tfeed-sub-avatar">MK</span><span class="tfeed-sub-avatar">JD</span>' + extra;
+  var extraNames = teamFeedMembers.map(function(id){ return DEPTS[id] ? DEPTS[id].name : id; });
+  var base = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "the team");
+  teamFeedMemberText.textContent = (3 + teamFeedMembers.length) + " people, including " + base +
+    (extraNames.length ? " and " + extraNames.join(", ") : "") + ", can see and post here";
+}
+
+function attachFeedAddChip(chipEl, deptId){
+  var pointerId = null, dragging = false, ghost = null;
+  function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
+  function teardown(){
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    pointerId = null;
+  }
+  function endVisuals(){
+    chipEl.classList.remove("dragging", "pressing");
+    if(ghost){ ghost.remove(); ghost = null; }
+    teamFeedMemberRow.classList.remove("drag-over");
+    dragging = false;
+  }
+  function onMove(ev){
+    if(ev.pointerId !== pointerId) return;
+    ev.preventDefault();
+    moveGhost(ev.clientX, ev.clientY);
+    var el = document.elementFromPoint(ev.clientX, ev.clientY);
+    var over = el && el.closest ? el.closest("#teamFeedMemberRow") : null;
+    teamFeedMemberRow.classList.toggle("drag-over", !!over);
+  }
+  function onCancel(ev){ if(ev.pointerId !== pointerId) return; teardown(); endVisuals(); }
+  function onUp(ev){
+    if(ev.pointerId !== pointerId) return;
+    var wasDragging = dragging;
+    var dropX = ev.clientX, dropY = ev.clientY;
+    teardown();
+    if(!wasDragging) return;
+    var el = document.elementFromPoint(dropX, dropY);
+    var over = el && el.closest ? el.closest("#teamFeedMemberRow") : null;
+    endVisuals();
+    if(over){
+      if(navigator.vibrate) navigator.vibrate(18);
+      if(teamFeedMembers.indexOf(deptId) === -1){
+        teamFeedMembers.push(deptId);
+        renderTeamFeedMembers();
+        showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " added to the feed");
+      } else {
+        showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " is already in this feed");
+      }
+    }
+  }
+  chipEl.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    pointerId = e.pointerId;
+    dragging = true;
+    chipEl.classList.add("pressing");
+    ghost = chipEl.cloneNode(true);
+    ghost.classList.add("drag-ghost");
+    ghost.style.width = chipEl.offsetWidth + "px";
+    document.body.appendChild(ghost);
+    moveGhost(e.clientX, e.clientY);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
+  });
+}
+
 teamFeedMenuBtn.addEventListener("click", function(){
   var d = DEPTS[STATE.self];
   teamFeedTitle.textContent = (d ? d.name : "Team") + " · Team feed";
+  teamFeedMembers = [];
+  renderTeamFeedMembers();
+  renderTeamFeedAddChips();
   teamFeedOverlay.hidden = false;
 });
 teamFeedClose.addEventListener("click", function(){ teamFeedOverlay.hidden = true; });
 teamFeedOverlay.addEventListener("click", function(e){ if(e.target === teamFeedOverlay) teamFeedOverlay.hidden = true; });
-function postMockFeedUpdate(){
-  var text = teamFeedInput.value.trim();
-  if(!text) return;
+
+function feedPostShell(bodyHtml){
   var myName = (AUTH.staff && AUTH.staff.name) || "Me";
   var post = document.createElement("div");
-  post.className = "feed-post";
+  post.className = "tfeed-post";
   post.innerHTML =
-    '<div class="feed-post-avatar">'+esc(myName.slice(0,2).toUpperCase())+'</div>'+
-    '<div class="feed-post-body">'+
-      '<div class="feed-post-head"><span class="feed-post-name">'+esc(myName)+'</span><span class="feed-post-time">Just now</span></div>'+
-      '<div class="feed-post-text">'+esc(text)+'</div>'+
+    '<div class="tfeed-post-avatar">'+esc(myName.slice(0,2).toUpperCase())+'</div>'+
+    '<div class="tfeed-post-body">'+
+      '<div class="tfeed-post-head"><span class="tfeed-post-name">'+esc(myName)+'</span><span class="tfeed-post-time">Just now</span></div>'+
+      bodyHtml+
     '</div>';
   teamFeedList.appendChild(post);
   teamFeedList.scrollTop = teamFeedList.scrollHeight;
+}
+function postMockFeedUpdate(){
+  var text = teamFeedInput.value.trim();
+  if(!text) return;
+  feedPostShell('<div class="tfeed-post-text">'+esc(text)+'</div>');
   teamFeedInput.value = "";
 }
 teamFeedSendBtn.addEventListener("click", postMockFeedUpdate);
 teamFeedInput.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); postMockFeedUpdate(); } });
+
+/* Attach menu (Photo / Video / PDF) */
+var feedAttachBtn = document.getElementById("feedAttachBtn");
+var feedAttachMenu = document.getElementById("feedAttachMenu");
+function closeFeedAttachMenu(){ feedAttachMenu.classList.remove("open"); feedAttachBtn.classList.remove("open"); }
+function openFeedAttachMenu(){ feedAttachMenu.classList.add("open"); feedAttachBtn.classList.add("open"); }
+feedAttachBtn.addEventListener("click", function(){
+  if(feedAttachMenu.classList.contains("open")) closeFeedAttachMenu(); else openFeedAttachMenu();
+});
+document.getElementById("feedOptPhoto").addEventListener("click", function(){ closeFeedAttachMenu(); document.getElementById("feedPhotoInput").click(); });
+document.getElementById("feedOptVideo").addEventListener("click", function(){ closeFeedAttachMenu(); document.getElementById("feedVideoInput").click(); });
+document.getElementById("feedOptPdf").addEventListener("click", function(){ closeFeedAttachMenu(); document.getElementById("feedPdfInput").click(); });
+
+document.getElementById("feedPhotoInput").addEventListener("change", function(e){
+  var file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  var url = URL.createObjectURL(file);
+  feedPostShell('<img class="tfeed-post-photo" src="'+url+'" alt="">');
+});
+document.getElementById("feedVideoInput").addEventListener("change", function(e){
+  var file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  var url = URL.createObjectURL(file);
+  feedPostShell('<video class="tfeed-post-video" src="'+url+'" controls playsinline></video>');
+});
+document.getElementById("feedPdfInput").addEventListener("change", function(e){
+  var file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  feedPostShell(
+    '<div class="tfeed-post-file"><svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg>'+
+    '<span>'+esc(file.name)+'</span></div>'
+  );
+});
+
+/* Voice note - tap to start, tap again to stop and post straight away */
+var feedVoiceBtn = document.getElementById("feedVoiceBtn");
+(function(){
+  var rec = null, stream = null, chunks = [];
+  feedVoiceBtn.addEventListener("click", function(){
+    if(rec){ rec.stop(); return; }
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      showToast("Voice recording isn't supported on this device");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(s){
+      stream = s;
+      try{ rec = new MediaRecorder(stream); }catch(e){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        stream = null;
+        showToast("Couldn't start recording");
+        return;
+      }
+      chunks = [];
+      feedVoiceBtn.classList.add("recording");
+      rec.ondataavailable = function(e){ if(e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = function(){
+        stream.getTracks().forEach(function(t){ t.stop(); });
+        stream = null;
+        feedVoiceBtn.classList.remove("recording");
+        var blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        rec = null;
+        chunks = [];
+        if(blob.size > 0){
+          var url = URL.createObjectURL(blob);
+          feedPostShell('<audio class="tfeed-post-audio" src="'+url+'" controls></audio>');
+        }
+      };
+      rec.start();
+    }).catch(function(){
+      showToast("Microphone access is needed to record a voice note");
+    });
+  });
+})();
 
 var optPoll = document.getElementById("optPoll");
 var pollComposeOverlay = document.getElementById("pollComposeOverlay");

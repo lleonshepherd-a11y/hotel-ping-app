@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260927i">
+<link rel="stylesheet" href="/styles.css?v=20260927j">
 </head>
 <body>
 
@@ -149,7 +149,7 @@
       </button>
       <button class="sb-menu-row" id="teamFeedMenuBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H8l-4 4z"/></svg></span>
-        <span class="sb-menu-label">Team feed <span class="mock-tag">Mock-up</span></span>
+        <span class="sb-menu-label">Team feed</span>
         <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
     </div>
@@ -960,53 +960,80 @@
 </div>
 
 <div class="admin-overlay" id="teamFeedOverlay" hidden>
-  <div class="admin-modal admin-modal-wide feed-modal">
+  <div class="admin-modal admin-modal-wide tfeed-modal">
     <div class="admin-modal-head">
       <h2 id="teamFeedTitle">Restaurant · Team feed</h2>
       <button class="admin-close" id="teamFeedClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="feed-sub">
-      <div class="feed-sub-avatars">
-        <span class="feed-sub-avatar">SA</span>
-        <span class="feed-sub-avatar">MK</span>
-        <span class="feed-sub-avatar">JD</span>
-      </div>
-      <span class="feed-sub-text">3 people in Restaurant can see and post here</span>
+    <div class="tfeed-add-row">
+      <span class="tfeed-add-label">Drop someone in</span>
+      <div class="tfeed-add-chips" id="teamFeedAddChips"></div>
     </div>
-    <div class="feed-list" id="teamFeedList">
-      <div class="feed-post">
-        <div class="feed-post-avatar">SA</div>
-        <div class="feed-post-body">
-          <div class="feed-post-head"><span class="feed-post-name">Sarah</span><span class="feed-post-time">10:12am</span></div>
-          <div class="feed-post-text">Room 8's set up for the wedding - chairs and tables done ✅</div>
+    <div class="tfeed-sub" id="teamFeedMemberRow">
+      <div class="tfeed-sub-avatars" id="teamFeedMemberAvatars">
+        <span class="tfeed-sub-avatar">SA</span>
+        <span class="tfeed-sub-avatar">MK</span>
+        <span class="tfeed-sub-avatar">JD</span>
+      </div>
+      <span class="tfeed-sub-text" id="teamFeedMemberText">3 people in Restaurant can see and post here</span>
+    </div>
+    <div class="tfeed-list" id="teamFeedList">
+      <div class="tfeed-post">
+        <div class="tfeed-post-avatar">SA</div>
+        <div class="tfeed-post-body">
+          <div class="tfeed-post-head"><span class="tfeed-post-name">Sarah</span><span class="tfeed-post-time">10:12am</span></div>
+          <div class="tfeed-post-text">Room 8's set up for the wedding - chairs and tables done ✅</div>
         </div>
       </div>
-      <div class="feed-post">
-        <div class="feed-post-avatar">MK</div>
-        <div class="feed-post-body">
-          <div class="feed-post-head"><span class="feed-post-name">Mike</span><span class="feed-post-time">10:14am</span></div>
-          <div class="feed-post-text">Nice one. I'll start on Room 7 for the conference now</div>
+      <div class="tfeed-post">
+        <div class="tfeed-post-avatar">MK</div>
+        <div class="tfeed-post-body">
+          <div class="tfeed-post-head"><span class="tfeed-post-name">Mike</span><span class="tfeed-post-time">10:14am</span></div>
+          <div class="tfeed-post-text">Nice one. I'll start on Room 7 for the conference now</div>
         </div>
       </div>
-      <div class="feed-post">
-        <div class="feed-post-avatar">SA</div>
-        <div class="feed-post-body">
-          <div class="feed-post-head"><span class="feed-post-name">Sarah</span><span class="feed-post-time">10:15am</span></div>
-          <div class="feed-post-text">Sounds good, I'll come help once I'm done with the linens</div>
+      <div class="tfeed-post">
+        <div class="tfeed-post-avatar">SA</div>
+        <div class="tfeed-post-body">
+          <div class="tfeed-post-head"><span class="tfeed-post-name">Sarah</span><span class="tfeed-post-time">10:15am</span></div>
+          <div class="tfeed-post-text">Sounds good, I'll come help once I'm done with the linens</div>
         </div>
       </div>
-      <div class="feed-post">
-        <div class="feed-post-avatar">JD</div>
-        <div class="feed-post-body">
-          <div class="feed-post-head"><span class="feed-post-name">Jamie</span><span class="feed-post-time">10:31am</span></div>
-          <div class="feed-post-text">Room 6 conference is all done, projector's tested and working</div>
+      <div class="tfeed-post">
+        <div class="tfeed-post-avatar">JD</div>
+        <div class="tfeed-post-body">
+          <div class="tfeed-post-head"><span class="tfeed-post-name">Jamie</span><span class="tfeed-post-time">10:31am</span></div>
+          <div class="tfeed-post-text">Room 6 conference is all done, projector's tested and working</div>
         </div>
       </div>
     </div>
-    <div class="feed-composer">
+    <div class="tfeed-composer">
+      <button class="icon-btn feed-attach-btn" id="feedAttachBtn" type="button" aria-label="Attach a file" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <div class="plus-menu feed-attach-menu" id="feedAttachMenu">
+        <button class="plus-opt" id="feedOptPhoto" type="button">
+          <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
+          <span class="plus-opt-label">Photo</span>
+        </button>
+        <button class="plus-opt" id="feedOptVideo" type="button">
+          <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="14" height="12" rx="2" stroke-width="1.7"/><path d="M16.5 10l5-3v10l-5-3" stroke-width="1.7" stroke-linejoin="round"/></svg></span>
+          <span class="plus-opt-label">Video</span>
+        </button>
+        <button class="plus-opt" id="feedOptPdf" type="button">
+          <span class="plus-opt-ic plus-opt-ic-pdf"><svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg></span>
+          <span class="plus-opt-label">PDF</span>
+        </button>
+      </div>
+      <input type="file" id="feedPhotoInput" accept="image/*" hidden>
+      <input type="file" id="feedVideoInput" accept="video/*" hidden>
+      <input type="file" id="feedPdfInput" accept="application/pdf" hidden>
       <input type="text" id="teamFeedInput" placeholder="Post an update to the team...">
+      <button class="icon-btn feed-voice-btn" id="feedVoiceBtn" type="button" aria-label="Record a voice note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v3"/></svg>
+      </button>
       <button class="icon-btn in-pill" id="teamFeedSendBtn" type="button" aria-label="Post">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
       </button>
@@ -1551,6 +1578,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260927i"></script>
+<script src="/app.js?v=20260927j"></script>
 </body>
 </html>
