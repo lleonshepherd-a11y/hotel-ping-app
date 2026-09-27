@@ -3366,12 +3366,21 @@ export default {
         await env.DB.prepare("UPDATE messages SET task_status = ? WHERE id = ?").bind(bodyIn.status, id).run();
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         if (bodyIn.status === "in_progress" || bodyIn.status === "completed") {
+          // The task card itself is the whole record of its own progress -
+          // one message, updated in place - so a status change notifies by
+          // push only, the same reasoning as the sign-off decision below.
+          // A second chat message here would fragment the task into two
+          // rows and, worse, would just be a plain bubble sitting next to
+          // the actual task card instead of updating it.
           const verb = bodyIn.status === "in_progress" ? "Accepted" : "Completed";
           const taskPreview = existing.body ? ': "' + existing.body + '"' : "";
-          await insertMessage(env, ctx, {
-            from: existing.to_dept, to: existing.from_dept, type: "text",
+          const notifyPromise = notifyDepartment(env, existing.from_dept, {
+            title: verb + " task",
             body: verb + " task" + taskPreview,
-          });
+            url: "/",
+            tag: "hotel-ping-task-" + id,
+          }, existing.to_dept).catch((e) => console.error("notifyDepartment (task status) error:", e && e.stack || e));
+          if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
         }
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }

@@ -2113,12 +2113,13 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE messages SET task_status = ? WHERE id = ?').run(bodyIn.status, id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       if (bodyIn.status === 'in_progress' || bodyIn.status === 'completed') {
+        // The task card is the whole record of its own progress - one message,
+        // updated in place. Notify by push only (no local dev simulation for
+        // 1:1 push exists yet), not by sending a second chat message that
+        // would fragment the task into two rows.
         const verb = bodyIn.status === 'in_progress' ? 'Accepted' : 'Completed';
         const taskPreview = existing.body ? ': "' + existing.body + '"' : '';
-        insertMessage({
-          from: existing.to_dept, to: existing.from_dept, type: 'text',
-          body: verb + ' task' + taskPreview,
-        });
+        console.log('[task notify]', existing.from_dept, verb.toLowerCase(), 'task' + taskPreview);
       }
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
