@@ -1042,6 +1042,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .tfeed-add-chips{display:flex;gap:12px;overflow-x:auto;padding:2px 2px}
 .tfeed-sub{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid var(--border);flex:none;border-radius:10px;transition:background .15s ease}
 .tfeed-sub.drag-over{background:var(--active-tint)}
+.tfeed-remove-zone{
+  display:none;align-items:center;justify-content:center;gap:8px;
+  margin-bottom:12px;padding:12px;border-radius:12px;
+  border:1.5px dashed var(--urgent);color:var(--urgent);font-size:12.5px;font-weight:700;
+  background:var(--urgent-tint);
+}
+.tfeed-remove-zone svg{width:18px;height:18px;flex:none}
+.tfeed-remove-zone.active{display:flex}
+.tfeed-remove-zone.drag-over{background:var(--urgent);color:#fff}
+.tfeed-sub-avatar-removable{cursor:grab;touch-action:none}
+.tfeed-sub-avatar-removable.dragging{opacity:.3}
+.tfeed-sub-avatar-removable.pressing{transform:scale(.85);transition:transform .1s ease}
 .tfeed-sub-avatars{display:flex;flex:none}
 .tfeed-sub-avatar{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:800;background:linear-gradient(155deg,#2c2c30,#131315);box-shadow:0 0 0 2px #fff;margin-left:-7px}
 .tfeed-sub-avatar:first-child{margin-left:0}

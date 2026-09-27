@@ -3022,15 +3022,80 @@ function renderTeamFeedAddChips(){
 }
 
 function renderTeamFeedMembers(){
-  var extra = teamFeedMembers.map(function(id){
-    return '<span class="tfeed-sub-avatar" style="'+avatarStyleAttr(id)+'" title="'+esc(DEPTS[id] ? DEPTS[id].name : id)+'">'+avatarInnerHtml(id)+'</span>';
-  }).join("");
   teamFeedMemberAvatars.innerHTML =
-    '<span class="tfeed-sub-avatar">SA</span><span class="tfeed-sub-avatar">MK</span><span class="tfeed-sub-avatar">JD</span>' + extra;
+    '<span class="tfeed-sub-avatar">SA</span><span class="tfeed-sub-avatar">MK</span><span class="tfeed-sub-avatar">JD</span>';
+  teamFeedMembers.forEach(function(id){
+    var chip = document.createElement("span");
+    chip.className = "tfeed-sub-avatar tfeed-sub-avatar-removable";
+    chip.setAttribute("style", avatarStyleAttr(id));
+    chip.title = (DEPTS[id] ? DEPTS[id].name : id) + " - drag out to remove";
+    chip.innerHTML = avatarInnerHtml(id);
+    attachFeedRemoveChip(chip, id);
+    teamFeedMemberAvatars.appendChild(chip);
+  });
   var extraNames = teamFeedMembers.map(function(id){ return DEPTS[id] ? DEPTS[id].name : id; });
   var base = (DEPTS[STATE.self] ? DEPTS[STATE.self].name : "the team");
   teamFeedMemberText.textContent = (3 + teamFeedMembers.length) + " people, including " + base +
     (extraNames.length ? " and " + extraNames.join(", ") : "") + ", can see and post here";
+}
+
+function attachFeedRemoveChip(chipEl, deptId){
+  var pointerId = null, dragging = false, ghost = null;
+  var removeZone = document.getElementById("teamFeedRemoveZone");
+  function moveGhost(x, y){ if(ghost){ ghost.style.left = x + "px"; ghost.style.top = y + "px"; } }
+  function teardown(){
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onCancel);
+    pointerId = null;
+  }
+  function endVisuals(){
+    chipEl.classList.remove("dragging", "pressing");
+    if(ghost){ ghost.remove(); ghost = null; }
+    removeZone.classList.remove("active", "drag-over");
+    dragging = false;
+  }
+  function onMove(ev){
+    if(ev.pointerId !== pointerId) return;
+    ev.preventDefault();
+    moveGhost(ev.clientX, ev.clientY);
+    var el = document.elementFromPoint(ev.clientX, ev.clientY);
+    var over = el && el.closest ? el.closest("#teamFeedRemoveZone") : null;
+    removeZone.classList.toggle("drag-over", !!over);
+  }
+  function onCancel(ev){ if(ev.pointerId !== pointerId) return; teardown(); endVisuals(); }
+  function onUp(ev){
+    if(ev.pointerId !== pointerId) return;
+    var wasDragging = dragging;
+    var dropX = ev.clientX, dropY = ev.clientY;
+    teardown();
+    if(!wasDragging){ endVisuals(); return; }
+    var el = document.elementFromPoint(dropX, dropY);
+    var over = el && el.closest ? el.closest("#teamFeedRemoveZone") : null;
+    endVisuals();
+    if(over){
+      if(navigator.vibrate) navigator.vibrate(18);
+      teamFeedMembers = teamFeedMembers.filter(function(id){ return id !== deptId; });
+      renderTeamFeedMembers();
+      showToast((DEPTS[deptId] ? DEPTS[deptId].name : deptId) + " taken out of the feed");
+    }
+  }
+  chipEl.addEventListener("pointerdown", function(e){
+    if(e.button !== undefined && e.button !== 0) return;
+    pointerId = e.pointerId;
+    dragging = true;
+    chipEl.classList.add("pressing", "dragging");
+    removeZone.classList.add("active");
+    ghost = chipEl.cloneNode(true);
+    ghost.classList.add("drag-ghost");
+    ghost.style.width = chipEl.offsetWidth + "px";
+    ghost.style.height = chipEl.offsetHeight + "px";
+    document.body.appendChild(ghost);
+    moveGhost(e.clientX, e.clientY);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
+  });
 }
 
 function attachFeedAddChip(chipEl, deptId){
