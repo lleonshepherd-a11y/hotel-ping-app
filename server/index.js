@@ -147,6 +147,11 @@ function rowToTicket(row) {
     escalatedAt: row.escalated_at || undefined,
     ownerStaffId: row.owner_staff_id || undefined,
     sortOrder: row.sort_order == null ? undefined : row.sort_order,
+    fixedReport: row.fixed_report || undefined,
+    fixedPhotoUrl: row.fixed_photo_path ? '/uploads/' + row.fixed_photo_path : undefined,
+    fixedVoiceUrl: row.fixed_voice_path ? '/uploads/' + row.fixed_voice_path : undefined,
+    fixedVoiceDuration: row.fixed_voice_duration || undefined,
+    fixedByName: row.fixed_by_name || undefined,
   };
 }
 function rowToBlocker(row) {
@@ -2118,7 +2123,7 @@ const server = http.createServer(async (req, res) => {
       if (!TASK_STATUSES.includes(bodyIn.status)) return send(res, 400, { error: 'Invalid task status' });
       const note = String(bodyIn.note || '').trim();
       if ((bodyIn.status === 'in_progress' || bodyIn.status === 'completed') && !note) {
-        return send(res, 400, { error: bodyIn.status === 'in_progress' ? "Say what you're about to do" : 'Say what you did' });
+        return send(res, 400, { error: bodyIn.status === 'in_progress' ? 'Say what your plan is' : 'Say how you completed it' });
       }
       if (note.length > 300) return send(res, 400, { error: 'That note is too long' });
       const nowIso = new Date().toISOString();
@@ -2742,8 +2747,44 @@ const server = http.createServer(async (req, res) => {
       }
       const now = new Date().toISOString();
       const newOwner = !existing.owner_staff_id && status !== 'reported' ? maintRequester.id : existing.owner_staff_id;
-      db.prepare('UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ? WHERE id = ?')
-        .run(status, now, status === 'fixed' ? now : null, newOwner, id);
+
+      // Marking a job fixed needs proof it was actually done - see the
+      // same requirement on src/worker.js for the full reasoning.
+      let fixedReport = null, fixedPhotoPath = null, fixedVoicePath = null, fixedVoiceDuration = null;
+      if (status === 'fixed') {
+        fixedReport = String(body.report || '').trim();
+        if (fixedReport.length > 1000) return send(res, 400, { error: 'That report is too long' });
+        if (!fixedReport && !body.voiceBase64) {
+          return send(res, 400, { error: 'Add a report or a voice note describing what you did' });
+        }
+        if (!body.photoBase64) {
+          return send(res, 400, { error: 'Attach a photo of the completed job' });
+        }
+        const photoBuf = Buffer.from(body.photoBase64, 'base64');
+        if (photoBuf.length > 60 * 1024 * 1024) return send(res, 400, { error: 'File is too large (60MB max)' });
+        const photoExt = (body.photoMime && body.photoMime.split('/')[1]) ? '.' + body.photoMime.split('/')[1].split(';')[0] : '';
+        fixedPhotoPath = crypto.randomUUID() + photoExt;
+        fs.writeFileSync(path.join(UPLOADS_DIR, fixedPhotoPath), photoBuf);
+
+        if (body.voiceBase64) {
+          const voiceBuf = Buffer.from(body.voiceBase64, 'base64');
+          if (voiceBuf.length > 25 * 1024 * 1024) return send(res, 400, { error: 'Voice note is too large (25MB max)' });
+          const voiceExt = (body.voiceMime && body.voiceMime.split('/')[1]) ? '.' + body.voiceMime.split('/')[1].split(';')[0] : '.webm';
+          fixedVoicePath = crypto.randomUUID() + voiceExt;
+          fs.writeFileSync(path.join(UPLOADS_DIR, fixedVoicePath), voiceBuf);
+          fixedVoiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
+        }
+      }
+
+      db.prepare(`UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ?,
+          fixed_report = COALESCE(?, fixed_report), fixed_photo_path = COALESCE(?, fixed_photo_path),
+          fixed_voice_path = COALESCE(?, fixed_voice_path), fixed_voice_duration = COALESCE(?, fixed_voice_duration),
+          fixed_by_name = COALESCE(?, fixed_by_name)
+        WHERE id = ?`)
+        .run(status, now, status === 'fixed' ? now : null, newOwner,
+          fixedReport || null, fixedPhotoPath, fixedVoicePath, fixedVoiceDuration,
+          status === 'fixed' ? (maintRequester.name || null) : null,
+          id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
 
       const statusNotice = { in_progress: 'Started work on: ', fixed: 'Fixed: ' };

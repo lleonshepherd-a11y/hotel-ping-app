@@ -565,6 +565,13 @@ if (!maintenanceColumns.includes('owner_staff_id')) {
 if (!maintenanceColumns.includes('sort_order')) {
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN sort_order REAL');
 }
+if (!maintenanceColumns.includes('fixed_report')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_report TEXT');
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_photo_path TEXT');
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_voice_path TEXT');
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_voice_duration INTEGER');
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_by_name TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS blockers (

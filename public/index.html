@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260927b">
+<link rel="stylesheet" href="/styles.css?v=20260927c">
 </head>
 <body>
 
@@ -1386,6 +1386,54 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="completeJobOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Complete this job</h2>
+      <button class="admin-close" id="completeJobClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="broadcast-hint">Proof it's actually done - a photo of the finished job, and a report of what you did.</p>
+    <form class="maint-new-form" id="completeJobForm">
+      <textarea id="completeJobReport" placeholder="How did you complete this job?" maxlength="1000" rows="3"></textarea>
+      <div class="maint-form-row">
+        <label class="maint-photo-btn" for="completeJobPhoto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/></svg>
+          <span>Add photo</span>
+        </label>
+        <input type="file" id="completeJobPhoto" accept="image/*" hidden>
+        <button type="button" class="maint-voice-btn" id="completeVoiceBtn" aria-label="Record a voice note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg>
+        </button>
+        <button type="submit" class="admin-add-btn">Mark as fixed</button>
+      </div>
+      <div class="maint-voice-recording" id="completeVoiceRecording" hidden>
+        <span class="maint-voice-dot"></span>
+        <span class="maint-voice-timer" id="completeVoiceTimer">0:00</span>
+        <span class="maint-voice-hint">Recording… tap mic to stop</span>
+      </div>
+      <div class="maint-voice-preview" id="completeVoicePreview" hidden>
+        <button type="button" class="maint-voice-play" id="completeVoicePlayBtn" aria-label="Play voice note">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <span id="completeVoicePreviewDur">0:00</span>
+        <span class="maint-voice-label">Voice note attached</span>
+        <button type="button" class="maint-voice-remove" id="completeVoiceRemove" aria-label="Remove voice note">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="maint-photo-preview" id="completeJobPhotoPreview" hidden>
+        <img id="completeJobPhotoPreviewImg" alt="Photo preview">
+        <button type="button" class="maint-photo-remove" id="completeJobPhotoRemove" aria-label="Remove photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+    </form>
+    <div class="admin-add-error" id="completeJobError"></div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="ticketDetailOverlay" hidden>
   <div class="admin-modal ticket-detail-modal">
     <div class="admin-modal-head">
@@ -1426,6 +1474,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260927b"></script>
+<script src="/app.js?v=20260927c"></script>
 </body>
 </html>

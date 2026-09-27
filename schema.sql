@@ -224,7 +224,12 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   pinned_at TEXT,
   escalation_level INTEGER NOT NULL DEFAULT 0,
   escalated_at TEXT,
-  owner_staff_id TEXT
+  owner_staff_id TEXT,
+  fixed_report TEXT,
+  fixed_photo_path TEXT,
+  fixed_voice_path TEXT,
+  fixed_voice_duration INTEGER,
+  fixed_by_name TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 

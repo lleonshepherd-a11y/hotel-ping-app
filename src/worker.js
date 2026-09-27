@@ -971,6 +971,11 @@ function mergeTicketRow(core, meta) {
     owner_staff_id: core.owner_staff_id,
     sort_order: meta ? meta.sort_order : null,
     ticket_number: meta ? meta.rowid : null,
+    fixed_report: core.fixed_report,
+    fixed_photo_path: core.fixed_photo_path,
+    fixed_voice_path: core.fixed_voice_path,
+    fixed_voice_duration: core.fixed_voice_duration,
+    fixed_by_name: core.fixed_by_name,
   };
 }
 function rowToTicket(row) {
@@ -995,6 +1000,11 @@ function rowToTicket(row) {
     escalatedAt: row.escalated_at || undefined,
     ownerStaffId: row.owner_staff_id || undefined,
     sortOrder: row.sort_order == null ? undefined : row.sort_order,
+    fixedReport: row.fixed_report || undefined,
+    fixedPhotoUrl: row.fixed_photo_path ? "/uploads/" + row.fixed_photo_path : undefined,
+    fixedVoiceUrl: row.fixed_voice_path ? "/uploads/" + row.fixed_voice_path : undefined,
+    fixedVoiceDuration: row.fixed_voice_duration || undefined,
+    fixedByName: row.fixed_by_name || undefined,
   };
 }
 function rowToBlocker(row) {
@@ -3375,7 +3385,7 @@ export default {
         // that's just backing the claim out, not making a new one.
         const note = String(bodyIn.note || "").trim();
         if ((bodyIn.status === "in_progress" || bodyIn.status === "completed") && !note) {
-          return json({ error: bodyIn.status === "in_progress" ? "Say what you're about to do" : "Say what you did" }, 400);
+          return json({ error: bodyIn.status === "in_progress" ? "Say what your plan is" : "Say how you completed it" }, 400);
         }
         if (note.length > 300) return json({ error: "That note is too long" }, 400);
         const now = new Date().toISOString();
@@ -4228,9 +4238,53 @@ export default {
         }
         const now = new Date().toISOString();
         const newOwner = !existing.owner_staff_id && status !== "reported" ? request._staff.id : existing.owner_staff_id;
+
+        // Marking a job fixed needs proof it was actually done - a photo of
+        // the finished job, and a report of what was done (written or
+        // spoken) - not just a tap. Same reasoning as the task-status note
+        // requirement: a bare status flip is no record at all.
+        let fixedReport = null, fixedPhotoPath = null, fixedVoicePath = null, fixedVoiceDuration = null;
+        if (status === "fixed") {
+          fixedReport = String(body.report || "").trim();
+          if (fixedReport.length > 1000) return json({ error: "That report is too long" }, 400);
+          if (!fixedReport && !body.voiceBase64) {
+            return json({ error: "Add a report or a voice note describing what you did" }, 400);
+          }
+          if (!body.photoBase64) {
+            return json({ error: "Attach a photo of the completed job" }, 400);
+          }
+          if (base64ExceedsBytes(body.photoBase64, 60 * 1024 * 1024)) return json({ error: "File is too large (60MB max)" }, 400);
+          const photoBinary = atob(body.photoBase64);
+          const photoBytes = new Uint8Array(photoBinary.length);
+          for (let i = 0; i < photoBinary.length; i++) photoBytes[i] = photoBinary.charCodeAt(i);
+          const photoExt = body.photoMime && body.photoMime.split("/")[1] ? "." + body.photoMime.split("/")[1].split(";")[0] : "";
+          fixedPhotoPath = hotelKeyPrefix + crypto.randomUUID() + photoExt;
+          await env.UPLOADS.put(fixedPhotoPath, photoBytes, { httpMetadata: { contentType: body.photoMime || "application/octet-stream" } });
+
+          if (body.voiceBase64) {
+            if (base64ExceedsBytes(body.voiceBase64, 25 * 1024 * 1024)) return json({ error: "Voice note is too large (25MB max)" }, 400);
+            const voiceBinary = atob(body.voiceBase64);
+            const voiceBytes = new Uint8Array(voiceBinary.length);
+            for (let i = 0; i < voiceBinary.length; i++) voiceBytes[i] = voiceBinary.charCodeAt(i);
+            const voiceExt = body.voiceMime && body.voiceMime.split("/")[1] ? "." + body.voiceMime.split("/")[1].split(";")[0] : ".webm";
+            fixedVoicePath = hotelKeyPrefix + crypto.randomUUID() + voiceExt;
+            await env.UPLOADS.put(fixedVoicePath, voiceBytes, { httpMetadata: { contentType: body.voiceMime || "audio/webm" } });
+            fixedVoiceDuration = Number.isFinite(Number(body.voiceDuration)) ? Math.round(Number(body.voiceDuration)) : null;
+          }
+        }
+
         await env.NOIR_DB.prepare(
-          "UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ? WHERE id = ?"
-        ).bind(status, now, status === "fixed" ? now : null, newOwner, id).run();
+          `UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ?,
+             fixed_report = COALESCE(?, fixed_report), fixed_photo_path = COALESCE(?, fixed_photo_path),
+             fixed_voice_path = COALESCE(?, fixed_voice_path), fixed_voice_duration = COALESCE(?, fixed_voice_duration),
+             fixed_by_name = COALESCE(?, fixed_by_name)
+           WHERE id = ?`
+        ).bind(
+          status, now, status === "fixed" ? now : null, newOwner,
+          fixedReport || null, fixedPhotoPath, fixedVoicePath, fixedVoiceDuration,
+          status === "fixed" ? (request._staff.name || null) : null,
+          id
+        ).run();
         const row = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`

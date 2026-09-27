@@ -1716,23 +1716,23 @@ function cycleTaskStatus(m){
   if(nextStatus === "in_progress"){
     showPrompt({
       title: "Starting this task",
-      placeholder: "What are you about to do?",
+      placeholder: "What's your plan for this?",
       confirmLabel: "Start task",
       maxLength: 300,
     }).then(function(note){
       note = (note || "").trim();
-      if(!note){ if(note !== null) showToast("Say what you're about to do"); return; }
+      if(!note){ if(note !== null) showToast("Say what your plan is"); return; }
       sendTaskStatus(m, nextStatus, note);
     });
   } else if(nextStatus === "completed"){
     showPrompt({
-      title: "Marking this done",
-      placeholder: "What did you do?",
+      title: "Completing this task",
+      placeholder: "How did you complete this task?",
       confirmLabel: "Mark as done",
       maxLength: 300,
     }).then(function(note){
       note = (note || "").trim();
-      if(!note){ if(note !== null) showToast("Say what you did"); return; }
+      if(!note){ if(note !== null) showToast("Say how you completed it"); return; }
       sendTaskStatus(m, nextStatus, note);
     });
   } else {
@@ -7629,7 +7629,7 @@ function buildStatusActions(t, onAfterUpdate){
     fixedBtn.type = "button";
     fixedBtn.className = "maint-card-btn fixed-btn";
     fixedBtn.textContent = "Mark fixed";
-    fixedBtn.addEventListener("click", function(e){ e.stopPropagation(); go("fixed"); });
+    fixedBtn.addEventListener("click", function(e){ e.stopPropagation(); openCompleteJobModal(t, onAfterUpdate); });
     actions.appendChild(fixedBtn);
   } else {
     var reopenBtn = document.createElement("button");
@@ -7903,6 +7903,14 @@ function renderTicketDetail(){
   }
   if(t.voiceUrl) html += '<div id="ticketVoicePlaceholder"></div>';
   html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
+  if(t.status === "fixed" && (t.fixedReport || t.fixedPhotoUrl || t.fixedVoiceUrl)){
+    html += '<div class="ticket-fixed-report">' +
+      '<div class="ticket-fixed-report-label">Completion report' + (t.fixedByName ? ' · ' + esc(t.fixedByName) : '') + '</div>' +
+      (t.fixedReport ? '<div class="ticket-fixed-report-text">' + esc(t.fixedReport) + '</div>' : '') +
+      (t.fixedPhotoUrl ? '<img class="ticket-detail-media" src="' + mediaUrl(t.fixedPhotoUrl) + '" alt="Completed job photo">' : '') +
+      (t.fixedVoiceUrl ? '<div id="ticketFixedVoicePlaceholder"></div>' : '') +
+      '</div>';
+  }
   ticketDetailBody.innerHTML = html;
   if(t.voiceUrl){
     // Same rich waveform player used for voice messages in chat, rather
@@ -7911,6 +7919,12 @@ function renderTicketDetail(){
     var voiceNode = buildAudioNode({ url: t.voiceUrl, duration: t.voiceDuration });
     voiceNode.classList.add("ticket-detail-voice");
     voicePlaceholder.replaceWith(voiceNode);
+  }
+  if(t.fixedVoiceUrl){
+    var fixedVoicePlaceholder = document.getElementById("ticketFixedVoicePlaceholder");
+    var fixedVoiceNode = buildAudioNode({ url: t.fixedVoiceUrl, duration: t.fixedVoiceDuration });
+    fixedVoiceNode.classList.add("ticket-detail-voice");
+    fixedVoicePlaceholder.replaceWith(fixedVoiceNode);
   }
   var pinBtn = buildPinButton(t);
   pinBtn.classList.add("ticket-detail-pin");
@@ -8140,6 +8154,182 @@ function updateTicketStatus(id, status){
     showToast("Couldn't update that");
   });
 }
+
+/* ---- Complete a job: requires a photo + a written or spoken report ---- */
+var completeJobOverlay = document.getElementById("completeJobOverlay");
+var completeJobClose = document.getElementById("completeJobClose");
+var completeJobForm = document.getElementById("completeJobForm");
+var completeJobReport = document.getElementById("completeJobReport");
+var completeJobError = document.getElementById("completeJobError");
+var completeJobPhoto = document.getElementById("completeJobPhoto");
+var completeJobPhotoPreview = document.getElementById("completeJobPhotoPreview");
+var completeJobPhotoPreviewImg = document.getElementById("completeJobPhotoPreviewImg");
+var completeJobPhotoRemove = document.getElementById("completeJobPhotoRemove");
+var completeJobPhotoFile = null;
+var completeJobTicket = null;
+var completeJobAfterUpdate = null;
+
+completeJobPhoto.addEventListener("change", function(){
+  var file = completeJobPhoto.files && completeJobPhoto.files[0];
+  if(!file) return;
+  completeJobPhotoFile = file;
+  var reader = new FileReader();
+  reader.onload = function(){
+    completeJobPhotoPreviewImg.src = String(reader.result);
+    completeJobPhotoPreview.hidden = false;
+  };
+  reader.readAsDataURL(file);
+});
+completeJobPhotoRemove.addEventListener("click", function(){
+  completeJobPhotoFile = null;
+  completeJobPhoto.value = "";
+  completeJobPhotoPreview.hidden = true;
+});
+
+var completeVoiceBtn = document.getElementById("completeVoiceBtn");
+var completeVoiceRecording = document.getElementById("completeVoiceRecording");
+var completeVoiceTimer = document.getElementById("completeVoiceTimer");
+var completeVoicePreview = document.getElementById("completeVoicePreview");
+var completeVoicePreviewDur = document.getElementById("completeVoicePreviewDur");
+var completeVoicePlayBtn = document.getElementById("completeVoicePlayBtn");
+var completeVoiceRemove = document.getElementById("completeVoiceRemove");
+var completeVoiceState = {
+  recording: false, mediaRecorder: null, stream: null, chunks: [],
+  startedAt: 0, timerId: null, blob: null, duration: 0, audioEl: null,
+};
+function completeVoiceTick(){
+  var s = Math.floor((Date.now() - completeVoiceState.startedAt)/1000);
+  completeVoiceTimer.textContent = fmtMaintVoiceDur(s);
+}
+function completeVoiceStart(){
+  if(completeVoiceState.recording || completeVoiceState.blob) return;
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    showToast("Microphone not available on this device.");
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    var rec;
+    try{ rec = new MediaRecorder(stream); }catch(e){
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      showToast("Couldn't start recording.");
+      return;
+    }
+    completeVoiceState.stream = stream;
+    completeVoiceState.mediaRecorder = rec;
+    completeVoiceState.chunks = [];
+    completeVoiceState.recording = true;
+    completeVoiceState.startedAt = Date.now();
+    completeVoiceState.timerId = setInterval(completeVoiceTick, 250);
+    rec.ondataavailable = function(e){ if(e.data.size>0) completeVoiceState.chunks.push(e.data); };
+    rec.start();
+    completeVoiceBtn.classList.add("recording");
+    completeVoiceRecording.hidden = false;
+    completeVoiceTimer.textContent = "0:00";
+  }).catch(function(){
+    showToast("Microphone permission was blocked.");
+  });
+}
+function completeVoiceStop(){
+  if(!completeVoiceState.mediaRecorder) return;
+  var rec = completeVoiceState.mediaRecorder;
+  var duration = Math.max(1, Math.round((Date.now() - completeVoiceState.startedAt)/1000));
+  rec.onstop = function(){
+    clearInterval(completeVoiceState.timerId);
+    if(completeVoiceState.stream){ completeVoiceState.stream.getTracks().forEach(function(t){ t.stop(); }); completeVoiceState.stream = null; }
+    completeVoiceState.mediaRecorder = null;
+    completeVoiceState.recording = false;
+    completeVoiceBtn.classList.remove("recording");
+    completeVoiceRecording.hidden = true;
+    var blob = new Blob(completeVoiceState.chunks, {type: rec.mimeType || (completeVoiceState.chunks[0] && completeVoiceState.chunks[0].type) || "audio/webm"});
+    completeVoiceState.chunks = [];
+    completeVoiceState.blob = blob;
+    completeVoiceState.duration = duration;
+    completeVoicePreviewDur.textContent = fmtMaintVoiceDur(duration);
+    completeVoicePreview.hidden = false;
+  };
+  try{ rec.stop(); }catch(e){}
+}
+function completeVoiceClear(){
+  if(completeVoiceState.audioEl){ completeVoiceState.audioEl.pause(); completeVoiceState.audioEl = null; }
+  completeVoiceState.blob = null;
+  completeVoiceState.duration = 0;
+  completeVoicePreview.hidden = true;
+}
+completeVoiceBtn.addEventListener("click", function(){
+  if(completeVoiceState.recording) completeVoiceStop();
+  else completeVoiceStart();
+});
+completeVoiceRemove.addEventListener("click", completeVoiceClear);
+completeVoicePlayBtn.addEventListener("click", function(){
+  if(!completeVoiceState.blob) return;
+  if(!completeVoiceState.audioEl){
+    completeVoiceState.audioEl = new Audio(URL.createObjectURL(completeVoiceState.blob));
+  }
+  if(completeVoiceState.audioEl.paused) completeVoiceState.audioEl.play().catch(function(){});
+  else completeVoiceState.audioEl.pause();
+});
+
+function openCompleteJobModal(t, onAfterUpdate){
+  completeJobTicket = t;
+  completeJobAfterUpdate = onAfterUpdate || null;
+  completeJobReport.value = "";
+  completeJobError.textContent = "";
+  completeJobPhotoFile = null;
+  completeJobPhoto.value = "";
+  completeJobPhotoPreview.hidden = true;
+  completeVoiceClear();
+  completeJobOverlay.hidden = false;
+}
+function closeCompleteJobModal(){
+  completeJobOverlay.hidden = true;
+  completeJobTicket = null;
+}
+completeJobClose.addEventListener("click", closeCompleteJobModal);
+completeJobOverlay.addEventListener("click", function(e){ if(e.target === completeJobOverlay) closeCompleteJobModal(); });
+
+completeJobForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  if(!completeJobTicket) return;
+  completeJobError.textContent = "";
+  var report = completeJobReport.value.trim();
+  var voiceBlob = completeVoiceState.blob, voiceDuration = completeVoiceState.duration;
+  if(!completeJobPhotoFile){ completeJobError.textContent = "Attach a photo of the completed job"; return; }
+  if(!report && !voiceBlob){ completeJobError.textContent = "Add a report or a voice note describing what you did"; return; }
+
+  var submitBtn = completeJobForm.querySelector(".admin-add-btn");
+  var originalLabel = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Completing…";
+
+  var payload = { status: "fixed", report: report };
+  var ticketId = completeJobTicket.id;
+  var afterUpdate = completeJobAfterUpdate;
+  blobToBase64(completeJobPhotoFile).then(function(b64){
+    payload.photoBase64 = b64;
+    payload.photoMime = completeJobPhotoFile.type;
+  }).then(function(){
+    if(!voiceBlob) return;
+    return blobToBase64(voiceBlob).then(function(b64){
+      payload.voiceBase64 = b64;
+      payload.voiceMime = voiceBlob.type || "audio/webm";
+      payload.voiceDuration = voiceDuration;
+    });
+  }).then(function(){
+    return apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/status', 'POST', payload);
+  }).then(function(res){
+    var idx = STATE.tickets.findIndex(function(x){ return x.id === ticketId; });
+    if(idx !== -1) STATE.tickets[idx] = res.ticket;
+    renderMaintenanceBoard();
+    showToast("Marked fixed");
+    closeCompleteJobModal();
+    if(afterUpdate) afterUpdate();
+  }).catch(function(err){
+    completeJobError.textContent = (err && err.message) || "Couldn't complete that";
+  }).finally(function(){
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
+  });
+});
 
 /* ---- Guest concierge requests ---- */
 var guestsFeed = document.getElementById("guestsFeed");
