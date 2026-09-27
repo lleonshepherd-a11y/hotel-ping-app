@@ -130,6 +130,18 @@ CREATE TABLE IF NOT EXISTS muted_conversations (
   PRIMARY KEY (department_id, other_dept_id)
 );
 
+-- A cleared conversation tidies it off the inbox list, same as swiping a
+-- chat away in any normal messaging app - it never deletes anything, and
+-- a new incoming message from that department un-clears it automatically
+-- (see GET /api/cleared and how the client compares cleared_at against
+-- each thread's own last-message time).
+CREATE TABLE IF NOT EXISTS cleared_conversations (
+  department_id TEXT NOT NULL,
+  other_dept_id TEXT NOT NULL,
+  cleared_at TEXT NOT NULL,
+  PRIMARY KEY (department_id, other_dept_id)
+);
+
 CREATE TABLE IF NOT EXISTS handover_notes (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,

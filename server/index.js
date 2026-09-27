@@ -2434,6 +2434,35 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { muted: true });
     }
 
+    if (req.method === 'GET' && p === '/api/cleared') {
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const clearedRequester = staffFromToken(req);
+      if (!canViewAsSelf(clearedRequester, self)) return send(res, 403, { error: "You can only view your own department's settings" });
+      const rows = db.prepare('SELECT other_dept_id, cleared_at FROM cleared_conversations WHERE department_id = ?').all(self);
+      return send(res, 200, { cleared: rows.map((r) => ({ with: r.other_dept_id, clearedAt: r.cleared_at })) });
+    }
+
+    if (req.method === 'POST' && p === '/api/cleared') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const other = body.with;
+      if (!DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      const self = requester.department_id;
+      const now = new Date().toISOString();
+      db.prepare(`INSERT INTO cleared_conversations (department_id, other_dept_id, cleared_at) VALUES (?, ?, ?)
+        ON CONFLICT(department_id, other_dept_id) DO UPDATE SET cleared_at = excluded.cleared_at`).run(self, other, now);
+      return send(res, 200, { clearedAt: now });
+    }
+
+    if (req.method === 'DELETE' && p === '/api/cleared') {
+      const requester = staffFromToken(req);
+      const other = url.searchParams.get('with');
+      if (!DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      db.prepare('DELETE FROM cleared_conversations WHERE department_id = ? AND other_dept_id = ?').run(requester.department_id, other);
+      return send(res, 200, { ok: true });
+    }
+
     const GM_MUTABLE_DEPTS = Array.from(DEPT_IDS).filter((d) => d !== 'gm');
     if (req.method === 'GET' && p === '/api/gm/mute-departments') {
       const requester = staffFromToken(req);

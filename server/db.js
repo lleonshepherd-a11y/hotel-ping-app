@@ -252,6 +252,13 @@ db.exec(`
     PRIMARY KEY (department_id, other_dept_id)
   );
 
+  CREATE TABLE IF NOT EXISTS cleared_conversations (
+    department_id TEXT NOT NULL,
+    other_dept_id TEXT NOT NULL,
+    cleared_at TEXT NOT NULL,
+    PRIMARY KEY (department_id, other_dept_id)
+  );
+
   CREATE TABLE IF NOT EXISTS handover_notes (
     id TEXT PRIMARY KEY,
     department_id TEXT NOT NULL,

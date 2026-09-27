@@ -3749,6 +3749,40 @@ export default {
         return json({ muted: true });
       }
 
+      // Clearing tidies a conversation off the inbox - it's never deleted,
+      // and a new message from that department brings it straight back
+      // (the client compares cleared_at against the thread's own last
+      // message time, same idea as an unread badge clearing itself).
+      if (method === "GET" && p === "/api/cleared") {
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's settings" }, 403);
+        const rows = await env.DB.prepare("SELECT other_dept_id, cleared_at FROM cleared_conversations WHERE department_id = ?").bind(self).all();
+        return json({ cleared: rows.results.map((r) => ({ with: r.other_dept_id, clearedAt: r.cleared_at })) });
+      }
+
+      if (method === "POST" && p === "/api/cleared") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const other = body.with;
+        if (!DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        const self = requester.department_id;
+        const now = new Date().toISOString();
+        await env.DB.prepare(
+          `INSERT INTO cleared_conversations (department_id, other_dept_id, cleared_at) VALUES (?, ?, ?)
+           ON CONFLICT(department_id, other_dept_id) DO UPDATE SET cleared_at = excluded.cleared_at`
+        ).bind(self, other, now).run();
+        return json({ clearedAt: now });
+      }
+
+      if (method === "DELETE" && p === "/api/cleared") {
+        const requester = request._staff;
+        const other = url.searchParams.get("with");
+        if (!DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        await env.DB.prepare("DELETE FROM cleared_conversations WHERE department_id = ? AND other_dept_id = ?").bind(requester.department_id, other).run();
+        return json({ ok: true });
+      }
+
       // ---- GM's own "don't notify me for plain departments" switch ----
       // A personal GM setting, not a department one - only the GM (is_admin,
       // which is GM-only now) can read or flip it. Built on the same

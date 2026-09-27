@@ -130,7 +130,10 @@ var STATE = {
   replyingTo: null,
   muted: {},
   threadOpened: false,
-  myHelpAlertId: null
+  myHelpAlertId: null,
+  clearedThreads: {}, // { deptId: clearedAtTimestamp } - loaded from /api/cleared
+  openSwipeCloser: null,
+  threadSwipeOpen: false
 };
 
 /* ---------------- Real backend client ---------------- */
@@ -646,6 +649,23 @@ function hasOutstandingTask(deptId){
 function hasOutstandingRoomClean(deptId){
   return (STATE.data[deptId] || []).some(function(m){ return m.from !== "self" && m.roomClean && !m.completed; });
 }
+// A cleared thread stays off the main list until a new message actually
+// arrives in it - clearing tidies up the view, it never hides something
+// new.
+function isThreadCleared(deptId){
+  var clearedAt = STATE.clearedThreads[deptId];
+  if(!clearedAt) return false;
+  var last = lastOf(STATE.data[deptId]);
+  return !last || last.t <= clearedAt;
+}
+function clearThread(deptId){
+  STATE.clearedThreads[deptId] = Date.now();
+  STATE.threadSwipeOpen = false;
+  STATE.openSwipeCloser = null;
+  renderList();
+  showToast("Cleared");
+  apiSend('/api/cleared', 'POST', { with: deptId }).catch(function(){});
+}
 
 function fmtClockDuration(seconds){
   seconds = Math.max(0, Math.round(seconds || 0));
@@ -687,11 +707,12 @@ function findSearchMatch(id, term){
 }
 
 function renderList(){
-  if(STATE.reordering) return;
+  if(STATE.reordering || STATE.threadSwipeOpen) return;
   threadList.innerHTML = "";
   var term = (STATE.searchTerm || "").trim().toLowerCase();
   var matches = {};
   var ids = sortedDeptIds().filter(function(id){
+    if(isThreadCleared(id) && !term) return false;
     if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
     if(STATE.chatFilter === "urgent" && !hasUrgentUnread(id)) return false;
     if(STATE.chatFilter === "tasks" && !hasOutstandingTask(id)) return false;
@@ -772,27 +793,56 @@ function renderList(){
         }, 80);
       }
     });
+    var wrap = document.createElement("div");
+    wrap.className = "thread-item-wrap";
+    var clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "t-clear-action";
+    clearBtn.textContent = "Clear";
+    clearBtn.addEventListener("click", function(e){ e.stopPropagation(); clearThread(id); });
+    wrap.appendChild(clearBtn);
+    wrap.appendChild(el);
     attachThreadReorder(el, id);
-    threadList.appendChild(el);
+    threadList.appendChild(wrap);
   });
 }
 
+var SWIPE_REVEAL_PX = 84, SWIPE_OPEN_THRESHOLD_PX = 40;
 function attachThreadReorder(el, deptId){
   var LONG_PRESS_MS = 350, MOVE_TOLERANCE = 10;
   var timer = null, startX = 0, startY = 0, pointerId = null;
   var dragging = false, ghost = null, rowH = 0, grabOffsetY = 0;
   var order = [], elems = [], startRect = null, lastTargetIndex = null;
+  var swiping = false, swipeX = 0;
 
   function teardown(){
     document.removeEventListener("pointermove", onPreMove);
     document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointermove", onSwipeMove);
     document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointerup", onSwipeUp);
     document.removeEventListener("pointercancel", onCancel);
     clearTimeout(timer);
     pointerId = null;
   }
+  function closeSwipe(){
+    el.style.transition = "transform .2s ease";
+    el.style.transform = "";
+    el.classList.remove("swiped-open");
+    if(STATE.openSwipeCloser === closeSwipe) STATE.openSwipeCloser = null;
+    STATE.threadSwipeOpen = false;
+  }
   function onDown(e){
     if(e.button !== undefined && e.button !== 0) return;
+    // A row that's already swiped open just closes on the next tap,
+    // rather than opening its thread or starting a fresh gesture on top
+    // of the revealed Clear action.
+    if(el.classList.contains("swiped-open")){
+      closeSwipe();
+      el._suppressClick = true;
+      return;
+    }
+    if(STATE.openSwipeCloser) STATE.openSwipeCloser();
     pointerId = e.pointerId;
     startX = e.clientX; startY = e.clientY;
     clearTimeout(timer);
@@ -803,8 +853,45 @@ function attachThreadReorder(el, deptId){
   }
   function onPreMove(e){
     if(e.pointerId !== pointerId || dragging) return;
-    if(Math.abs(e.clientX-startX) > MOVE_TOLERANCE || Math.abs(e.clientY-startY) > MOVE_TOLERANCE){
+    var dx = e.clientX - startX, dy = e.clientY - startY;
+    if(Math.abs(dx) > MOVE_TOLERANCE && Math.abs(dx) > Math.abs(dy)){
       clearTimeout(timer);
+      document.removeEventListener("pointermove", onPreMove);
+      document.removeEventListener("pointerup", onUp);
+      swiping = true;
+      // Blocked from the moment a swipe gesture starts, not just once it
+      // settles open - a poll landing mid-drag would otherwise blow away
+      // the row this gesture is tracking and silently strand the rest of
+      // the gesture on a detached, invisible element.
+      STATE.threadSwipeOpen = true;
+      el.style.transition = "none";
+      document.addEventListener("pointermove", onSwipeMove);
+      document.addEventListener("pointerup", onSwipeUp);
+      return;
+    }
+    if(Math.abs(dy) > MOVE_TOLERANCE){
+      clearTimeout(timer);
+    }
+  }
+  function onSwipeMove(e){
+    if(e.pointerId !== pointerId) return;
+    e.preventDefault();
+    swipeX = Math.max(-SWIPE_REVEAL_PX, Math.min(0, e.clientX - startX));
+    el.style.transform = "translateX(" + swipeX + "px)";
+  }
+  function onSwipeUp(e){
+    if(e.pointerId !== pointerId) return;
+    teardown();
+    swiping = false;
+    el._suppressClick = true;
+    if(-swipeX > SWIPE_OPEN_THRESHOLD_PX){
+      el.style.transition = "transform .2s ease";
+      el.style.transform = "translateX(-" + SWIPE_REVEAL_PX + "px)";
+      el.classList.add("swiped-open");
+      STATE.openSwipeCloser = closeSwipe;
+      STATE.threadSwipeOpen = true;
+    } else {
+      closeSwipe();
     }
   }
   function startLift(e){
@@ -816,7 +903,11 @@ function attachThreadReorder(el, deptId){
     elems = Array.prototype.slice.call(threadList.querySelectorAll(".thread-item"));
     order = elems.map(function(x){ return x.getAttribute("data-dept-id"); });
     startRect = el.getBoundingClientRect();
-    var next = el.nextElementSibling;
+    // el now sits inside its own .thread-item-wrap (for the swipe-to-clear
+    // action behind it), so its next row is elems[idx+1], not a raw DOM
+    // nextElementSibling - that would be undefined, being the only
+    // .thread-item in its wrap.
+    var next = elems[elems.indexOf(el) + 1];
     rowH = startRect.height + (next ? next.getBoundingClientRect().top - startRect.bottom : 8);
     grabOffsetY = startY - startRect.top;
     ghost = el.cloneNode(true);
@@ -886,6 +977,7 @@ function attachThreadReorder(el, deptId){
     if(e.pointerId !== pointerId) return;
     teardown();
     if(dragging){ dragging = false; lastTargetIndex = null; settle(); }
+    if(swiping){ swiping = false; closeSwipe(); }
   }
   el.addEventListener("pointerdown", onDown);
 }
@@ -899,6 +991,10 @@ function markRead(deptId){
 function openThread(deptId){
   var __openT0 = performance.now();
   if(STATE.active !== deptId){ clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; saveCurrentDraft(); }
+  if(STATE.clearedThreads[deptId]){
+    delete STATE.clearedThreads[deptId];
+    apiDelete('/api/cleared?with=' + encodeURIComponent(deptId)).catch(function(){});
+  }
   STATE.active = deptId;
   STATE.activeGroupId = null;
   STATE.threadOpened = true;
@@ -2430,6 +2526,13 @@ function loadMutedList(){
   }).catch(function(){});
 }
 
+function loadClearedList(){
+  return apiGet('/api/cleared?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    STATE.clearedThreads = {};
+    (res.cleared || []).forEach(function(row){ STATE.clearedThreads[row.with] = new Date(row.clearedAt).getTime(); });
+  }).catch(function(){});
+}
+
 function switchSelf(id){
   if(id === STATE.self || STATE.loading) return;
   STATE.self = id;
@@ -2438,7 +2541,7 @@ function switchSelf(id){
   renderSwitcher();
   renderMyProfileCard();
   updateComposerLock();
-  Promise.all([buildData(id), loadMutedList()]).then(function(results){
+  Promise.all([buildData(id), loadMutedList(), loadClearedList()]).then(function(results){
     STATE.data = results[0];
     var order = sortedDeptIds();
     STATE.active = order[0];
@@ -3561,7 +3664,7 @@ function boot(){
   } else {
     renderList();
   }
-  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList()]).then(function(results){
+  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList(), loadClearedList()]).then(function(results){
     STATE.data = mergePendingIntoData(results[2]);
     flushOfflineQueue();
     renderBooted();
@@ -6233,6 +6336,52 @@ operationalBtn.addEventListener("click", function(){
 });
 operationalClose.addEventListener("click", function(){ operationalOverlay.hidden = true; });
 operationalOverlay.addEventListener("click", function(e){ if(e.target === operationalOverlay) operationalOverlay.hidden = true; });
+
+/* ---------------- Directory (start/reopen a conversation) ---------------- */
+var directoryBtn = document.getElementById("directoryBtn");
+var directoryOverlay = document.getElementById("directoryOverlay");
+var directoryClose = document.getElementById("directoryClose");
+var directoryList = document.getElementById("directoryList");
+var directorySearchInput = document.getElementById("directorySearchInput");
+
+function renderDirectory(){
+  var term = directorySearchInput.value.trim().toLowerCase();
+  var ids = Object.keys(STATE.data).filter(function(id){
+    var d = DEPTS[id];
+    if(!d) return false;
+    return !term || d.name.toLowerCase().indexOf(term) !== -1;
+  }).sort(function(a, b){ return DEPTS[a].name.localeCompare(DEPTS[b].name); });
+
+  if(!ids.length){
+    directoryList.innerHTML = '<div class="handover-empty">No departments match that.</div>';
+    return;
+  }
+  directoryList.innerHTML = "";
+  ids.forEach(function(id){
+    var d = DEPTS[id];
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "directory-row";
+    row.innerHTML =
+      '<span class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="directory-row-name">'+esc(d.name)+'</span>'+
+      (isThreadCleared(id) ? '<span class="directory-row-cleared">Cleared</span>' : '');
+    row.addEventListener("click", function(){
+      directoryOverlay.hidden = true;
+      openThread(id);
+      renderList();
+    });
+    directoryList.appendChild(row);
+  });
+}
+directoryBtn.addEventListener("click", function(){
+  directorySearchInput.value = "";
+  renderDirectory();
+  directoryOverlay.hidden = false;
+});
+directoryClose.addEventListener("click", function(){ directoryOverlay.hidden = true; });
+directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) directoryOverlay.hidden = true; });
+directorySearchInput.addEventListener("input", renderDirectory);
 
 /* ---------------- Blockers ("waiting on" chains) ---------------- */
 var blockersBtn = document.getElementById("blockersBtn");

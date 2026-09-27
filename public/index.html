@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20260927d">
+<link rel="stylesheet" href="/styles.css?v=20260927e">
 </head>
 <body>
 
@@ -318,6 +318,9 @@
       <div class="list-header-title" id="listLabel">Conversations</div>
       <div class="list-header-right">
         <div class="list-header-scope" id="listHeaderScope">All Departments</div>
+        <button class="directory-open-btn" id="directoryBtn" type="button" aria-label="Start a conversation" title="Start a conversation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
         <div class="sb-search" id="headerSearchWrap">
           <button class="search-toggle-btn" id="searchToggleBtn" type="button" aria-label="Search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -936,6 +939,22 @@
   </div>
 </div>
 
+<div class="admin-overlay" id="directoryOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Start a conversation</h2>
+      <button class="admin-close" id="directoryClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sb-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="directorySearchInput" placeholder="Search departments">
+    </div>
+    <div class="directory-list" id="directoryList"></div>
+  </div>
+</div>
+
 <div class="admin-overlay" id="operationalOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1473,6 +1492,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20260927d"></script>
+<script src="/app.js?v=20260927e"></script>
 </body>
 </html>
