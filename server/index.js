@@ -225,6 +225,12 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     roomNumber: row.room_number || undefined,
     roomClean: row.room_clean || undefined,
     taskStatus: row.task_status || undefined,
+    taskStartedNote: row.task_started_note || undefined,
+    taskStartedBy: row.task_started_by || undefined,
+    taskStartedAt: row.task_started_at || undefined,
+    taskCompletedNote: row.task_completed_note || undefined,
+    taskCompletedBy: row.task_completed_by || undefined,
+    taskCompletedAt: row.task_completed_at || undefined,
     groupId: row.group_id || undefined,
     editedAt: row.edited_at || undefined,
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
@@ -2110,7 +2116,21 @@ const server = http.createServer(async (req, res) => {
       if (existing.to_dept !== requester.department_id) return send(res, 403, { error: 'Only the department this task was sent to can update it' });
       const bodyIn = await readJsonBody(req);
       if (!TASK_STATUSES.includes(bodyIn.status)) return send(res, 400, { error: 'Invalid task status' });
-      db.prepare('UPDATE messages SET task_status = ? WHERE id = ?').run(bodyIn.status, id);
+      const note = String(bodyIn.note || '').trim();
+      if ((bodyIn.status === 'in_progress' || bodyIn.status === 'completed') && !note) {
+        return send(res, 400, { error: bodyIn.status === 'in_progress' ? "Say what you're about to do" : 'Say what you did' });
+      }
+      if (note.length > 300) return send(res, 400, { error: 'That note is too long' });
+      const nowIso = new Date().toISOString();
+      if (bodyIn.status === 'in_progress') {
+        db.prepare('UPDATE messages SET task_status = ?, task_started_note = ?, task_started_by = ?, task_started_at = ? WHERE id = ?')
+          .run(bodyIn.status, note, requester.name || null, nowIso, id);
+      } else if (bodyIn.status === 'completed') {
+        db.prepare('UPDATE messages SET task_status = ?, task_completed_note = ?, task_completed_by = ?, task_completed_at = ? WHERE id = ?')
+          .run(bodyIn.status, note, requester.name || null, nowIso, id);
+      } else {
+        db.prepare('UPDATE messages SET task_status = ? WHERE id = ?').run(bodyIn.status, id);
+      }
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       if (bodyIn.status === 'in_progress' || bodyIn.status === 'completed') {
         // The task card is the whole record of its own progress - one message,
@@ -2119,7 +2139,7 @@ const server = http.createServer(async (req, res) => {
         // would fragment the task into two rows.
         const verb = bodyIn.status === 'in_progress' ? 'Accepted' : 'Completed';
         const taskPreview = existing.body ? ': "' + existing.body + '"' : '';
-        console.log('[task notify]', existing.from_dept, verb.toLowerCase(), 'task' + taskPreview);
+        console.log('[task notify]', existing.from_dept, verb.toLowerCase(), 'task' + taskPreview, '-', note);
       }
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
@@ -2777,19 +2797,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ticket: rowToTicket(row) });
     }
 
+    // No one deletes a maintenance job - see src/worker.js for the full reasoning.
     if (req.method === 'DELETE' && p.startsWith('/api/maintenance/')) {
-      const id = decodeURIComponent(p.slice('/api/maintenance/'.length));
-      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Ticket not found' });
-      const requester = staffFromToken(req);
-      if (existing.created_by !== requester.department_id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only remove your own department's tickets" });
-      }
-      if (existing.status !== 'reported' && !requester.is_admin) {
-        return send(res, 400, { error: "This job has already been picked up and can't be deleted" });
-      }
-      db.prepare('DELETE FROM maintenance_tickets WHERE id = ?').run(id);
-      return send(res, 200, { ok: true });
+      return send(res, 403, { error: "Jobs can't be deleted once reported - this is permanent, for every role including admin. Mark it fixed instead." });
     }
 
     if (req.method === 'GET' && p === '/api/guest-requests') {

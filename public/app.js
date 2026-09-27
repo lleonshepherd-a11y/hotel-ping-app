@@ -209,6 +209,10 @@ function mapServerMessage(row, self){
     roomNumber: row.roomNumber || undefined,
     roomClean: row.roomClean || undefined,
     taskStatus: row.taskStatus || undefined,
+    taskStartedNote: row.taskStartedNote || undefined,
+    taskStartedBy: row.taskStartedBy || undefined,
+    taskCompletedNote: row.taskCompletedNote || undefined,
+    taskCompletedBy: row.taskCompletedBy || undefined,
     edited: !!row.editedAt,
     mentions: row.mentions || undefined,
     signoff: row.signoff || undefined,
@@ -1694,15 +1698,46 @@ function decideSignoff(m, decision){
 
 var TASK_LABELS = { not_started: "New", in_progress: "Started", completed: "Completed" };
 var TASK_NEXT = { not_started: "in_progress", in_progress: "completed", completed: "not_started" };
-function cycleTaskStatus(m){
-  var nextStatus = TASK_NEXT[m.taskStatus] || "not_started";
-  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/task-status', 'POST', { status: nextStatus }).then(function(res){
+function sendTaskStatus(m, nextStatus, note){
+  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/task-status', 'POST', { status: nextStatus, note: note || undefined }).then(function(res){
     var msgs = currentMessagesArray();
     var idx = msgs.findIndex(function(x){ return x.id === m.id; });
     if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
     renderThread();
     showToast(TASK_LABELS[nextStatus]);
-  }).catch(function(){ showToast("Couldn't update that"); });
+  }).catch(function(e){ showToast((e && e.message) || "Couldn't update that"); });
+}
+function cycleTaskStatus(m){
+  var nextStatus = TASK_NEXT[m.taskStatus] || "not_started";
+  // Starting or finishing needs a written note - a status flip with
+  // nothing behind it is a tap, not proof the work actually happened.
+  // Reopening (back to not started) is just backing that out, so it
+  // doesn't need one.
+  if(nextStatus === "in_progress"){
+    showPrompt({
+      title: "Starting this task",
+      placeholder: "What are you about to do?",
+      confirmLabel: "Start task",
+      maxLength: 300,
+    }).then(function(note){
+      note = (note || "").trim();
+      if(!note){ if(note !== null) showToast("Say what you're about to do"); return; }
+      sendTaskStatus(m, nextStatus, note);
+    });
+  } else if(nextStatus === "completed"){
+    showPrompt({
+      title: "Marking this done",
+      placeholder: "What did you do?",
+      confirmLabel: "Mark as done",
+      maxLength: 300,
+    }).then(function(note){
+      note = (note || "").trim();
+      if(!note){ if(note !== null) showToast("Say what you did"); return; }
+      sendTaskStatus(m, nextStatus, note);
+    });
+  } else {
+    sendTaskStatus(m, nextStatus, null);
+  }
 }
 
 var forwardOverlay = document.getElementById("forwardOverlay");
@@ -1964,8 +1999,28 @@ function buildTaskCard(m){
   var fromDept = DEPTS[m.from] || { name: m.from };
   var meta = document.createElement("div");
   meta.className = "task-card-meta";
-  meta.textContent = "From " + fromDept.name + " · " + fmtNoteTime(m.createdAt);
+  meta.textContent = "From " + fromDept.name + " · " + fmtNoteTime(m.t);
   card.appendChild(meta);
+
+  // Starting or finishing a task always leaves a note behind - this is
+  // the actual proof the work happened, not just a status flip, so it's
+  // shown right on the card rather than tucked away somewhere else.
+  if(m.taskStartedNote){
+    var startedNote = document.createElement("div");
+    startedNote.className = "task-card-note";
+    startedNote.innerHTML =
+      '<div class="task-card-note-row"><span class="task-card-note-label">Started</span>' + (m.taskStartedBy ? '<span class="task-card-note-by">' + esc(m.taskStartedBy) + '</span>' : '') + '</div>' +
+      '<div class="task-card-note-text">' + esc(m.taskStartedNote) + '</div>';
+    card.appendChild(startedNote);
+  }
+  if(m.taskCompletedNote){
+    var completedNote = document.createElement("div");
+    completedNote.className = "task-card-note";
+    completedNote.innerHTML =
+      '<div class="task-card-note-row"><span class="task-card-note-label">Completed</span>' + (m.taskCompletedBy ? '<span class="task-card-note-by">' + esc(m.taskCompletedBy) + '</span>' : '') + '</div>' +
+      '<div class="task-card-note-text">' + esc(m.taskCompletedNote) + '</div>';
+    card.appendChild(completedNote);
+  }
 
   var canAction = m.to === AUTH.staff.departmentId;
   if(canAction && status !== "completed"){
@@ -7867,16 +7922,6 @@ function renderTicketDetail(){
     renderTicketDetail();
   }));
 
-  var canDelete = (t.status === "reported" || AUTH.staff.isAdmin) && (t.createdBy === STATE.self || AUTH.staff.isAdmin);
-  if(canDelete){
-    var delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "ticket-detail-delete";
-    delBtn.textContent = "Delete this job";
-    delBtn.addEventListener("click", function(){ deleteTicketFromDetail(t.id); });
-    ticketDetailBody.appendChild(delBtn);
-  }
-
   var historyWrap = document.createElement("div");
   historyWrap.className = "ticket-history";
   historyWrap.innerHTML = '<div class="ticket-history-label">History</div><div class="ticket-history-list" id="ticketHistoryList"><div class="ticket-replies-loading">Loading…</div></div>';
@@ -8039,24 +8084,6 @@ ticketDetailPrev.addEventListener("click", function(){
 ticketDetailNext.addEventListener("click", function(){
   if(STATE.ticketDetailIndex < STATE.ticketDetailQueue.length - 1){ STATE.ticketDetailIndex += 1; renderTicketDetail(); }
 });
-function deleteTicketFromDetail(id){
-  showConfirm({ title: "Delete this job?", body: "This can't be undone." }).then(function(ok){
-    if(!ok) return;
-    apiDelete('/api/maintenance/' + encodeURIComponent(id)).then(function(){
-      STATE.tickets = STATE.tickets.filter(function(x){ return x.id !== id; });
-      STATE.ticketDetailQueue.splice(STATE.ticketDetailIndex, 1);
-      if(!STATE.ticketDetailQueue.length){ closeTicketDetail(); } else {
-        if(STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length) STATE.ticketDetailIndex = STATE.ticketDetailQueue.length - 1;
-        renderTicketDetail();
-      }
-      renderMaintenanceBoard();
-      showToast("Deleted");
-    }).catch(function(err){
-      showToast(err.message || "Couldn't delete that");
-    });
-  });
-}
-
 var tabMaintBadge = document.getElementById("tabMaintBadge");
 function refreshMaintenanceBadge(){
   apiGet('/api/maintenance').then(function(res){

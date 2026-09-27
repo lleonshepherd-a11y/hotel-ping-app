@@ -1214,6 +1214,12 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     roomNumber: row.room_number || undefined,
     roomClean: row.room_clean || undefined,
     taskStatus: row.task_status || undefined,
+    taskStartedNote: row.task_started_note || undefined,
+    taskStartedBy: row.task_started_by || undefined,
+    taskStartedAt: row.task_started_at || undefined,
+    taskCompletedNote: row.task_completed_note || undefined,
+    taskCompletedBy: row.task_completed_by || undefined,
+    taskCompletedAt: row.task_completed_at || undefined,
     groupId: row.group_id || undefined,
     editedAt: row.edited_at || undefined,
     mentions: row.mentions ? JSON.parse(row.mentions) : undefined,
@@ -3363,7 +3369,25 @@ export default {
         if (existing.to_dept !== requester.department_id) return json({ error: "Only the department this task was sent to can update it" }, 403);
         const bodyIn = await readJsonBody(request);
         if (!TASK_STATUSES.includes(bodyIn.status)) return json({ error: "Invalid task status" }, 400);
-        await env.DB.prepare("UPDATE messages SET task_status = ? WHERE id = ?").bind(bodyIn.status, id).run();
+        // Starting or finishing a task needs a note, not just a tap - a
+        // status flip with no record of what was actually done is no proof
+        // it was done at all. Reopening (back to not_started) needs none;
+        // that's just backing the claim out, not making a new one.
+        const note = String(bodyIn.note || "").trim();
+        if ((bodyIn.status === "in_progress" || bodyIn.status === "completed") && !note) {
+          return json({ error: bodyIn.status === "in_progress" ? "Say what you're about to do" : "Say what you did" }, 400);
+        }
+        if (note.length > 300) return json({ error: "That note is too long" }, 400);
+        const now = new Date().toISOString();
+        if (bodyIn.status === "in_progress") {
+          await env.DB.prepare("UPDATE messages SET task_status = ?, task_started_note = ?, task_started_by = ?, task_started_at = ? WHERE id = ?")
+            .bind(bodyIn.status, note, requester.name || null, now, id).run();
+        } else if (bodyIn.status === "completed") {
+          await env.DB.prepare("UPDATE messages SET task_status = ?, task_completed_note = ?, task_completed_by = ?, task_completed_at = ? WHERE id = ?")
+            .bind(bodyIn.status, note, requester.name || null, now, id).run();
+        } else {
+          await env.DB.prepare("UPDATE messages SET task_status = ? WHERE id = ?").bind(bodyIn.status, id).run();
+        }
         const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         if (bodyIn.status === "in_progress" || bodyIn.status === "completed") {
           // The task card itself is the whole record of its own progress -
@@ -3376,7 +3400,7 @@ export default {
           const taskPreview = existing.body ? ': "' + existing.body + '"' : "";
           const notifyPromise = notifyDepartment(env, existing.from_dept, {
             title: verb + " task",
-            body: verb + " task" + taskPreview,
+            body: verb + " task" + taskPreview + " - " + note,
             url: "/",
             tag: "hotel-ping-task-" + id,
           }, existing.to_dept).catch((e) => console.error("notifyDepartment (task status) error:", e && e.stack || e));
@@ -4313,24 +4337,14 @@ export default {
         return json({ ticket: rowToTicket(mergeTicketRow(existing, meta)) });
       }
 
+      // No one deletes a maintenance job - not Maintenance, not the GM, not
+      // an admin. Once it's reported it stays until it's actually fixed,
+      // so a job that's been sitting untouched can never just be made to
+      // disappear instead of being done - the only way off this list is
+      // marking it fixed. This route deliberately refuses rather than
+      // being removed outright, same reasoning as the messages route above.
       if (method === "DELETE" && p.startsWith("/api/maintenance/")) {
-        const id = decodeURIComponent(p.slice("/api/maintenance/".length));
-        const existing = await env.NOIR_DB.prepare(
-          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
-           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
-        ).bind(id).first();
-        if (!existing) return json({ error: "Ticket not found" }, 404);
-        const requester = request._staff;
-        if (!canManageMaintenance(requester)) {
-          return json({ error: "Not authorized" }, 403);
-        }
-        if (existing.status !== "reported" && !requester.is_admin) {
-          return json({ error: "This job has already been picked up and can't be deleted" }, 400);
-        }
-        await env.NOIR_DB.prepare("DELETE FROM maintenance_replies WHERE ticket_id = ?").bind(id).run();
-        await env.NOIR_DB.prepare("DELETE FROM maintenance_tickets WHERE id = ?").bind(id).run();
-        await env.DB.prepare("DELETE FROM maintenance_ticket_meta WHERE ticket_id = ?").bind(id).run();
-        return json({ ok: true });
+        return json({ error: "Jobs can't be deleted once reported - this is permanent, for every role including admin. Mark it fixed instead." }, 403);
       }
 
       if (method === "GET" && p === "/api/guest-requests") {

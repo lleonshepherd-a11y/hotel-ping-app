@@ -161,6 +161,14 @@ if (!messageColumns.includes('client_message_id')) {
 if (!messageColumns.includes('task_reminder_sent')) {
   db.exec('ALTER TABLE messages ADD COLUMN task_reminder_sent INTEGER NOT NULL DEFAULT 0');
 }
+if (!messageColumns.includes('task_started_note')) {
+  db.exec('ALTER TABLE messages ADD COLUMN task_started_note TEXT');
+  db.exec('ALTER TABLE messages ADD COLUMN task_started_by TEXT');
+  db.exec('ALTER TABLE messages ADD COLUMN task_started_at TEXT');
+  db.exec('ALTER TABLE messages ADD COLUMN task_completed_note TEXT');
+  db.exec('ALTER TABLE messages ADD COLUMN task_completed_by TEXT');
+  db.exec('ALTER TABLE messages ADD COLUMN task_completed_at TEXT');
+}
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_client_id ON messages(client_message_id) WHERE client_message_id IS NOT NULL');
 
 const toDeptCol = db.prepare("PRAGMA table_info(messages)").all().find((c) => c.name === 'to_dept');
@@ -210,9 +218,16 @@ if (toDeptCol && toDeptCol.notnull) {
       affects_guest INTEGER NOT NULL DEFAULT 0,
       room_clean TEXT,
       from_staff_name TEXT,
-      client_message_id TEXT
+      client_message_id TEXT,
+      task_reminder_sent INTEGER NOT NULL DEFAULT 0,
+      task_started_note TEXT,
+      task_started_by TEXT,
+      task_started_at TEXT,
+      task_completed_note TEXT,
+      task_completed_by TEXT,
+      task_completed_at TEXT
     );
-    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean, from_staff_name, client_message_id FROM messages;
+    INSERT INTO messages_new SELECT id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, deleted_at, reply_to_id, pinned_at, completed_at, completed_by, escalated_at, broadcast_id, room_number, read_at, task_status, group_id, edited_at, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_decided_by, signoff_decided_at, signoff_code, dashboard_conversation_id, poll_question, poll_options, poll_votes, escalation_level, affects_guest, room_clean, from_staff_name, client_message_id, task_reminder_sent, task_started_note, task_started_by, task_started_at, task_completed_note, task_completed_by, task_completed_at FROM messages;
     DROP TABLE messages;
     ALTER TABLE messages_new RENAME TO messages;
     CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
