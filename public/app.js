@@ -3215,6 +3215,40 @@ teamFeedMenuBtn.addEventListener("click", function(){
 teamFeedClose.addEventListener("click", function(){ teamFeedOverlay.hidden = true; });
 teamFeedOverlay.addEventListener("click", function(e){ if(e.target === teamFeedOverlay) teamFeedOverlay.hidden = true; });
 
+var TFEED_TICK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+function feedReactionsRowHtml(){
+  return '<div class="tfeed-post-reactions">'+
+    '<button type="button" class="tfeed-reaction-pill thumb" data-count="0" aria-label="Thumbs up">'+THUMB_ICON+'</button>'+
+    '<button type="button" class="tfeed-reaction-pill tick" data-count="0" aria-label="Agree">'+TFEED_TICK_ICON+'</button>'+
+  '</div>';
+}
+function attachFeedReactions(postEl){
+  postEl.querySelectorAll(".tfeed-reaction-pill").forEach(function(btn){
+    if(btn._tfeedWired) return;
+    btn._tfeedWired = true;
+    btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var mine = btn.classList.toggle("mine");
+      var count = parseInt(btn.getAttribute("data-count") || "0", 10);
+      count = mine ? count + 1 : Math.max(0, count - 1);
+      btn.setAttribute("data-count", count);
+      var span = btn.querySelector("span");
+      if(span) span.remove();
+      if(count > 1){
+        var s = document.createElement("span");
+        s.textContent = count;
+        btn.appendChild(s);
+      }
+    });
+  });
+}
+// The 4 seed posts are static markup, not built by feedPostShell - give
+// them the same reactions row so the demo feed is fully interactive.
+teamFeedList.querySelectorAll(".tfeed-post-body").forEach(function(body){
+  body.insertAdjacentHTML("beforeend", feedReactionsRowHtml());
+});
+teamFeedList.querySelectorAll(".tfeed-post").forEach(attachFeedReactions);
+
 function feedPostShell(bodyHtml){
   var myName = (AUTH.staff && AUTH.staff.name) || "Me";
   var post = document.createElement("div");
@@ -3224,8 +3258,10 @@ function feedPostShell(bodyHtml){
     '<div class="tfeed-post-body">'+
       '<div class="tfeed-post-head"><span class="tfeed-post-name">'+esc(myName)+'</span><span class="tfeed-post-time">Just now</span></div>'+
       bodyHtml+
+      feedReactionsRowHtml()+
     '</div>';
   teamFeedList.appendChild(post);
+  attachFeedReactions(post);
   teamFeedList.scrollTop = teamFeedList.scrollHeight;
 }
 function postMockFeedUpdate(){
