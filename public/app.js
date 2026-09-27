@@ -3052,7 +3052,7 @@ function attachFeedRemoveChip(chipEl, deptId){
   function endVisuals(){
     chipEl.classList.remove("dragging", "pressing");
     if(ghost){ ghost.remove(); ghost = null; }
-    removeZone.classList.remove("active", "drag-over");
+    removeZone.classList.remove("drag-over");
     dragging = false;
   }
   function onMove(ev){
@@ -3085,7 +3085,6 @@ function attachFeedRemoveChip(chipEl, deptId){
     pointerId = e.pointerId;
     dragging = true;
     chipEl.classList.add("pressing", "dragging");
-    removeZone.classList.add("active");
     ghost = chipEl.cloneNode(true);
     ghost.classList.add("drag-ghost");
     ghost.style.width = chipEl.offsetWidth + "px";
