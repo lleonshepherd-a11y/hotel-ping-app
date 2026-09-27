@@ -1060,7 +1060,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .tfeed-bin-btn svg{width:16px;height:16px}
 .tfeed-bin-btn.drag-over{background:var(--urgent);color:#fff;transform:scale(1.15)}
-.tfeed-sub-avatar-removable{cursor:grab;touch-action:none}
+.tfeed-sub-avatar-removable{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .tfeed-sub-avatar-removable.dragging{opacity:.3}
 .tfeed-sub-avatar-removable.pressing{transform:scale(.85);transition:transform .1s ease}
 .tfeed-sub-avatars{display:flex;flex:none}
