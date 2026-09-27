@@ -3783,6 +3783,35 @@ export default {
         return json({ ok: true });
       }
 
+      // A pinned conversation always sorts first in the inbox - same
+      // toggle shape as /api/muted above.
+      if (method === "GET" && p === "/api/pinned") {
+        const self = url.searchParams.get("self");
+        if (!DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's settings" }, 403);
+        const rows = await env.DB.prepare("SELECT other_dept_id FROM pinned_conversations WHERE department_id = ?").bind(self).all();
+        return json({ pinned: rows.results.map((r) => r.other_dept_id) });
+      }
+
+      if (method === "POST" && p === "/api/pinned") {
+        const requester = request._staff;
+        const body = await readJsonBody(request);
+        const other = body.with;
+        if (!DEPT_IDS.has(other)) return json({ error: "Unknown department" }, 400);
+        const self = requester.department_id;
+        const existing = await env.DB.prepare(
+          "SELECT 1 FROM pinned_conversations WHERE department_id = ? AND other_dept_id = ?"
+        ).bind(self, other).first();
+        if (existing) {
+          await env.DB.prepare("DELETE FROM pinned_conversations WHERE department_id = ? AND other_dept_id = ?").bind(self, other).run();
+          return json({ pinned: false });
+        }
+        await env.DB.prepare(
+          "INSERT INTO pinned_conversations (department_id, other_dept_id, pinned_at) VALUES (?, ?, ?)"
+        ).bind(self, other, new Date().toISOString()).run();
+        return json({ pinned: true });
+      }
+
       // ---- GM's own "don't notify me for plain departments" switch ----
       // A personal GM setting, not a department one - only the GM (is_admin,
       // which is GM-only now) can read or flip it. Built on the same

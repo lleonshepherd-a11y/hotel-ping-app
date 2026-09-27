@@ -2463,6 +2463,30 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    if (req.method === 'GET' && p === '/api/pinned') {
+      const self = url.searchParams.get('self');
+      if (!DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const pinnedRequester = staffFromToken(req);
+      if (!canViewAsSelf(pinnedRequester, self)) return send(res, 403, { error: "You can only view your own department's settings" });
+      const rows = db.prepare('SELECT other_dept_id FROM pinned_conversations WHERE department_id = ?').all(self);
+      return send(res, 200, { pinned: rows.map((r) => r.other_dept_id) });
+    }
+
+    if (req.method === 'POST' && p === '/api/pinned') {
+      const requester = staffFromToken(req);
+      const body = await readJsonBody(req);
+      const other = body.with;
+      if (!DEPT_IDS.has(other)) return send(res, 400, { error: 'Unknown department' });
+      const self = requester.department_id;
+      const existing = db.prepare('SELECT 1 FROM pinned_conversations WHERE department_id = ? AND other_dept_id = ?').get(self, other);
+      if (existing) {
+        db.prepare('DELETE FROM pinned_conversations WHERE department_id = ? AND other_dept_id = ?').run(self, other);
+        return send(res, 200, { pinned: false });
+      }
+      db.prepare('INSERT INTO pinned_conversations (department_id, other_dept_id, pinned_at) VALUES (?, ?, ?)').run(self, other, new Date().toISOString());
+      return send(res, 200, { pinned: true });
+    }
+
     const GM_MUTABLE_DEPTS = Array.from(DEPT_IDS).filter((d) => d !== 'gm');
     if (req.method === 'GET' && p === '/api/gm/mute-departments') {
       const requester = staffFromToken(req);

@@ -142,6 +142,15 @@ CREATE TABLE IF NOT EXISTS cleared_conversations (
   PRIMARY KEY (department_id, other_dept_id)
 );
 
+-- A pinned conversation always sorts to the top of the inbox, so it can't
+-- get lost or swiped away by accident - same toggle shape as muted_conversations.
+CREATE TABLE IF NOT EXISTS pinned_conversations (
+  department_id TEXT NOT NULL,
+  other_dept_id TEXT NOT NULL,
+  pinned_at TEXT NOT NULL,
+  PRIMARY KEY (department_id, other_dept_id)
+);
+
 CREATE TABLE IF NOT EXISTS handover_notes (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL,

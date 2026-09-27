@@ -132,6 +132,7 @@ var STATE = {
   threadOpened: false,
   myHelpAlertId: null,
   clearedThreads: {}, // { deptId: clearedAtTimestamp } - loaded from /api/cleared
+  pinnedThreads: {}, // { deptId: true } - loaded from /api/pinned
   openSwipeCloser: null,
   threadSwipeOpen: false
 };
@@ -624,17 +625,28 @@ function saveCustomThreadOrder(order){
 function sortedDeptIds(){
   var ids = Object.keys(STATE.data);
   var custom = loadCustomThreadOrder();
+  var base;
   if(custom && custom.length){
     var known = {};
     ids.forEach(function(id){ known[id] = true; });
     var ordered = custom.filter(function(id){ return known[id]; });
     ids.forEach(function(id){ if(ordered.indexOf(id) === -1) ordered.push(id); });
-    return ordered;
+    base = ordered;
+  } else {
+    base = ids.sort(function(a,b){
+      var la = lastOf(STATE.data[a]), lb = lastOf(STATE.data[b]);
+      return (lb ? lb.t : 0) - (la ? la.t : 0);
+    });
   }
-  return ids.sort(function(a,b){
-    var la = lastOf(STATE.data[a]), lb = lastOf(STATE.data[b]);
-    return (lb ? lb.t : 0) - (la ? la.t : 0);
-  });
+  // Pinned conversations always float to the top, ahead of custom order
+  // or recency - a pin exists specifically so a conversation can't get
+  // buried or lost, whatever else is going on with sort order.
+  if(Object.keys(STATE.pinnedThreads).length){
+    var pinned = base.filter(function(id){ return STATE.pinnedThreads[id]; });
+    var rest = base.filter(function(id){ return !STATE.pinnedThreads[id]; });
+    return pinned.concat(rest);
+  }
+  return base;
 }
 
 function unreadCount(deptId){
@@ -774,7 +786,7 @@ function renderList(){
     el.innerHTML =
       '<div class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
+        '<div class="t-row1"><span class="t-name">'+(STATE.pinnedThreads[id] ? '<svg class="t-pin-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> ' : '')+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
@@ -795,6 +807,12 @@ function renderList(){
     });
     var wrap = document.createElement("div");
     wrap.className = "thread-item-wrap";
+    var pinBtn = document.createElement("button");
+    pinBtn.type = "button";
+    pinBtn.className = "t-pin-action";
+    pinBtn.textContent = STATE.pinnedThreads[id] ? "Unpin" : "Pin";
+    pinBtn.addEventListener("click", function(e){ e.stopPropagation(); togglePinThread(id); });
+    wrap.appendChild(pinBtn);
     var clearBtn = document.createElement("button");
     clearBtn.type = "button";
     clearBtn.className = "t-clear-action";
@@ -807,7 +825,16 @@ function renderList(){
   });
 }
 
-var SWIPE_REVEAL_PX = 84, SWIPE_OPEN_THRESHOLD_PX = 40;
+function togglePinThread(deptId){
+  STATE.pinnedThreads[deptId] = !STATE.pinnedThreads[deptId];
+  STATE.threadSwipeOpen = false;
+  STATE.openSwipeCloser = null;
+  renderList();
+  showToast(STATE.pinnedThreads[deptId] ? "Pinned" : "Unpinned");
+  apiSend('/api/pinned', 'POST', { with: deptId }).catch(function(){});
+}
+
+var SWIPE_REVEAL_PX = 156, SWIPE_OPEN_THRESHOLD_PX = 40;
 function attachThreadReorder(el, deptId){
   var LONG_PRESS_MS = 350, MOVE_TOLERANCE = 10;
   var timer = null, startX = 0, startY = 0, pointerId = null;
@@ -2533,6 +2560,13 @@ function loadClearedList(){
   }).catch(function(){});
 }
 
+function loadPinnedList(){
+  return apiGet('/api/pinned?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    STATE.pinnedThreads = {};
+    (res.pinned || []).forEach(function(id){ STATE.pinnedThreads[id] = true; });
+  }).catch(function(){});
+}
+
 function switchSelf(id){
   if(id === STATE.self || STATE.loading) return;
   STATE.self = id;
@@ -2541,7 +2575,7 @@ function switchSelf(id){
   renderSwitcher();
   renderMyProfileCard();
   updateComposerLock();
-  Promise.all([buildData(id), loadMutedList(), loadClearedList()]).then(function(results){
+  Promise.all([buildData(id), loadMutedList(), loadClearedList(), loadPinnedList()]).then(function(results){
     STATE.data = results[0];
     var order = sortedDeptIds();
     STATE.active = order[0];
@@ -3664,7 +3698,7 @@ function boot(){
   } else {
     renderList();
   }
-  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList(), loadClearedList()]).then(function(results){
+  Promise.all([loadDepartmentMeta(), loadStaffMeta(), buildData(STATE.self), loadMutedList(), loadClearedList(), loadPinnedList()]).then(function(results){
     STATE.data = mergePendingIntoData(results[2]);
     flushOfflineQueue();
     renderBooted();
