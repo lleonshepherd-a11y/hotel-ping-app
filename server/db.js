@@ -35,6 +35,15 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
 
+  CREATE TABLE IF NOT EXISTS message_reactions (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    department_id TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(message_id, department_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
 
   CREATE TABLE IF NOT EXISTS staff (
     id TEXT PRIMARY KEY,
@@ -340,6 +349,18 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_maintenance_replies_ticket ON maintenance_replies(ticket_id, created_at);
+
+  CREATE TABLE IF NOT EXISTS maintenance_ticket_status_log (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT NOT NULL,
+    changed_by_staff_id TEXT NOT NULL,
+    changed_by_name TEXT,
+    changed_by_department_id TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_maint_status_log_ticket ON maintenance_ticket_status_log(ticket_id, created_at);
 `);
 
 const replyColumns = db.prepare("PRAGMA table_info(maintenance_replies)").all().map((c) => c.name);

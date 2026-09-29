@@ -260,6 +260,24 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     staffName: hide ? null : (row.from_staff_name || undefined),
   };
 }
+function reactionsMap(messageIds) {
+  const ids = [...new Set(messageIds)];
+  if (!ids.length) return {};
+  const rows = db.prepare(
+    `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${ids.map(() => '?').join(',')})`
+  ).all(...ids);
+  const byMessage = {};
+  rows.forEach((r) => {
+    byMessage[r.message_id] = byMessage[r.message_id] || [];
+    byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
+  });
+  return byMessage;
+}
+function attachReactions(messages) {
+  const map = reactionsMap(messages.map((m) => m.id));
+  messages.forEach((m) => { m.reactions = map[m.id] || []; });
+  return messages;
+}
 function rowToGroup(row, members) {
   return {
     id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [],
@@ -1064,7 +1082,8 @@ const server = http.createServer(async (req, res) => {
       const rows = db.prepare(sql).all(...params);
       const hasMore = rows.length > MESSAGE_PAGE_SIZE;
       const page = (hasMore ? rows.slice(0, MESSAGE_PAGE_SIZE) : rows).reverse();
-      return send(res, 200, { messages: page.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean), hasMore });
+      const pageMessages = page.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean);
+      return send(res, 200, { messages: attachReactions(pageMessages), hasMore });
     }
 
     if (req.method === 'GET' && p === '/api/groups') {
@@ -1397,7 +1416,8 @@ const server = http.createServer(async (req, res) => {
         }
       }
       const rows = db.prepare('SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC').all(id);
-      return send(res, 200, { messages: rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean) });
+      const groupMessages = rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean);
+      return send(res, 200, { messages: attachReactions(groupMessages) });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/read')) {
@@ -2082,6 +2102,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 
+    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/reactions')) {
+      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/reactions'.length));
+      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Message not found' });
+      const requester = staffFromToken(req);
+      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
+        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
+      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
+      const body = await readJsonBody(req);
+      const emoji = String(body.emoji || '').trim().slice(0, 8);
+      if (!emoji) return send(res, 400, { error: 'An emoji is required' });
+      const current = db.prepare('SELECT emoji FROM message_reactions WHERE message_id = ? AND department_id = ?').get(id, requester.department_id);
+      // Tapping the same reaction again removes it - a real toggle, same as tapping a like a second time anywhere else.
+      if (current && current.emoji === emoji) {
+        db.prepare('DELETE FROM message_reactions WHERE message_id = ? AND department_id = ?').run(id, requester.department_id);
+      } else {
+        db.prepare(`
+          INSERT INTO message_reactions (id, message_id, department_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(message_id, department_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at
+        `).run(crypto.randomUUID(), id, requester.department_id, emoji, new Date().toISOString());
+      }
+      const rMap = reactionsMap([id]);
+      return send(res, 200, { reactions: rMap[id] || [] });
+    }
+
     if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/affects-guest')) {
       const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/affects-guest'.length));
       const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
@@ -2748,6 +2793,9 @@ const server = http.createServer(async (req, res) => {
       db.prepare(
         "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
       ).run(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now);
+      db.prepare(
+        "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, NULL, 'reported', ?, ?, ?, ?)"
+      ).run(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, now);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       let notifyBody = (roomNumber ? 'Room ' + roomNumber + ': ' : '') + description;
       if (guestPresent) notifyBody += ' · Guest in room';
@@ -2850,6 +2898,12 @@ const server = http.createServer(async (req, res) => {
           id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
 
+      // A provable, per-transition record of who changed this ticket's
+      // status and when - see the same note in src/worker.js.
+      db.prepare(
+        'INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(crypto.randomUUID(), id, existing.status, status, maintRequester.id, maintRequester.name || null, maintRequester.department_id, now);
+
       const statusNotice = { in_progress: 'Started work on: ', fixed: 'Fixed: ' };
       if (statusNotice[status] && existing.created_by !== 'maintenance') {
         insertMessage({
@@ -2859,6 +2913,22 @@ const server = http.createServer(async (req, res) => {
       }
 
       return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.endsWith('/history')) {
+      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/history'.length));
+      const rows = db.prepare('SELECT * FROM maintenance_ticket_status_log WHERE ticket_id = ? ORDER BY created_at ASC').all(id);
+      return send(res, 200, {
+        history: rows.map((r) => ({
+          id: r.id,
+          fromStatus: r.from_status,
+          toStatus: r.to_status,
+          byName: r.changed_by_name || undefined,
+          byDepartment: r.changed_by_department_id,
+          createdAt: r.created_at,
+        })),
+      });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/owner')) {
