@@ -3715,6 +3715,7 @@ export default {
       if (method === "GET" && p === "/api/typing") {
         const self = url.searchParams.get("self");
         if (!ALL_DEPT_IDS.has(self)) return json({ error: "Unknown department" }, 400);
+        if (!canViewAsSelf(request._staff, self)) return json({ error: "You can only view your own department's typing status" }, 403);
         const cutoff = new Date(Date.now() - 6000).toISOString();
         const rows = await env.DB.prepare(
           "SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?"

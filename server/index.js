@@ -556,6 +556,9 @@ function canViewAsSelf(requester, self) {
   if (self === requester.department_id || requester.is_admin) return true;
   return !!(requester.head_depts && requester.head_depts.includes(self));
 }
+function canManageMaintenance(requester) {
+  return requester.department_id === 'maintenance' || requester.department_id === 'gm' || !!requester.is_admin;
+}
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, '');
@@ -2405,6 +2408,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/typing') {
       const self = url.searchParams.get('self');
       if (!ALL_DEPT_IDS.has(self)) return send(res, 400, { error: 'Unknown department' });
+      const requester = staffFromToken(req);
+      if (!canViewAsSelf(requester, self)) return send(res, 403, { error: "You can only view your own department's typing status" });
       const cutoff = new Date(Date.now() - 6000).toISOString();
       const rows = db.prepare('SELECT from_dept FROM typing_status WHERE to_dept = ? AND updated_at > ?').all(self, cutoff);
       return send(res, 200, { typing: rows.map((r) => r.from_dept) });
@@ -2683,6 +2688,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && p === '/api/maintenance') {
+      const requester = staffFromToken(req);
+      if (!canManageMaintenance(requester)) return send(res, 403, { error: 'Not authorized' });
       const rows = db.prepare('SELECT * FROM maintenance_tickets ORDER BY created_at DESC').all();
       return send(res, 200, { tickets: rows.map(rowToTicket) });
     }
@@ -2750,6 +2757,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.endsWith('/replies')) {
+      const replyRequester = staffFromToken(req);
+      if (!canManageMaintenance(replyRequester)) return send(res, 403, { error: 'Not authorized' });
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
       const rows = db.prepare('SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC').all(id);
       return send(res, 200, { replies: rows.map(rowToTicketReply) });
@@ -2759,6 +2768,7 @@ const server = http.createServer(async (req, res) => {
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
       const body = await readJsonBody(req);
       const text = String(body.text || '').trim();
       let voicePath = null;
@@ -2871,6 +2881,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && p === '/api/maintenance/reorder') {
+      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
       const body = await readJsonBody(req);
       const order = Array.isArray(body.order) ? body.order : [];
       if (!order.length) return send(res, 400, { error: 'order is required' });
@@ -2884,6 +2895,7 @@ const server = http.createServer(async (req, res) => {
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/pin'.length));
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
       const nextPinned = !existing.pinned_at;
       db.prepare('UPDATE maintenance_tickets SET pinned_at = ? WHERE id = ?')
         .run(nextPinned ? new Date().toISOString() : null, id);
