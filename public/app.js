@@ -1844,15 +1844,16 @@ function sendTaskStatus(m, nextStatus, note){
 }
 function cycleTaskStatus(m){
   var nextStatus = TASK_NEXT[m.taskStatus] || "not_started";
+  var isMaintTicketTask = !!(m.text && m.text.indexOf("🔧 New ticket #") === 0);
   // Starting or finishing needs a written note - a status flip with
   // nothing behind it is a tap, not proof the work actually happened.
   // Reopening (back to not started) is just backing that out, so it
   // doesn't need one.
   if(nextStatus === "in_progress"){
     showPrompt({
-      title: "Starting this task",
+      title: isMaintTicketTask ? "Starting this job" : "Starting this task",
       placeholder: "What's your plan for this?",
-      confirmLabel: "Start task",
+      confirmLabel: isMaintTicketTask ? "Start job" : "Start task",
       maxLength: 300,
     }).then(function(note){
       note = (note || "").trim();
@@ -1861,9 +1862,9 @@ function cycleTaskStatus(m){
     });
   } else if(nextStatus === "completed"){
     showPrompt({
-      title: "Completing this task",
-      placeholder: "How did you complete this task?",
-      confirmLabel: "Mark as done",
+      title: isMaintTicketTask ? "Completing this job" : "Completing this task",
+      placeholder: isMaintTicketTask ? "How did you complete this job?" : "How did you complete this task?",
+      confirmLabel: isMaintTicketTask ? "Mark job done" : "Mark as done",
       maxLength: 300,
     }).then(function(note){
       note = (note || "").trim();
@@ -2157,12 +2158,18 @@ function buildTaskCard(m){
     card.appendChild(completedNote);
   }
 
+  // A maintenance ticket's own auto-posted arrival message reuses this same
+  // task-card UI (so maintenance gets a progress track for it in chat too),
+  // but it's a job, not a generic task - the button wording should match.
+  var isMaintTicketTask = !!(m.text && m.text.indexOf("🔧 New ticket #") === 0);
   var canAction = m.to === AUTH.staff.departmentId;
   if(canAction && status !== "completed"){
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "task-card-btn";
-    btn.textContent = status === "not_started" ? "Start task" : "Mark as done";
+    btn.textContent = status === "not_started"
+      ? (isMaintTicketTask ? "Start job" : "Start task")
+      : (isMaintTicketTask ? "Mark job done" : "Mark as done");
     btn.addEventListener("click", function(){ cycleTaskStatus(m); });
     card.appendChild(btn);
   } else if(canAction && status === "completed"){
