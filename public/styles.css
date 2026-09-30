@@ -472,8 +472,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   scrollbar-width:none;
   position:relative;
 }
-.reply-thread-badge{color:#2f5fe0;font-weight:700;font-size:10.5px;margin-top:4px;padding:0 4px;cursor:default}
-.reply-thread-line{position:absolute;background:#2f5fe0;pointer-events:none;z-index:0}
+.reply-thread-badge{color:#7ab8ff;font-weight:700;font-size:10.5px;margin-top:4px;padding:0 4px;cursor:default}
+.reply-thread-line{position:absolute;background:#7ab8ff;pointer-events:none;z-index:0}
 .reply-thread-line-v{width:2px;border-radius:1px}
 .reply-thread-line-h{height:2px;border-radius:1px}
 .thread-scroll::-webkit-scrollbar{display:none}

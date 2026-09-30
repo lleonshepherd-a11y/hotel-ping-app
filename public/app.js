@@ -1473,20 +1473,31 @@ function renderReplyThreadLines(msgs){
     var lineTop = badgeRect.top + badgeRect.height;
     var avCenterX = avRect.left + avRect.width / 2;
     var avCenterY = avRect.top + avRect.height / 2;
+    // The horizontal run has to happen in the blank gap above the reply
+    // row, not at the sender name's own height - otherwise it draws right
+    // through the text instead of routing around it.
+    var gapY = avRect.top - 6;
 
-    var vLine = document.createElement("div");
-    vLine.className = "reply-thread-line reply-thread-line-v";
-    vLine.style.left = lineX + "px";
-    vLine.style.top = lineTop + "px";
-    vLine.style.height = Math.max(0, avCenterY - lineTop) + "px";
-    threadScroll.appendChild(vLine);
+    var vLineTop = document.createElement("div");
+    vLineTop.className = "reply-thread-line reply-thread-line-v";
+    vLineTop.style.left = lineX + "px";
+    vLineTop.style.top = lineTop + "px";
+    vLineTop.style.height = Math.max(0, gapY - lineTop) + "px";
+    threadScroll.appendChild(vLineTop);
 
     var hLine = document.createElement("div");
     hLine.className = "reply-thread-line reply-thread-line-h";
     hLine.style.left = Math.min(lineX, avCenterX) + "px";
-    hLine.style.top = (avCenterY - 1) + "px";
+    hLine.style.top = (gapY - 1) + "px";
     hLine.style.width = Math.abs(avCenterX - lineX) + "px";
     threadScroll.appendChild(hLine);
+
+    var vLineBottom = document.createElement("div");
+    vLineBottom.className = "reply-thread-line reply-thread-line-v";
+    vLineBottom.style.left = avCenterX + "px";
+    vLineBottom.style.top = gapY + "px";
+    vLineBottom.style.height = Math.max(0, avCenterY - gapY) + "px";
+    threadScroll.appendChild(vLineBottom);
   });
 }
 
