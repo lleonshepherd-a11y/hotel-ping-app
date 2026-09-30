@@ -340,15 +340,12 @@
           </div>
           <div class="guests-header-text">
             <div class="sb-title">Events</div>
-            <div class="sb-sub">Drag a department onto an event to bring them in. Drag a member out to let them leave.</div>
+            <div class="sb-sub">Set up an event and add the people who need it.</div>
           </div>
+          <button type="button" class="new-event-trigger-btn" id="newEventTriggerBtn" aria-label="New event">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
         </div>
-        <div class="event-palette" id="eventPalette"></div>
-        <form class="event-new-form" id="newEventForm">
-          <input type="text" id="newEventName" placeholder="Event name, e.g. Wedding" required maxlength="60">
-          <button type="submit" class="admin-add-btn">Create event</button>
-        </form>
-        <div class="admin-add-error" id="eventError"></div>
         <div class="chat-filter-row" id="eventsFilterRow">
           <button type="button" class="chat-filter-chip active" data-filter="active">Active</button>
           <button type="button" class="chat-filter-chip" data-filter="past">Past</button>
@@ -951,13 +948,37 @@
       <button class="tfeed-back-btn" id="directoryClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <h2>Add to message</h2>
+      <h2 id="directoryTitle">Add to message</h2>
     </div>
     <div class="sb-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       <input type="text" id="directorySearchInput" placeholder="Search">
     </div>
     <div class="directory-list" id="directoryList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay compose-overlay" id="newEventOverlay" hidden>
+  <div class="admin-modal compose-modal">
+    <div class="admin-modal-head">
+      <button class="tfeed-back-btn" id="newEventOverlayClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>New Event</h2>
+    </div>
+    <div class="new-event-form-body">
+      <input type="text" id="newEventNameInput" class="new-event-name-input" placeholder="Event name, e.g. Smith Wedding" maxlength="60">
+      <div class="new-event-people-label">People</div>
+      <div class="new-event-people-list" id="newEventPeopleList"></div>
+      <button type="button" class="new-event-add-person-btn" id="newEventAddPersonBtn">
+        <span class="new-event-add-person-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+        Add people
+      </button>
+      <div class="admin-add-error" id="newEventFormError"></div>
+    </div>
+    <div class="new-event-form-footer">
+      <button type="button" class="new-event-create-submit-btn" id="newEventCreateSubmitBtn">Create event</button>
+    </div>
   </div>
 </div>
 

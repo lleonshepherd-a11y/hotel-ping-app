@@ -6915,11 +6915,49 @@ function renderComposeBody(){
     '</div>';
 }
 
+// The picker is shared by three flows: composing a new message ("compose"),
+// building the people list before an event exists yet ("newEvent"), and
+// adding one more person to an event that's already been created
+// ("existingEvent"). Each just supplies its own excluded-ids list and its
+// own callback for what happens when a row is tapped.
+var directoryTitle = document.getElementById("directoryTitle");
+var directoryMode = "compose";
+var directoryExistingEventGroupId = null;
+// When the picker is opened from on top of another full-screen overlay
+// (the New Event screen), that overlay has to be hidden first - two
+// .admin-overlay panels stacked at once means the later one in the DOM
+// paints over the other and swallows its clicks. closeDirectoryOverlay()
+// is the only path that hides the picker, so it's always the one place
+// that brings the caller's overlay back.
+var directoryReturnOverlay = null;
+function openDirectoryPicker(mode, opts){
+  directoryMode = mode;
+  opts = opts || {};
+  directoryTitle.textContent = opts.title || "Add to message";
+  directoryExistingEventGroupId = opts.groupId || null;
+  directoryReturnOverlay = opts.returnOverlay || null;
+  if(directoryReturnOverlay) directoryReturnOverlay.hidden = true;
+  directorySearchInput.value = "";
+  renderDirectory();
+  directoryOverlay.hidden = false;
+  directorySearchInput.focus();
+}
+function closeDirectoryOverlay(){
+  directoryOverlay.hidden = true;
+  if(directoryReturnOverlay){ directoryReturnOverlay.hidden = false; directoryReturnOverlay = null; }
+}
 function renderDirectory(){
   var term = directorySearchInput.value.trim().toLowerCase();
   var assignedHeads = HEAD_DEPT_IDS.filter(function(id){ return !!DEPT_HEADS[headRealDeptId(id)]; });
+  var excluded;
+  if(directoryMode === "newEvent") excluded = newEventRecipients;
+  else if(directoryMode === "existingEvent"){
+    var g = STATE.groups.find(function(x){ return x.id === directoryExistingEventGroupId; });
+    excluded = g ? g.members : [];
+  } else excluded = composeRecipients;
   var ids = DEPT_ORDER.concat(assignedHeads).filter(function(id){
-    if(id === STATE.self || composeRecipients.indexOf(id) !== -1) return false;
+    if(directoryMode === "compose" && id === STATE.self) return false;
+    if(excluded.indexOf(id) !== -1) return false;
     var d = DEPTS[id];
     if(!d) return false;
     return !term || d.name.toLowerCase().indexOf(term) !== -1;
@@ -6939,24 +6977,30 @@ function renderDirectory(){
       '<span class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
       '<span class="directory-row-name">'+esc(d.name)+'</span>';
     row.addEventListener("click", function(){
-      composeRecipients.push(id);
-      directoryOverlay.hidden = true;
-      renderHeader();
-      renderComposeBody();
-      focusInput();
+      if(directoryMode === "newEvent"){
+        newEventRecipients.push(id);
+        closeDirectoryOverlay();
+        renderNewEventPeopleList();
+      } else if(directoryMode === "existingEvent"){
+        closeDirectoryOverlay();
+        joinGroup(directoryExistingEventGroupId, id);
+      } else {
+        composeRecipients.push(id);
+        closeDirectoryOverlay();
+        renderHeader();
+        renderComposeBody();
+        focusInput();
+      }
     });
     directoryList.appendChild(row);
   });
 }
 directoryBtn.addEventListener("click", openComposeScreen);
 composeAddBtn.addEventListener("click", function(){
-  directorySearchInput.value = "";
-  renderDirectory();
-  directoryOverlay.hidden = false;
-  directorySearchInput.focus();
+  openDirectoryPicker("compose", { title: "Add to message" });
 });
-directoryClose.addEventListener("click", function(){ directoryOverlay.hidden = true; });
-directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) directoryOverlay.hidden = true; });
+directoryClose.addEventListener("click", closeDirectoryOverlay);
+directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) closeDirectoryOverlay(); });
 directorySearchInput.addEventListener("input", renderDirectory);
 
 /* ---------------- Blockers ("waiting on" chains) ---------------- */
@@ -7409,7 +7453,6 @@ blockerAddForm.addEventListener("submit", function(e){
 });
 
 /* ---------------- Events (ad-hoc group chats) ---------------- */
-var eventPalette = document.getElementById("eventPalette");
 var eventList = document.getElementById("eventList");
 var eventsActiveSection = document.getElementById("eventsActiveSection");
 var eventsPastSection = document.getElementById("eventsPastSection");
@@ -7417,11 +7460,69 @@ var eventsFilterRow = document.getElementById("eventsFilterRow");
 var pastEventsLabel = document.getElementById("pastEventsLabel");
 var pastEventsHint = document.getElementById("pastEventsHint");
 var pastEventList = document.getElementById("pastEventList");
-var eventError = document.getElementById("eventError");
 var eventDropZone = document.getElementById("eventDropZone");
 var eventDropZoneLabel = document.getElementById("eventDropZoneLabel");
-var newEventForm = document.getElementById("newEventForm");
-var newEventName = document.getElementById("newEventName");
+var newEventTriggerBtn = document.getElementById("newEventTriggerBtn");
+var newEventOverlay = document.getElementById("newEventOverlay");
+var newEventOverlayClose = document.getElementById("newEventOverlayClose");
+var newEventNameInput = document.getElementById("newEventNameInput");
+var newEventPeopleList = document.getElementById("newEventPeopleList");
+var newEventAddPersonBtn = document.getElementById("newEventAddPersonBtn");
+var newEventFormError = document.getElementById("newEventFormError");
+var newEventCreateSubmitBtn = document.getElementById("newEventCreateSubmitBtn");
+var newEventRecipients = [];
+
+function openNewEventScreen(){
+  newEventRecipients = [];
+  newEventNameInput.value = "";
+  newEventFormError.textContent = "";
+  renderNewEventPeopleList();
+  newEventOverlay.hidden = false;
+  newEventNameInput.focus();
+}
+function closeNewEventScreen(){ newEventOverlay.hidden = true; }
+function renderNewEventPeopleList(){
+  if(!newEventRecipients.length){
+    newEventPeopleList.innerHTML = '<div class="new-event-people-empty">Nobody added yet</div>';
+    return;
+  }
+  newEventPeopleList.innerHTML = "";
+  newEventRecipients.forEach(function(id){
+    var d = DEPTS[id];
+    if(!d) return;
+    var chip = document.createElement("div");
+    chip.className = "new-event-person-chip";
+    chip.innerHTML =
+      '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="new-event-person-name">'+esc(d.name)+'</span>'+
+      '<button type="button" class="new-event-person-remove" aria-label="Remove '+esc(d.name)+'">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'+
+      '</button>';
+    chip.querySelector(".new-event-person-remove").addEventListener("click", function(){
+      var idx = newEventRecipients.indexOf(id);
+      if(idx !== -1) newEventRecipients.splice(idx, 1);
+      renderNewEventPeopleList();
+    });
+    newEventPeopleList.appendChild(chip);
+  });
+}
+newEventTriggerBtn.addEventListener("click", openNewEventScreen);
+newEventOverlayClose.addEventListener("click", closeNewEventScreen);
+newEventOverlay.addEventListener("click", function(e){ if(e.target === newEventOverlay) closeNewEventScreen(); });
+newEventAddPersonBtn.addEventListener("click", function(){
+  openDirectoryPicker("newEvent", { title: "Add people", returnOverlay: newEventOverlay });
+});
+newEventCreateSubmitBtn.addEventListener("click", function(){
+  var name = newEventNameInput.value.trim();
+  if(!name){ newEventFormError.textContent = "Give the event a name"; newEventNameInput.focus(); return; }
+  newEventFormError.textContent = "";
+  apiSend('/api/groups', 'POST', { self: STATE.self, name: name, memberDepartmentIds: newEventRecipients }).then(function(){
+    closeNewEventScreen();
+    return loadGroups();
+  }).then(renderEventList).catch(function(err){
+    newEventFormError.textContent = err.message || "Couldn't create the event";
+  });
+});
 
 STATE.eventsFilter = "active";
 eventsFilterRow.addEventListener("click", function(e){
@@ -7613,21 +7714,6 @@ function leaveGroup(groupId, deptId){
     showToast("Couldn't remove them");
   });
 }
-function renderEventPalette(){
-  eventPalette.innerHTML = "";
-  DEPT_ORDER.forEach(function(id){
-    var chip = document.createElement("div");
-    chip.className = "event-chip";
-    chip.innerHTML =
-      '<div class="event-chip-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</div>'+
-      '<div class="event-chip-label">'+esc((DEPTS[id] ? DEPTS[id].initials : id))+'</div>';
-    attachDragChip(chip, function(groupId){
-      if(groupId) joinGroup(groupId, id);
-    }, { isMember: false, scrollGuard: "horizontal", scrollContainer: eventPalette });
-    eventPalette.appendChild(chip);
-  });
-}
-
 function deleteEmptyEvent(groupId){
   showConfirm({ title: "Delete this event?", body: "There's nothing in it yet, so this can't be undone.", confirmLabel: "Delete" }).then(function(ok){
     if(!ok) return;
@@ -7705,6 +7791,10 @@ function renderEventList(){
     }).join("");
     var canManage = g.createdBy === STATE.self || (AUTH.staff && AUTH.staff.isAdmin);
     var isEmpty = !g.lastMessage;
+    var addPersonBtnHtml = canManage ?
+      '<button type="button" class="event-member-add-btn" data-group-id="'+g.id+'" aria-label="Add people">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>'+
+      '</button>' : '';
     card.innerHTML =
       '<div class="event-card-head">'+
         '<span class="event-card-name">'+esc(g.name)+(g.unreadCount ? ' <span class="event-card-badge">'+g.unreadCount+'</span>' : '')+'</span>'+
@@ -7717,19 +7807,33 @@ function renderEventList(){
           '</button>'+
         '</div>'+
       '</div>'+
-      '<div class="event-card-members">'+membersHtml+'</div>'+
-      (g.isMember ? '' : '<div class="event-card-hint">Drag a department here to add them</div>')+
+      '<div class="event-card-members">'+membersHtml+addPersonBtnHtml+'</div>'+
       '<div class="event-card-hint event-card-tap-hint">'+(canManage ? "Tap for the banner, stations & run sheet" : "Tap for event details")+'</div>';
     eventList.appendChild(card);
 
     card.addEventListener("click", function(e){
-      if(e.target.closest(".event-card-open, .event-card-end, .event-card-delete, .event-card-details-btn, .event-member-chip")) return;
+      if(e.target.closest(".event-card-open, .event-card-end, .event-card-delete, .event-card-details-btn, .event-member-chip, .event-member-add-btn")) return;
       openEventDetail(g.id);
     });
     card.querySelectorAll(".event-member-chip").forEach(function(chip){
       var deptId = chip.getAttribute("data-dept-id");
-      attachDragChip(chip, function(){ leaveGroup(g.id, deptId); }, { isMember: true, dropLabel: "Drop to remove" });
+      chip.addEventListener("click", function(e){
+        e.stopPropagation();
+        if(!canManage) return;
+        var deptName = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+        showConfirm({
+          icon: CONFIRM_ICON_TRASH, title: "Remove " + deptName + "?",
+          body: "They'll no longer see or post in this event's chat.",
+          confirmLabel: "Remove", cancelLabel: "Cancel"
+        }).then(function(ok){ if(ok) leaveGroup(g.id, deptId); });
+      });
     });
+    if(canManage){
+      card.querySelector(".event-member-add-btn").addEventListener("click", function(e){
+        e.stopPropagation();
+        openDirectoryPicker("existingEvent", { title: "Add to " + g.name, groupId: g.id });
+      });
+    }
     if(canManage && isEmpty){
       card.querySelector(".event-card-delete").addEventListener("click", function(e){ e.stopPropagation(); deleteEmptyEvent(g.id); });
     }
@@ -8168,19 +8272,6 @@ function attachStationDragChip(chipEl, deptId){
   });
 }
 
-newEventForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  var name = newEventName.value.trim();
-  if(!name) return;
-  eventError.textContent = "";
-  apiSend('/api/groups', 'POST', { self: STATE.self, name: name, memberDepartmentIds: [] }).then(function(){
-    newEventName.value = "";
-    return loadGroups();
-  }).then(renderEventList).catch(function(err){
-    eventError.textContent = err.message || "Couldn't create the event";
-  });
-});
-
 var tabEventsBadge = document.getElementById("tabEventsBadge");
 function refreshEventsBadge(){
   loadGroups().then(function(){
@@ -8192,7 +8283,6 @@ function refreshEventsBadge(){
 }
 
 function openEventsTab(){
-  renderEventPalette();
   eventList.innerHTML = '<div class="event-empty">Loading…</div>';
   refreshEventsBadge();
 }
