@@ -1411,6 +1411,11 @@ function renderThread(){
   var prevDay = null;
   var msgsById = {};
   msgs.forEach(function(m){ msgsById[m.id] = m; });
+  // Reserved up front (not in the deferred line-drawing pass) so the extra
+  // space is there from first paint instead of popping in and shoving
+  // later messages down a moment after they've already rendered.
+  var repliedToIds = {};
+  if(STATE.activeGroupId) msgs.forEach(function(m){ if(m.replyTo) repliedToIds[m.replyTo] = true; });
 
   msgs.forEach(function(m, i){
     if(!prevDay || !sameDay(prevDay, m.t)){
@@ -1424,7 +1429,9 @@ function renderThread(){
     var prev = msgs[i-1];
     var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
     var groupStart = !prev || prev.from !== m.from || !sameDay(prev.t, m.t);
-    threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById, groupStart));
+    var row = buildMessageRow(m, groupEnd, msgsById, groupStart);
+    if(repliedToIds[m.id]) row.classList.add("has-reply-thread-badge");
+    threadScroll.appendChild(row);
   });
   if(!STATE.activeGroupId && STATE.typingFrom[STATE.active]) threadScroll.appendChild(buildTypingBubble());
   // Deferred: rows animate in (bubbleIn, translateY over .3s), so measuring
@@ -1462,42 +1469,31 @@ function renderReplyThreadLines(msgs){
     var avatarEl = replyRow && replyRow.querySelector(".group-sender-avatar");
     if(!replyRow || !avatarEl) return;
 
+    var avRect = relRect(avatarEl);
+    var parentRect = relRect(parentRow);
+    // Both the label and the line live at the reply's avatar column on the
+    // left, regardless of which side the original message's own bubble is
+    // on - a straight drop down the left margin, never crossing into any
+    // bubble or text from the right.
+    var lineX = avRect.left + avRect.width / 2;
+
     var badge = document.createElement("div");
     badge.className = "reply-thread-badge";
     badge.textContent = replies.length === 1 ? "1 Reply" : replies.length + " Replies";
-    parentRow.querySelector(".bubble-wrap").appendChild(badge);
+    badge.style.left = avRect.left + "px";
+    badge.style.top = (parentRect.top + parentRect.height + 4) + "px";
+    threadScroll.appendChild(badge);
 
     var badgeRect = relRect(badge);
-    var avRect = relRect(avatarEl);
-    var lineX = badgeRect.left + 6;
     var lineTop = badgeRect.top + badgeRect.height;
-    var avCenterX = avRect.left + avRect.width / 2;
     var avCenterY = avRect.top + avRect.height / 2;
-    // The horizontal run has to happen in the blank gap above the reply
-    // row, not at the sender name's own height - otherwise it draws right
-    // through the text instead of routing around it.
-    var gapY = avRect.top - 6;
 
-    var vLineTop = document.createElement("div");
-    vLineTop.className = "reply-thread-line reply-thread-line-v";
-    vLineTop.style.left = lineX + "px";
-    vLineTop.style.top = lineTop + "px";
-    vLineTop.style.height = Math.max(0, gapY - lineTop) + "px";
-    threadScroll.appendChild(vLineTop);
-
-    var hLine = document.createElement("div");
-    hLine.className = "reply-thread-line reply-thread-line-h";
-    hLine.style.left = Math.min(lineX, avCenterX) + "px";
-    hLine.style.top = (gapY - 1) + "px";
-    hLine.style.width = Math.abs(avCenterX - lineX) + "px";
-    threadScroll.appendChild(hLine);
-
-    var vLineBottom = document.createElement("div");
-    vLineBottom.className = "reply-thread-line reply-thread-line-v";
-    vLineBottom.style.left = avCenterX + "px";
-    vLineBottom.style.top = gapY + "px";
-    vLineBottom.style.height = Math.max(0, avCenterY - gapY) + "px";
-    threadScroll.appendChild(vLineBottom);
+    var vLine = document.createElement("div");
+    vLine.className = "reply-thread-line reply-thread-line-v";
+    vLine.style.left = lineX + "px";
+    vLine.style.top = lineTop + "px";
+    vLine.style.height = Math.max(0, avCenterY - lineTop) + "px";
+    threadScroll.appendChild(vLine);
   });
 }
 
