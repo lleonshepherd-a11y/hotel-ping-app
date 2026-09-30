@@ -262,7 +262,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .sb-list-label{padding:18px 20px 9px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint)}
 .list-header-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:18px 20px 9px}
 .list-header-title{font-family:Manrope,sans-serif;font-weight:800;font-size:15.5px;color:var(--text)}
-.push-prompt{margin:10px 20px 0;padding:9px 11px;border-radius:12px;background:var(--active-tint);}
+.push-prompt{margin:10px 20px 0;padding:9px 11px;border-radius:12px;background:var(--active-tint);width:fit-content;max-width:100%}
 .push-prompt-text{font-size:11px;line-height:1.35;color:var(--text-dim)}
 .push-prompt-actions{display:flex;align-items:center;gap:8px;margin-top:7px}
 .push-prompt-btn{flex:none;border:none;border-radius:8px;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;font-size:11px;padding:6px 14px}
