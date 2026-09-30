@@ -1488,12 +1488,16 @@ function renderReplyThreadLines(msgs){
     var badgeRect = relRect(badge);
     var lineTop = badgeRect.top + badgeRect.height;
     var avCenterY = avRect.top + avRect.height / 2;
+    // Guaranteed minimum, not just whatever's left over - the reserved
+    // margin below the parent row is generous, but this is the safety net
+    // that keeps the segment from silently collapsing to 0px if it isn't.
+    var vHeight = Math.max(10, avCenterY - lineTop);
 
     var vLine = document.createElement("div");
     vLine.className = "reply-thread-line reply-thread-line-v";
     vLine.style.left = gutterX + "px";
     vLine.style.top = lineTop + "px";
-    vLine.style.height = Math.max(0, avCenterY - lineTop) + "px";
+    vLine.style.height = vHeight + "px";
     threadScroll.appendChild(vLine);
 
     var hLine = document.createElement("div");
