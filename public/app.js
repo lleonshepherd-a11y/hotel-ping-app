@@ -553,20 +553,28 @@ searchClear.addEventListener("click", function(){
   searchInput.focus();
 });
 
-var searchToggleBtn = document.getElementById("searchToggleBtn");
-var headerSearchWrap = document.getElementById("headerSearchWrap");
-if(searchToggleBtn && headerSearchWrap){
-  searchToggleBtn.addEventListener("click", function(){
-    if(!headerSearchWrap.classList.contains("expanded")){
-      headerSearchWrap.classList.add("expanded");
-      searchInput.focus();
-    }
-  });
-  searchInput.addEventListener("blur", function(){
-    if(!searchInput.value){
-      headerSearchWrap.classList.remove("expanded");
-    }
-  });
+var searchMicBtn = document.getElementById("searchMicBtn");
+var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(searchMicBtn){
+  if(!SpeechRec){
+    searchMicBtn.hidden = true;
+  } else {
+    var searchRecognizer = new SpeechRec();
+    searchRecognizer.continuous = false;
+    searchRecognizer.interimResults = false;
+    searchRecognizer.onresult = function(e){
+      searchInput.value = e.results[0][0].transcript;
+      STATE.searchTerm = searchInput.value;
+      searchClear.hidden = STATE.searchTerm.length === 0;
+      renderList();
+    };
+    searchRecognizer.onend = function(){ searchMicBtn.classList.remove("listening"); };
+    searchRecognizer.onerror = function(){ searchMicBtn.classList.remove("listening"); };
+    searchMicBtn.addEventListener("click", function(){
+      searchMicBtn.classList.add("listening");
+      try { searchRecognizer.start(); } catch(err) { searchMicBtn.classList.remove("listening"); }
+    });
+  }
 }
 
 var chatFilterRow = document.getElementById("chatFilterRow");

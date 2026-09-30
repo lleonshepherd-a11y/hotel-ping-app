@@ -284,18 +284,7 @@
         </div>
       </div>
     </div>
-    <div class="chatlist-head">
-      <div class="sb-search" id="headerSearchWrap">
-        <button class="search-toggle-btn" id="searchToggleBtn" type="button" aria-label="Search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        </button>
-        <input type="text" id="searchInput" placeholder="Search">
-        <button id="searchClear" hidden aria-label="Clear search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="chatlist-toprow">
+    <div class="chatlist-toprow" hidden>
       <div class="stories-row" id="storiesRow"></div>
     </div>
 
@@ -324,16 +313,23 @@
     <div class="pull-refresh" id="listPullRefresh">
       <span class="pull-refresh-spinner"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
     </div>
-    <div class="list-header-row" hidden>
-      <div class="list-header-title" id="listLabel">Conversations</div>
-      <div class="list-header-right">
-        <button class="directory-open-btn" id="directoryBtn" type="button" aria-label="Start a conversation" title="Start a conversation">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        </button>
-      </div>
-    </div>
     <nav class="thread-list" id="threadList"></nav>
     <div class="sb-empty" id="searchEmpty" hidden><span id="searchEmptyLoading" hidden>Loading conversations&hellip;</span><span id="searchEmptyUnread" hidden>No unread conversations</span><span id="searchEmptyMatch">No conversations match "<span id="searchEmptyTerm"></span>"</span></div>
+    <div class="chatlist-bottom-bar">
+      <div class="chatlist-bottom-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Search">
+        <button id="searchClear" hidden aria-label="Clear search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <button id="searchMicBtn" type="button" aria-label="Search by voice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4M9 21h6"/></svg>
+        </button>
+      </div>
+      <button class="chatlist-fab" id="directoryBtn" type="button" aria-label="Start a conversation" title="Start a conversation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
     </div>
 
     <div class="sb-page events-page" id="eventsPage" hidden>

@@ -89,6 +89,32 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   z-index:1;
 }
 .sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+#chatPage{padding-bottom:0}
+.chatlist-bottom-bar{
+  position:sticky;bottom:0;z-index:5;margin-top:auto;
+  display:flex;align-items:center;gap:10px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  background:var(--sidebar-bg);border-top:1px solid var(--border);
+}
+.chatlist-bottom-search{
+  flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+  background:var(--surface-2);border-radius:14px;padding:9px 12px;
+  box-shadow:inset 0 0 0 1px var(--border);color:var(--text-faint);
+}
+.chatlist-bottom-search svg{width:17px;height:17px;flex:none}
+.chatlist-bottom-search input{flex:1;min-width:0;border:none;background:none;font-size:15px;color:var(--text);font-family:inherit}
+.chatlist-bottom-search input::placeholder{color:var(--text-faint)}
+.chatlist-bottom-search input:focus{outline:none}
+.chatlist-bottom-search button{flex:none;border:none;background:none;color:var(--text-faint);display:flex;align-items:center;justify-content:center;padding:2px}
+#searchMicBtn svg{width:18px;height:18px}
+#searchMicBtn.listening{color:#2f5fe0}
+.chatlist-fab{
+  flex:none;width:44px;height:44px;border-radius:13px;border:none;
+  background:var(--text);color:#fff;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 6px 16px -4px rgba(20,20,15,.35);
+}
+.chatlist-fab svg{width:20px;height:20px}
+.chatlist-fab:active{transform:scale(.94)}
 .sb-page::-webkit-scrollbar{display:none}
 .help-hold-btn{
   position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;
