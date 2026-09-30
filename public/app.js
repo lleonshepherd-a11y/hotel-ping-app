@@ -1471,17 +1471,18 @@ function renderReplyThreadLines(msgs){
 
     var avRect = relRect(avatarEl);
     var parentRect = relRect(parentRow);
-    // Both the label and the line live at the reply's avatar column on the
-    // left, regardless of which side the original message's own bubble is
-    // on - a straight drop down the left margin, never crossing into any
-    // bubble or text from the right.
-    var lineX = avRect.left + avRect.width / 2;
+    // Both the label and the drop live in the gutter just left of the
+    // avatar column, regardless of which side the original message's own
+    // bubble is on - then a short hook bends right into the avatar. Stays
+    // in the empty margin the whole way, never crossing any bubble or text.
+    var gutterX = avRect.left - 7;
+    var avCenterX = avRect.left + avRect.width / 2;
 
     var badge = document.createElement("div");
     badge.className = "reply-thread-badge";
     badge.textContent = replies.length === 1 ? "1 Reply" : replies.length + " Replies";
-    badge.style.left = avRect.left + "px";
-    badge.style.top = (parentRect.top + parentRect.height + 4) + "px";
+    badge.style.left = gutterX + "px";
+    badge.style.top = (parentRect.top + parentRect.height + 8) + "px";
     threadScroll.appendChild(badge);
 
     var badgeRect = relRect(badge);
@@ -1490,10 +1491,17 @@ function renderReplyThreadLines(msgs){
 
     var vLine = document.createElement("div");
     vLine.className = "reply-thread-line reply-thread-line-v";
-    vLine.style.left = lineX + "px";
+    vLine.style.left = gutterX + "px";
     vLine.style.top = lineTop + "px";
     vLine.style.height = Math.max(0, avCenterY - lineTop) + "px";
     threadScroll.appendChild(vLine);
+
+    var hLine = document.createElement("div");
+    hLine.className = "reply-thread-line reply-thread-line-h";
+    hLine.style.left = gutterX + "px";
+    hLine.style.top = (avCenterY - 1) + "px";
+    hLine.style.width = Math.max(0, avCenterX - gutterX) + "px";
+    threadScroll.appendChild(hLine);
   });
 }
 
