@@ -470,7 +470,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   background-size:20px 20px;
   background-position:-4px -4px;
   scrollbar-width:none;
+  position:relative;
 }
+.reply-thread-badge{color:#2f5fe0;font-weight:700;font-size:10.5px;margin-top:4px;padding:0 4px;cursor:default}
+.reply-thread-line{position:absolute;background:#2f5fe0;pointer-events:none;z-index:0}
+.reply-thread-line-v{width:2px;border-radius:1px}
+.reply-thread-line-h{height:2px;border-radius:1px}
 .thread-scroll::-webkit-scrollbar{display:none}
 .day-div{text-align:center;font-size:11px;font-weight:700;color:var(--text-faint);margin:14px 0 10px;text-transform:uppercase;letter-spacing:.04em}
 
@@ -489,7 +494,14 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .bubble-wrap{max-width:72%;display:flex;flex-direction:column;position:relative}
 .msg-row.out .bubble-wrap{align-items:flex-end;padding-right:7px}
 .msg-row.in .bubble-wrap{align-items:flex-start;padding-left:7px}
-.group-sender-name{font-size:11.5px;font-weight:800;margin:0 2px 2px;color:var(--text-dim)}
+.group-sender-row{display:flex;align-items:center;gap:5px;margin-bottom:2px}
+.group-sender-name{font-size:11.5px;font-weight:800;margin:0 2px;color:var(--text-dim)}
+.group-sender-avatar{
+  width:17px;height:17px;border-radius:50%;flex:none;position:relative;
+  display:flex;align-items:center;justify-content:center;color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.group-sender-avatar svg{width:9px;height:9px}
 
 .bubble{
   position:relative;display:flow-root;

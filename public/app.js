@@ -1427,7 +1427,67 @@ function renderThread(){
     threadScroll.appendChild(buildMessageRow(m, groupEnd, msgsById, groupStart));
   });
   if(!STATE.activeGroupId && STATE.typingFrom[STATE.active]) threadScroll.appendChild(buildTypingBubble());
+  // Deferred: rows animate in (bubbleIn, translateY over .3s), so measuring
+  // positions synchronously here would catch them mid-slide - wait for that
+  // to settle first, or the line lands ~8px off from the avatar it's aiming for.
+  if(replyLineTimer) clearTimeout(replyLineTimer);
+  replyLineTimer = setTimeout(function(){ renderReplyThreadLines(msgs); }, 320);
   threadScroll.scrollTop = threadScroll.scrollHeight;
+}
+var replyLineTimer = null;
+
+// In a group (an Event or an ad-hoc multi-department chat - same thread
+// view either way), a reply to an earlier message gets a blue L-shaped
+// line: down from a "N Replies" label under the original, then across
+// into the avatar of whoever replied - so it's visually obvious who
+// answered what without following the flat timeline back up.
+function renderReplyThreadLines(msgs){
+  if(!STATE.activeGroupId) return;
+  var byParent = {};
+  msgs.forEach(function(m){
+    if(m.replyTo) (byParent[m.replyTo] = byParent[m.replyTo] || []).push(m);
+  });
+  var parentIds = Object.keys(byParent);
+  if(!parentIds.length) return;
+  var scrollRect = threadScroll.getBoundingClientRect();
+  function relRect(el){
+    var r = el.getBoundingClientRect();
+    return { top: r.top - scrollRect.top + threadScroll.scrollTop, left: r.left - scrollRect.left + threadScroll.scrollLeft, width: r.width, height: r.height };
+  }
+  parentIds.forEach(function(parentId){
+    var parentRow = threadScroll.querySelector('[data-msg-id="' + parentId + '"]');
+    if(!parentRow) return;
+    var replies = byParent[parentId];
+    var replyRow = threadScroll.querySelector('[data-msg-id="' + replies[0].id + '"]');
+    var avatarEl = replyRow && replyRow.querySelector(".group-sender-avatar");
+    if(!replyRow || !avatarEl) return;
+
+    var badge = document.createElement("div");
+    badge.className = "reply-thread-badge";
+    badge.textContent = replies.length === 1 ? "1 Reply" : replies.length + " Replies";
+    parentRow.querySelector(".bubble-wrap").appendChild(badge);
+
+    var badgeRect = relRect(badge);
+    var avRect = relRect(avatarEl);
+    var lineX = badgeRect.left + 6;
+    var lineTop = badgeRect.top + badgeRect.height;
+    var avCenterX = avRect.left + avRect.width / 2;
+    var avCenterY = avRect.top + avRect.height / 2;
+
+    var vLine = document.createElement("div");
+    vLine.className = "reply-thread-line reply-thread-line-v";
+    vLine.style.left = lineX + "px";
+    vLine.style.top = lineTop + "px";
+    vLine.style.height = Math.max(0, avCenterY - lineTop) + "px";
+    threadScroll.appendChild(vLine);
+
+    var hLine = document.createElement("div");
+    hLine.className = "reply-thread-line reply-thread-line-h";
+    hLine.style.left = Math.min(lineX, avCenterX) + "px";
+    hLine.style.top = (avCenterY - 1) + "px";
+    hLine.style.width = Math.abs(avCenterX - lineX) + "px";
+    threadScroll.appendChild(hLine);
+  });
 }
 
 function buildTypingBubble(){
@@ -2323,11 +2383,21 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
       ? (senderDept ? senderDept.name : m.from) + (m.staffName ? " · " + m.staffName : "")
       : (m.staffName || (STATE.activeGroupId && !out ? (senderDept ? senderDept.name : m.from) : null));
     if(labelText){
+      var senderRow = document.createElement("div");
+      senderRow.className = "group-sender-row";
+      if(STATE.activeGroupId && !out){
+        var senderAvatar = document.createElement("span");
+        senderAvatar.className = "group-sender-avatar";
+        senderAvatar.setAttribute("style", avatarStyleAttr(m.from));
+        senderAvatar.innerHTML = avatarInnerHtml(m.from);
+        senderRow.appendChild(senderAvatar);
+      }
       var senderLabel = document.createElement("div");
       senderLabel.className = "group-sender-name";
       if(senderDept) senderLabel.style.color = senderDept.color;
       senderLabel.textContent = labelText;
-      wrap.appendChild(senderLabel);
+      senderRow.appendChild(senderLabel);
+      wrap.appendChild(senderRow);
     }
   }
 
