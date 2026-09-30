@@ -2758,7 +2758,7 @@ var dutyTrack = document.getElementById("dutyTrack");
 var dutyKnob = document.getElementById("dutyKnob");
 var dutyCaptionLabel = document.getElementById("dutyCaptionLabel");
 
-function dutyMaxLeft(){ return dutyTrack.clientWidth - 20 - 4; }
+function dutyMaxLeft(){ return dutyTrack.clientWidth - 16 - 4; }
 
 function renderDuty(){
   var on = isOnDuty(STATE.self);
@@ -4343,7 +4343,6 @@ var setupForm = document.getElementById("setupForm");
 var setupName = document.getElementById("setupName");
 var setupBtn = document.getElementById("setupBtn");
 var setupError = document.getElementById("setupError");
-var sbSub = document.getElementById("sbSub");
 var switcherWrap = document.getElementById("switcherWrap");
 var switcherLabel = document.getElementById("switcherLabel");
 var adminBtn = document.getElementById("adminBtn");
@@ -4360,9 +4359,12 @@ function enterApp(staff){
   loginScreen.hidden = true;
   setupScreen.hidden = true;
   appRoot.hidden = false;
-  sbSub.hidden = true;
   loadHotelProfile();
-  switcherWrap.hidden = !staff.isAdmin && !(staff.headDepts && staff.headDepts.length);
+  // The GM/admin used to always get the switcher too ("Viewing as" every
+  // department) - dropped per direction that the GM just views as himself,
+  // not as a picker of everyone else. Real multi-department heads still
+  // need it to choose which hat they're messaging as.
+  switcherWrap.hidden = !(staff.headDepts && staff.headDepts.length);
   switcherLabel.textContent = staff.isAdmin ? "Viewing as" : "Message as";
   adminGroupBtn.hidden = !staff.isAdmin;
   adminBtn.hidden = !staff.isAdmin;
@@ -5367,8 +5369,9 @@ function renderMyProfileCard(){
   myProfileAvatar.innerHTML = AUTH.staff.photoUrl
     ? iconSvg(STATE.self) + '<img src="'+esc(mediaUrl(AUTH.staff.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
     : avatarInnerHtml(STATE.self);
-  myProfileName.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
-  myProfileRole.hidden = true;
+  myProfileName.textContent = AUTH.staff.name || (DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self);
+  myProfileRole.hidden = false;
+  myProfileRole.textContent = DEPTS[STATE.self] ? DEPTS[STATE.self].name : STATE.self;
   myProfileStatus.hidden = !AUTH.staff.statusLine;
   myProfileStatus.textContent = AUTH.staff.statusLine || "";
 }
