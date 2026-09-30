@@ -1476,7 +1476,6 @@ function renderReplyThreadLines(msgs){
     // bubble is on - then a short hook bends right into the avatar. Stays
     // in the empty margin the whole way, never crossing any bubble or text.
     var gutterX = avRect.left - 7;
-    var avCenterX = avRect.left + avRect.width / 2;
 
     var badge = document.createElement("div");
     badge.className = "reply-thread-badge";
@@ -1504,7 +1503,9 @@ function renderReplyThreadLines(msgs){
     hLine.className = "reply-thread-line reply-thread-line-h";
     hLine.style.left = gutterX + "px";
     hLine.style.top = (avCenterY - 1) + "px";
-    hLine.style.width = Math.max(0, avCenterX - gutterX) + "px";
+    // Stop right at the avatar's own edge, so the line points at it
+    // instead of running across/under the icon.
+    hLine.style.width = Math.max(0, avRect.left - gutterX) + "px";
     threadScroll.appendChild(hLine);
   });
 }
