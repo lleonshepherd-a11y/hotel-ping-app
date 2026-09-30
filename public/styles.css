@@ -310,8 +310,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .new-event-add-person-btn:active{background:var(--surface-2)}
 .new-event-add-person-icon{flex:none;width:26px;height:26px;border-radius:50%;background:var(--text-dim);color:#fff;display:flex;align-items:center;justify-content:center}
 .new-event-add-person-icon svg{width:13px;height:13px}
-.new-event-form-footer{padding:14px 2px calc(18px + env(safe-area-inset-bottom))}
-.new-event-create-submit-btn{width:100%;border:none;border-radius:13px;padding:12px;background:var(--accent);color:#fff;font-weight:800;font-size:13.5px;box-shadow:var(--shadow-soft)}
+.new-event-form-footer{padding:14px 2px calc(18px + env(safe-area-inset-bottom));display:flex;justify-content:center}
+.new-event-create-submit-btn{width:auto;border:none;border-radius:12px;padding:10px 22px;background:var(--accent);color:#fff;font-weight:800;font-size:13.5px;box-shadow:var(--shadow-soft)}
 .new-event-create-submit-btn:active{transform:scale(.98)}
 #headerSearchWrap input{width:0;opacity:0;font-size:16px;transition:width .18s ease,opacity .12s ease}
 #headerSearchWrap.expanded input{width:100%;opacity:1}
