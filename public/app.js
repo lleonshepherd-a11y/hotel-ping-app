@@ -3630,7 +3630,12 @@ function doSend(){
       return;
     }
     var names = composeRecipients.map(function(id){ return DEPTS[id].name; });
-    var groupMembers = composeRecipients.slice();
+    // A group's membership is department-level - a head-of-department pick
+    // (a specific named person) maps to their own department for group
+    // purposes, since there's no per-person seat in a group the way there
+    // is in a 1:1 thread.
+    var groupMembers = composeRecipients.map(function(id){ return headRealDeptId(id) || id; })
+      .filter(function(id, i, arr){ return arr.indexOf(id) === i; });
     apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: groupMembers })
       .then(function(res){
         composeMode = false;
@@ -6822,7 +6827,8 @@ function renderComposeBody(){
 
 function renderDirectory(){
   var term = directorySearchInput.value.trim().toLowerCase();
-  var ids = DEPT_ORDER.filter(function(id){
+  var assignedHeads = HEAD_DEPT_IDS.filter(function(id){ return !!DEPT_HEADS[headRealDeptId(id)]; });
+  var ids = DEPT_ORDER.concat(assignedHeads).filter(function(id){
     if(id === STATE.self || composeRecipients.indexOf(id) !== -1) return false;
     var d = DEPTS[id];
     if(!d) return false;
@@ -6830,7 +6836,7 @@ function renderDirectory(){
   }).sort(function(a, b){ return DEPTS[a].name.localeCompare(DEPTS[b].name); });
 
   if(!ids.length){
-    directoryList.innerHTML = '<div class="handover-empty">No departments match that.</div>';
+    directoryList.innerHTML = '<div class="handover-empty">No one matches that.</div>';
     return;
   }
   directoryList.innerHTML = "";
