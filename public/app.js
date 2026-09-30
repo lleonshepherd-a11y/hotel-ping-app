@@ -4287,7 +4287,7 @@ function enterApp(staff){
   tabEventsBtn.hidden = staff.departmentId === "maintenance";
   tabGuestsBtn.hidden = staff.departmentId !== "foh";
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
-  msgInput.placeholder = "Message as " + staff.name + "…";
+  msgInput.placeholder = "Message";
   boot();
   loadStories();
   startPolling();
@@ -5311,7 +5311,7 @@ myProfileNameForm.addEventListener("submit", function(e){
     AUTH.staff.statusLine = res.staff.statusLine;
     AUTH.staff.phone = res.staff.phone;
     renderMyProfileCard();
-    msgInput.placeholder = "Message as " + AUTH.staff.name + "…";
+    msgInput.placeholder = "Message";
     return loadStaffMeta();
   }).then(function(){
     renderList();

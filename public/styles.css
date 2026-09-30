@@ -624,7 +624,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ptt-wave-row{display:flex;align-items:center;justify-content:center;gap:2.5px;height:20px}
 .ptt-wave-bar{width:2.6px;border-radius:3px;background:#fff;height:6px;transition:height .09s ease}
 .composer-pill .ptt-float{
-  position:static;flex:none;width:32px;height:32px;margin:0 -1px 0 2px;
+  position:relative;left:auto;bottom:auto;flex:none;width:32px;height:32px;margin:0 -1px 0 2px;
   background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:none;box-shadow:none;
 }
 .composer-pill .ptt-float.live{background:none;box-shadow:none}
@@ -908,6 +908,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .plus-btn{transition:background .12s ease,color .12s ease,transform .2s cubic-bezier(.3,1.4,.4,1)}
 .plus-btn.open{transform:rotate(45deg);background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff}
+.composer-pill .plus-btn{
+  flex:none;width:28px;height:28px;margin-left:-2px;border:none;background:none;
+  color:var(--text-dim);border-radius:50%;display:flex;align-items:center;justify-content:center;
+}
+.composer-pill .plus-btn svg{width:17px;height:17px}
+.composer-pill .plus-btn.open{background:var(--accent);color:#fff}
 .plus-menu{
   position:absolute;bottom:calc(100% + 10px);left:0;
   display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:14px 8px;
