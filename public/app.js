@@ -691,7 +691,7 @@ function clearThread(deptId){
   STATE.threadSwipeOpen = false;
   STATE.openSwipeCloser = null;
   renderList();
-  showToast("Cleared");
+  showToast("Archived");
   apiSend('/api/cleared', 'POST', { with: deptId }).catch(function(){});
 }
 
@@ -818,7 +818,7 @@ function renderList(){
     var clearBtn = document.createElement("button");
     clearBtn.type = "button";
     clearBtn.className = "t-clear-action";
-    clearBtn.textContent = "Clear";
+    clearBtn.textContent = "Archive";
     clearBtn.addEventListener("click", function(e){ e.stopPropagation(); clearThread(id); });
     wrap.appendChild(clearBtn);
     wrap.appendChild(el);
@@ -836,7 +836,7 @@ function togglePinThread(deptId){
   apiSend('/api/pinned', 'POST', { with: deptId }).catch(function(){});
 }
 
-var SWIPE_REVEAL_PX = 156, SWIPE_OPEN_THRESHOLD_PX = 40;
+var SWIPE_REVEAL_PX = 172, SWIPE_OPEN_THRESHOLD_PX = 40, SWIPE_AUTO_ARCHIVE_PX = 240;
 function attachThreadReorder(el, deptId){
   var LONG_PRESS_MS = 350, MOVE_TOLERANCE = 10;
   var timer = null, startX = 0, startY = 0, pointerId = null;
@@ -905,15 +905,36 @@ function attachThreadReorder(el, deptId){
   function onSwipeMove(e){
     if(e.pointerId !== pointerId) return;
     e.preventDefault();
-    swipeX = Math.max(-SWIPE_REVEAL_PX, Math.min(0, e.clientX - startX));
+    // Dragged past the two revealed pills entirely - a full swipe-through
+    // archives on release without needing a separate tap, same as Mail's
+    // full-swipe-to-delete. The archive pill fills in to show it's armed.
+    swipeX = Math.max(-SWIPE_AUTO_ARCHIVE_PX, Math.min(0, e.clientX - startX));
     el.style.transform = "translateX(" + swipeX + "px)";
+    var wrap = el.parentElement;
+    var clearBtn = wrap && wrap.querySelector(".t-clear-action");
+    if(clearBtn){
+      var nowArmed = -swipeX >= SWIPE_AUTO_ARCHIVE_PX;
+      if(nowArmed && !clearBtn.classList.contains("armed") && navigator.vibrate) navigator.vibrate(14);
+      clearBtn.classList.toggle("armed", nowArmed);
+    }
   }
   function onSwipeUp(e){
     if(e.pointerId !== pointerId) return;
+    var wrap = el.parentElement;
+    var clearBtn = wrap && wrap.querySelector(".t-clear-action");
+    var autoArchive = -swipeX >= SWIPE_AUTO_ARCHIVE_PX;
     teardown();
     swiping = false;
     el._suppressClick = true;
-    if(-swipeX > SWIPE_OPEN_THRESHOLD_PX){
+    if(autoArchive){
+      if(clearBtn) clearBtn.classList.remove("armed");
+      el.style.transition = "transform .18s ease, opacity .18s ease";
+      el.style.transform = "translateX(-100%)";
+      el.style.opacity = "0";
+      // clearThread() re-renders the whole list, which would otherwise
+      // yank the row out from under the animation before it can play.
+      setTimeout(function(){ clearThread(deptId); }, 180);
+    } else if(-swipeX > SWIPE_OPEN_THRESHOLD_PX){
       el.style.transition = "transform .2s ease";
       el.style.transform = "translateX(-" + SWIPE_REVEAL_PX + "px)";
       el.classList.add("swiped-open");
@@ -8632,16 +8653,12 @@ function buildMaintCard(t){
   card.dataset.ticketId = t.id;
   var isVideo = isTicketVideo(t);
 
-  var stageIdx = MAINT_STAGE_INDEX[t.status] || 0;
   var head = document.createElement("div");
   head.className = "maint-card-head";
-  var track = '<span class="task-track">' +
-    [0,1,2].map(function(i){ return '<span class="task-seg' + (i <= stageIdx ? ' filled' : '') + '"></span>'; }).join('') +
-    '</span>';
   head.innerHTML =
-    '<span class="task-card-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg> ' + (t.ticketNumber ? 'JOB #' + t.ticketNumber : 'JOB') + '</span>' +
-    track +
-    '<span class="task-card-chip">' + MAINT_STATUS_LABEL[t.status] + '</span>' +
+    '<span class="maint-status-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg></span>' +
+    '<span class="maint-card-job-label">' + (t.ticketNumber ? 'Job #' + t.ticketNumber : 'Job') + '</span>' +
+    '<span class="maint-status-chip">' + MAINT_STATUS_LABEL[t.status] + '</span>' +
     (isTicketStale(t) ? '<span class="maint-card-stale-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Not started</span>' : '');
   card.appendChild(head);
 

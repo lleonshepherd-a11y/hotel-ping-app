@@ -385,13 +385,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-chev{width:13px;height:13px;color:var(--text-faint);opacity:.5;flex:none}
 .t-clear-action{
   position:absolute;top:50%;right:16px;transform:translateY(-50%);z-index:0;
-  width:58px;height:34px;border:none;border-radius:11px;
-  background:var(--text-dim);color:#fff;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  min-width:64px;height:34px;border:none;border-radius:999px;padding:0 16px;
+  background:#d6493c;color:#fff;font-size:12.5px;font-weight:700;letter-spacing:.02em;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:background .12s ease,transform .12s ease;
 }
+/* Dragged all the way through - one more pixel and letting go archives
+   it immediately, no tap needed. The pill swells and darkens to say so. */
+.t-clear-action.armed{background:#b8392e;transform:translateY(-50%) scale(1.08)}
 .t-pin-action{
-  position:absolute;top:50%;right:82px;transform:translateY(-50%);z-index:0;
-  width:58px;height:34px;border:none;border-radius:11px;
+  position:absolute;top:50%;right:92px;transform:translateY(-50%);z-index:0;
+  min-width:64px;height:34px;border:none;border-radius:999px;padding:0 16px;
   background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;letter-spacing:.02em;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
@@ -725,7 +729,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .reply-preview-bar-text{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-preview-bar-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:4px;display:flex;align-items:center}
 .reply-preview-bar-close svg{width:16px;height:16px}
-#taskTagClose{color:var(--accent)}
+/* Tinted red like the not-started stage it's about to create, so the
+   banner previews the color the resulting task card will start life in. */
+#taskTagBar{background:rgba(214,73,60,.1);padding:8px 8px 8px 10px}
+#taskTagBar .reply-preview-bar-name{color:#c0392b}
+.task-tag-bar-icon{flex:none;width:30px;height:30px;border-radius:50%;background:#d6493c;color:#fff;display:flex;align-items:center;justify-content:center}
+.task-tag-bar-icon svg{width:15px;height:15px}
+#taskTagClose{color:#c0392b}
 .room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
 .mention-popover{position:absolute;left:20px;right:20px;bottom:100%;margin-bottom:6px;max-width:640px;margin-left:auto;margin-right:auto;background:var(--surface-3);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden;max-height:220px;overflow-y:auto;z-index:25}
@@ -742,17 +752,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    the same status-equals-color convention already used for maintenance
    priority and duty state elsewhere in the app. */
 .task-card{
-  margin-top:2px;margin-bottom:4px;width:min(300px,80vw);border-radius:16px;padding:12px 14px 13px;
-  background:var(--surface);border:1px solid var(--border);
-  box-shadow:0 3px 14px -6px rgba(15,15,20,.16);
+  position:relative;margin-top:2px;margin-bottom:4px;width:min(300px,80vw);border-radius:16px;padding:13px 14px 13px 17px;
+  background:#fff;box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
   -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
 }
-.task-card-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.task-card-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-faint)}
+.task-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3.5px;border-radius:3px;background:var(--task-stage-color,#c7c7cc)}
+.task-card-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.task-card-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint)}
 .task-card-label svg{width:12px;height:12px}
-.task-track{display:inline-flex;align-items:center;gap:3px;flex:1}
-.task-seg{display:block;width:16px;height:5px;border-radius:3px;background:var(--surface-3)}
-.task-card-chip{flex:none;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:3px 9px;border-radius:20px;background:var(--surface-3);color:var(--text-dim)}
+.task-track{display:inline-flex;align-items:center;gap:4px;flex:1;justify-content:center}
+.task-seg{display:block;width:5px;height:5px;border-radius:50%;background:var(--surface-3)}
+.task-card-chip{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.01em;padding:4px 10px;border-radius:20px;background:var(--surface-3);color:var(--text-dim)}
+.task-card-chip::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .task-card-body{font-size:14.5px;font-weight:600;line-height:1.38;color:var(--text);margin-bottom:6px}
 .task-card-meta{font-size:11px;color:var(--text-faint);margin-bottom:10px}
 .task-card-note{background:var(--surface-2);border-radius:11px;padding:8px 10px;margin-bottom:8px}
@@ -761,22 +772,32 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .task-card-note-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint)}
 .task-card-note-by{font-size:10.5px;font-weight:600;color:var(--text-dim)}
 .task-card-note-text{font-size:12.5px;font-weight:600;color:var(--text);line-height:1.32}
-.task-card-btn{width:100%;border:none;border-radius:12px;padding:9px 10px;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;background:var(--accent)}
+.task-card-btn{width:100%;border:none;border-radius:12px;padding:10px 10px;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;background:var(--task-stage-color,var(--accent))}
 .task-card-reopen-btn{width:100%;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);border-radius:12px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer}
 .task-card-done-row{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:#2f9a5c}
 .task-card-done-row svg{width:13px;height:13px}
 .task-card-waiting-row{font-size:11.5px;font-weight:600;color:var(--text-faint)}
 
-.task-card.new .task-seg.filled{background:var(--accent)}
-.task-card.new .task-card-chip{color:var(--accent);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border)}
+/* Traffic-light convention: red = not started, amber = in progress, green
+   = done. Each progress dot carries its OWN stage's color once reached
+   (dot 1 red, dot 2 amber, dot 3 green), so the dot row reads like a
+   little traffic light filling in left to right. The action button
+   always takes the color of the stage it's about to move the card INTO,
+   so tapping it visually tells you what you're about to turn the card.
+   --task-stage-color feeds the left accent bar and the chip. */
+.task-seg.filled:nth-child(1){background:#d6493c}
+.task-seg.filled:nth-child(2){background:#e0902c}
+.task-seg.filled:nth-child(3){background:#2f9a5c}
 
-.task-card.started{border-color:rgba(224,144,44,.35)}
-.task-card.started .task-seg.filled{background:#e0902c}
+.task-card.new{--task-stage-color:#d6493c}
+.task-card.new .task-card-chip{color:#c0392b;background:rgba(214,73,60,.12)}
+.task-card.new .task-card-btn{--task-stage-color:#e0902c}
+
+.task-card.started{--task-stage-color:#e0902c}
 .task-card.started .task-card-chip{color:#b3760f;background:rgba(224,144,44,.14)}
-.task-card.started .task-card-btn{background:linear-gradient(150deg,#e0902c,#b3760f)}
+.task-card.started .task-card-btn{--task-stage-color:#2f9a5c}
 
-.task-card.done{border-color:rgba(47,154,92,.35)}
-.task-card.done .task-seg.filled{background:#2f9a5c}
+.task-card.done{--task-stage-color:#2f9a5c}
 .task-card.done .task-card-chip{color:#2f9a5c;background:rgba(47,154,92,.14)}
 
 .signoff-card{margin-top:2px;margin-bottom:4px;width:min(300px,78vw);border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,rgba(77,132,245,.16),rgba(77,132,245,.05));border:1px solid rgba(77,132,245,.4);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
@@ -1590,6 +1611,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* .sb-search/.chat-filter-row/.maint-feed all set an explicit display,
    which otherwise beats the [hidden] attribute at equal specificity. */
 #maintSearchWrap[hidden],#maintFilterRow[hidden],#maintFeed[hidden]{display:none}
+/* Maintenance cards are deliberately not the task card: a tinted-panel
+   "job ticket" look (full wash of the status color) instead of a white
+   card with a left accent bar, and a wrench-badge + chip instead of the
+   task card's progress dots - so a glance at the board never gets
+   confused with a glance at a chat thread. */
 .maint-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px 14px 13px 40px;box-shadow:0 3px 14px -6px rgba(15,15,20,.16);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:36px;display:flex;align-items:center;justify-content:center;color:var(--text);touch-action:none;cursor:grab}
 .maint-card-handle::before{content:"";position:absolute;left:5px;top:50%;transform:translateY(-50%);width:22px;height:36px;border-radius:10px;background:var(--surface-3)}
@@ -1599,17 +1625,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-pin-btn{position:absolute;top:7px;right:7px;width:22px;height:22px;border:none;background:var(--surface-3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text);cursor:pointer}
 .maint-pin-btn svg{width:11px;height:11px}
 .maint-pin-btn.pinned{background:rgba(47,95,224,.18);color:#2f5fe0}
-.maint-card.status-reported{border-color:rgba(163,34,26,.3)}
-.maint-card.status-reported .task-seg.filled{background:var(--urgent)}
-.maint-card.status-reported .task-card-chip{color:var(--urgent);background:var(--urgent-tint)}
-.maint-card.status-in_progress{border-color:rgba(224,144,44,.35)}
-.maint-card.status-in_progress .task-seg.filled{background:#e0902c}
-.maint-card.status-in_progress .task-card-chip{color:#b3760f;background:rgba(224,144,44,.14)}
-.maint-card.status-fixed{border-color:rgba(47,154,92,.35)}
-.maint-card.status-fixed .task-seg.filled{background:#2f9a5c}
-.maint-card.status-fixed .task-card-chip{color:#2f9a5c;background:rgba(47,154,92,.14)}
-.maint-card-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-.maint-card-head .task-card-label{white-space:nowrap}
+.maint-card.status-reported{background:rgba(214,73,60,.07);border-color:rgba(214,73,60,.22)}
+.maint-card.status-in_progress{background:rgba(224,144,44,.08);border-color:rgba(224,144,44,.28)}
+.maint-card.status-fixed{background:rgba(47,154,92,.07);border-color:rgba(47,154,92,.22)}
+.maint-card-head{display:flex;align-items:center;gap:8px;margin-bottom:9px;padding-right:26px}
+.maint-status-badge{flex:none;width:24px;height:24px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;background:#8a8a85}
+.maint-status-badge svg{width:13px;height:13px}
+.status-reported .maint-status-badge{background:#d6493c}
+.status-in_progress .maint-status-badge{background:#e0902c}
+.status-fixed .maint-status-badge{background:#2f9a5c}
+.maint-card-job-label{flex:1;min-width:0;font-size:11px;font-weight:800;letter-spacing:.02em;color:var(--text-dim);white-space:nowrap}
+.maint-status-chip{flex:none;font-size:10.5px;font-weight:800;padding:4px 10px;border-radius:8px;color:#fff}
+.status-reported .maint-status-chip{background:#d6493c}
+.status-in_progress .maint-status-chip{background:#e0902c}
+.status-fixed .maint-status-chip{background:#2f9a5c}
 .maint-card-stale-tag{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:2px 7px;border-radius:6px;background:var(--urgent-tint);color:var(--urgent);white-space:nowrap;flex:none}
 .maint-card-stale-tag svg{width:10px;height:10px}
 .maint-card-top{display:flex;align-items:center;gap:9px;margin-bottom:6px}
