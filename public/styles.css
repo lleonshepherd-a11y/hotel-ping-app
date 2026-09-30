@@ -424,14 +424,17 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .back-btn svg{width:19px;height:19px}
 .h-center{
   flex:none;max-width:100%;position:relative;
-  display:flex;align-items:center;gap:9px;
-  background:#fff;border-radius:999px;padding:5px 16px 5px 5px;
+  display:flex;align-items:center;gap:7px;
+  background:#fff;border-radius:999px;padding:4px 13px 4px 4px;
   box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
   margin:0 auto;
 }
-.h-center .h-avatar{width:34px;height:34px}
+.h-center .h-avatar{width:26px;height:26px}
+/* The "New Ping" compose title isn't a contact - it shouldn't wear the
+   same pill chrome as an actual person/group header. */
+.h-center.plain{background:none;box-shadow:none;padding:0;border-radius:0}
 .h-name-wrap{flex:1;min-width:0;max-width:100%;overflow:hidden}
-.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:14.5px}
+.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px}
 .h-name-row{display:flex;justify-content:flex-start}
 .h-sub{justify-content:flex-start;font-size:10.5px}
 .thread-head-actions{flex:none;margin-left:auto;display:flex;align-items:center;gap:2px}
@@ -460,8 +463,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .back-btn:active{background:var(--surface-3)}
 .h-avatar{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 12px -3px rgba(15,15,20,.35)}
 .h-avatar svg{width:19px;height:19px}
-.h-name{font-family:Manrope,sans-serif;font-weight:800;font-size:14.5px;letter-spacing:-.01em}
-.h-sub{font-size:10.5px;color:var(--text-dim);margin-top:1px;display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
+.h-center .h-avatar svg{width:13px;height:13px}
+.h-name{font-family:Manrope,sans-serif;font-weight:800;font-size:13px;letter-spacing:-.005em}
+.h-sub{font-size:10px;color:var(--text-dim);margin-top:0;display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
 #hContactWrap{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;flex-shrink:1}
 /* The status text ("Active now"/"Off duty") is redundant now that the
    same signal lives as a colored dot badge on the avatar - only the
@@ -471,8 +475,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #hSub.typing{display:inline;color:var(--accent);font-weight:700}
 #hSub.meta{display:inline}
 .h-dot{
-  position:absolute;left:28px;top:28px;width:9px;height:9px;border-radius:50%;
-  background:#34c759;border:2px solid #fff;transition:background .2s ease;
+  position:absolute;left:21px;top:21px;width:7px;height:7px;border-radius:50%;
+  background:#34c759;border:1.5px solid #fff;transition:background .2s ease;
 }
 .h-dot.off{background:#c7c7cc}
 

@@ -527,6 +527,7 @@ var switcherRow = document.getElementById("switcherRow");
 var threadList = document.getElementById("threadList");
 var threadScroll = document.getElementById("threadScroll");
 var hAvatar = document.getElementById("hAvatar");
+var hCenter = document.getElementById("hCenter");
 var hName = document.getElementById("hName");
 var hSub = document.getElementById("hSub");
 var filterCountAll = document.getElementById("filterCountAll");
@@ -1073,6 +1074,7 @@ var composeToBarNames = document.getElementById("composeToBarNames");
 function renderHeader(){
   if(composeMode){
     composeToBar.hidden = false;
+    hCenter.classList.add("plain");
     hAvatar.hidden = true;
     hName.textContent = "New Ping";
     hSub.textContent = "";
@@ -1088,6 +1090,7 @@ function renderHeader(){
     return;
   }
   composeToBar.hidden = true;
+  hCenter.classList.remove("plain");
   hAvatar.hidden = false;
   if(STATE.activeGroupId){
     var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
