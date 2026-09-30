@@ -8653,43 +8653,45 @@ function buildMaintCard(t){
   card.dataset.ticketId = t.id;
   var isVideo = isTicketVideo(t);
 
-  var head = document.createElement("div");
-  head.className = "maint-card-head";
-  head.innerHTML =
-    '<span class="maint-status-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg></span>' +
-    '<span class="maint-card-job-label">' + (t.ticketNumber ? 'Job #' + t.ticketNumber : 'Job') + '</span>' +
-    '<span class="maint-status-chip">' + MAINT_STATUS_LABEL[t.status] + '</span>' +
-    (isTicketStale(t) ? '<span class="maint-card-stale-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Not started</span>' : '');
-  card.appendChild(head);
-
+  // Horizontal ticket-row layout: badge, content column, status+chevron -
+  // matches the reference exactly. Status-changing actions live in the
+  // detail view only now (buildStatusActions is reused there too), so
+  // the list card is pure summary - tap through to act on it.
   var top = document.createElement("div");
   top.className = "maint-card-top";
-  if(t.photoUrl){
-    var thumb = document.createElement(isVideo ? "video" : "img");
-    thumb.className = "maint-card-thumb";
-    thumb.src = mediaUrl(t.photoUrl);
-    if(isVideo){ thumb.muted = true; thumb.setAttribute("preload", "metadata"); }
-    else thumb.alt = "Issue photo";
-    top.appendChild(thumb);
-  }
+  var badgeHtml = t.photoUrl
+    ? '<' + (isVideo ? "video" : "img") + ' class="maint-card-thumb" src="' + esc(mediaUrl(t.photoUrl)) + '"' + (isVideo ? ' muted preload="metadata"' : ' alt="Issue photo"') + '>'
+    : '<span class="maint-status-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg></span>';
+  top.innerHTML = badgeHtml;
+
   var info = document.createElement("div");
   info.className = "maint-card-info";
-  var infoHtml = "";
-  if(t.roomNumber) infoHtml += '<span class="maint-card-room">' + esc(t.roomNumber) + '</span>';
+  var infoHtml = '<span class="maint-card-job-label">' + (t.ticketNumber ? 'Job #' + t.ticketNumber : 'Job') + (t.roomNumber ? ' · ' + esc(t.roomNumber) : '') + '</span>';
   infoHtml += '<div class="maint-card-desc">' + esc(t.description) + '</div>';
   var tagsHtml = "";
-  if(t.priority === "safety") tagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
+  if(t.priority === "safety") tagsHtml += '<span class="maint-tag tag-safety"><span class="maint-tag-dot"></span>Safety</span>';
   else if(t.priority === "guest") tagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';
   else if(t.priority === "routine") tagsHtml += '<span class="maint-tag tag-routine">Routine</span>';
   if(t.guestPresent) tagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
   if(t.deadline) tagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
+  if(isTicketStale(t)) tagsHtml += '<span class="maint-tag tag-stale">Not started</span>';
   if(tagsHtml) infoHtml += '<div class="maint-card-tags">' + tagsHtml + '</div>';
-  infoHtml += '<div class="maint-card-meta">' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + (t.voiceUrl ? ' · 🎤' : '') + '</div>';
+  infoHtml +=
+    '<div class="maint-card-meta">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>' +
+      'Received ' + esc(fmtNoteTime(t.createdAt)) + (t.voiceUrl ? ' · 🎤' : '') +
+    '</div>';
   info.innerHTML = infoHtml;
   top.appendChild(info);
+
+  var endCol = document.createElement("div");
+  endCol.className = "maint-card-end";
+  endCol.innerHTML =
+    '<span class="maint-status-chip">' + MAINT_STATUS_LABEL[t.status] + '</span>' +
+    '<svg class="maint-card-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+  top.appendChild(endCol);
   card.appendChild(top);
   card.appendChild(buildPinButton(t));
-  card.appendChild(buildStatusActions(t));
   // A dedicated grab handle, not the whole card, owns the drag gesture.
   // The card itself keeps normal scrolling (touch-action isn't blocked),
   // so the list still scrolls anywhere except this handle - only the
