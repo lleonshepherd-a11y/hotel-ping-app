@@ -88,7 +88,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;
   z-index:1;
 }
-.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 .chatlist-float-bar{
   position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:6;
   display:flex;align-items:center;gap:10px;pointer-events:none;
@@ -271,7 +271,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .directory-row-cleared{flex:none;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--text-faint);background:var(--surface-3);padding:3px 8px;border-radius:8px}
 .compose-to-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
 .compose-to-bar-label{flex:none;font-size:14.5px;font-weight:700;color:var(--text-faint)}
-.compose-to-bar-names{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compose-to-bar-chips{flex:1;min-width:0;display:flex;align-items:center;overflow-x:auto;scrollbar-width:none}
+.compose-to-bar-chips::-webkit-scrollbar{display:none}
+.compose-recipient-chip{
+  flex:none;display:flex;align-items:center;gap:6px;
+  background:#fff;border-radius:999px;padding:3px 12px 3px 3px;
+  box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;
+  margin-left:-14px;
+}
+.compose-recipient-chip:first-child{margin-left:0}
+.compose-recipient-chip .t-avatar{width:24px;height:24px}
+.compose-recipient-chip .t-avatar svg{width:11px;height:11px}
 .compose-to-bar-add{flex:none;width:30px;height:30px;border-radius:50%;border:none;background:var(--surface-3);color:var(--text);display:flex;align-items:center;justify-content:center}
 .compose-to-bar-add svg{width:16px;height:16px}
 .compose-to-bar-add:active{background:var(--active-tint)}
@@ -1302,7 +1313,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .where-chip.subzone{background:#333;border-color:#333}
 
 /* ---- Housekeeping rooms board ---- */
-.rooms-body{padding:16px 20px calc(48px + env(safe-area-inset-bottom))}
+.rooms-body{padding:16px 20px 16px}
 .rooms-search{margin:0 0 14px}
 .rooms-no-match{text-align:center;padding:30px 10px;font-size:13px;color:var(--text-faint)}
 .rooms-count-badge{flex:none;font-size:12.5px;font-weight:800;color:var(--text-dim);background:var(--surface-2);border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-variant-numeric:tabular-nums}
@@ -1322,7 +1333,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}
-.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 .events-page-scroll::-webkit-scrollbar{display:none}
 .events-hint{padding:0 20px;margin:0 0 14px}
 .new-event-trigger-btn{flex:none;width:38px;height:38px;border:none;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px -4px rgba(20,20,16,.4)}

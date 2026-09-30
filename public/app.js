@@ -1070,7 +1070,20 @@ var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
 
 var composeToBar = document.getElementById("composeToBar");
-var composeToBarNames = document.getElementById("composeToBarNames");
+var composeToBarChips = document.getElementById("composeToBarChips");
+function renderComposeToBarChips(){
+  composeToBarChips.innerHTML = "";
+  composeRecipients.forEach(function(id){
+    var d = DEPTS[id];
+    if(!d) return;
+    var chip = document.createElement("span");
+    chip.className = "compose-recipient-chip";
+    chip.innerHTML =
+      '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="compose-recipient-name">'+esc(d.name)+'</span>';
+    composeToBarChips.appendChild(chip);
+  });
+}
 function renderHeader(){
   if(composeMode){
     composeToBar.hidden = false;
@@ -1086,7 +1099,7 @@ function renderHeader(){
     callBtn.hidden = true;
     optTask.hidden = true;
     optSignoff.hidden = true;
-    composeToBarNames.textContent = composeRecipients.map(function(id){ return DEPTS[id].name; }).join(", ");
+    renderComposeToBarChips();
     return;
   }
   composeToBar.hidden = true;
