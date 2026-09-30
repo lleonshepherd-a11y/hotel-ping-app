@@ -315,7 +315,8 @@
     </div>
     <nav class="thread-list" id="threadList"></nav>
     <div class="sb-empty" id="searchEmpty" hidden><span id="searchEmptyLoading" hidden>Loading conversations&hellip;</span><span id="searchEmptyUnread" hidden>No unread conversations</span><span id="searchEmptyMatch">No conversations match "<span id="searchEmptyTerm"></span>"</span></div>
-    <div class="chatlist-bottom-bar">
+    </div>
+    <div class="chatlist-float-bar" id="chatFloatBar" hidden>
       <div class="chatlist-bottom-search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input type="text" id="searchInput" placeholder="Search">
@@ -327,9 +328,8 @@
         </button>
       </div>
       <button class="chatlist-fab" id="directoryBtn" type="button" aria-label="Start a conversation" title="Start a conversation">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M15.8 7.3a1.6 1.6 0 0 1 2.3 2.3l-5.6 5.6-3 .8.8-3 5.5-5.7z"/></svg>
       </button>
-    </div>
     </div>
 
     <div class="sb-page events-page" id="eventsPage" hidden>
@@ -934,19 +934,22 @@
   </div>
 </div>
 
-<div class="admin-overlay" id="directoryOverlay" hidden>
-  <div class="admin-modal">
+<div class="admin-overlay compose-overlay" id="directoryOverlay" hidden>
+  <div class="admin-modal compose-modal">
     <div class="admin-modal-head">
-      <h2>Start a conversation</h2>
+      <h2>New message</h2>
       <button class="admin-close" id="directoryClose" type="button" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
-    <div class="sb-search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="text" id="directorySearchInput" placeholder="Search departments">
+    <div class="compose-to-row">
+      <span class="compose-to-label">To:</span>
+      <div class="compose-to-field" id="composeToField">
+        <input type="text" id="directorySearchInput" placeholder="Search departments">
+      </div>
     </div>
     <div class="directory-list" id="directoryList"></div>
+    <button class="compose-start-btn" id="composeStartBtn" type="button" disabled>Start conversation</button>
   </div>
 </div>
 

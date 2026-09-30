@@ -6200,6 +6200,7 @@ var guestsPage = document.getElementById("guestsPage");
 var requestsPage = document.getElementById("requestsPage");
 var roomsPage = document.getElementById("roomsPage");
 var bottomTabs = document.getElementById("bottomTabs");
+var chatFloatBar = document.getElementById("chatFloatBar");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
 var tabEventsBtn = document.getElementById("tabEventsBtn");
@@ -6209,6 +6210,7 @@ var tabRequestsBtn = document.getElementById("tabRequestsBtn");
 var tabRoomsBtn = document.getElementById("tabRoomsBtn");
 function showTab(tab){
   bottomTabs.hidden = tab === "chat";
+  chatFloatBar.hidden = tab !== "chat";
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
   eventsPage.hidden = tab !== "events";
@@ -6726,10 +6728,31 @@ var directoryOverlay = document.getElementById("directoryOverlay");
 var directoryClose = document.getElementById("directoryClose");
 var directoryList = document.getElementById("directoryList");
 var directorySearchInput = document.getElementById("directorySearchInput");
+var composeToField = document.getElementById("composeToField");
+var composeStartBtn = document.getElementById("composeStartBtn");
+var composeRecipients = [];
+
+function renderComposeChips(){
+  composeToField.querySelectorAll(".compose-chip").forEach(function(c){ c.remove(); });
+  composeRecipients.forEach(function(id){
+    var chip = document.createElement("span");
+    chip.className = "compose-chip";
+    chip.innerHTML = esc(DEPTS[id].name) + '<button type="button" aria-label="Remove ' + esc(DEPTS[id].name) + '">&times;</button>';
+    chip.querySelector("button").addEventListener("click", function(){
+      composeRecipients = composeRecipients.filter(function(x){ return x !== id; });
+      renderComposeChips();
+      renderDirectory();
+    });
+    composeToField.insertBefore(chip, directorySearchInput);
+  });
+  composeStartBtn.disabled = composeRecipients.length === 0;
+  composeStartBtn.textContent = composeRecipients.length > 1 ? "Start group (" + composeRecipients.length + ")" : "Start conversation";
+}
 
 function renderDirectory(){
   var term = directorySearchInput.value.trim().toLowerCase();
-  var ids = Object.keys(STATE.data).filter(function(id){
+  var ids = DEPT_ORDER.filter(function(id){
+    if(id === STATE.self || composeRecipients.indexOf(id) !== -1) return false;
     var d = DEPTS[id];
     if(!d) return false;
     return !term || d.name.toLowerCase().indexOf(term) !== -1;
@@ -6747,24 +6770,50 @@ function renderDirectory(){
     row.className = "directory-row";
     row.innerHTML =
       '<span class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
-      '<span class="directory-row-name">'+esc(d.name)+'</span>'+
-      (isThreadCleared(id) ? '<span class="directory-row-cleared">Cleared</span>' : '');
+      '<span class="directory-row-name">'+esc(d.name)+'</span>';
     row.addEventListener("click", function(){
-      directoryOverlay.hidden = true;
-      openThread(id);
-      renderList();
+      composeRecipients.push(id);
+      directorySearchInput.value = "";
+      renderComposeChips();
+      renderDirectory();
+      directorySearchInput.focus();
     });
     directoryList.appendChild(row);
   });
 }
 directoryBtn.addEventListener("click", function(){
+  composeRecipients = [];
   directorySearchInput.value = "";
+  renderComposeChips();
   renderDirectory();
   directoryOverlay.hidden = false;
+  directorySearchInput.focus();
 });
 directoryClose.addEventListener("click", function(){ directoryOverlay.hidden = true; });
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) directoryOverlay.hidden = true; });
 directorySearchInput.addEventListener("input", renderDirectory);
+composeStartBtn.addEventListener("click", function(){
+  if(!composeRecipients.length) return;
+  if(composeRecipients.length === 1){
+    var id = composeRecipients[0];
+    directoryOverlay.hidden = true;
+    openThread(id);
+    renderList();
+    return;
+  }
+  var names = composeRecipients.map(function(id){ return DEPTS[id].name; });
+  composeStartBtn.disabled = true;
+  composeStartBtn.textContent = "Starting…";
+  apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: composeRecipients })
+    .then(function(res){
+      directoryOverlay.hidden = true;
+      return loadGroups().then(function(){ openGroupThread(res.group.id); });
+    })
+    .catch(function(){
+      composeStartBtn.disabled = false;
+      composeStartBtn.textContent = "Start group (" + composeRecipients.length + ")";
+    });
+});
 
 /* ---------------- Blockers ("waiting on" chains) ---------------- */
 var blockersBtn = document.getElementById("blockersBtn");
