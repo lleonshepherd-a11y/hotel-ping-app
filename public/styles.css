@@ -271,12 +271,30 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .directory-row-cleared{flex:none;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--text-faint);background:var(--surface-3);padding:3px 8px;border-radius:8px}
 .compose-to-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface)}
 .compose-to-bar-label{flex:none;font-size:14.5px;font-weight:700;color:var(--text-faint)}
-.compose-to-bar-chips{flex:1;min-width:0;display:flex;align-items:center;overflow-x:auto;scrollbar-width:none}
+.compose-to-bar-chips{flex:1;min-width:0;display:flex;align-items:center;overflow-x:visible;scrollbar-width:none;cursor:pointer}
 .compose-to-bar-chips::-webkit-scrollbar{display:none}
-.compose-recipient-chip{flex:none;display:flex;margin-left:-19px}
+.compose-recipient-chip{
+  flex:none;display:flex;align-items:center;position:relative;
+  margin-left:-19px;transition:margin-left .22s cubic-bezier(.32,1.4,.4,1);
+}
 .compose-recipient-chip:first-child{margin-left:0}
-.compose-recipient-chip .t-avatar{width:30px;height:30px;box-shadow:0 0 0 2px var(--surface), inset 0 0 0 1px rgba(255,255,255,.14)}
+.compose-to-bar-chips.expanded .compose-recipient-chip{margin-left:-6px}
+.compose-to-bar-chips.expanded .compose-recipient-chip:first-child{margin-left:0}
+.compose-recipient-chip .t-avatar{width:30px;height:30px;position:relative;box-shadow:0 0 0 2px var(--surface), inset 0 0 0 1px rgba(255,255,255,.14)}
 .compose-recipient-chip .t-avatar svg{width:14px;height:14px}
+/* Collapsed (default): just the overstacked icons. Tap the stack and
+   each one nudges apart, peeking its name in a little pill tail behind
+   the icon - tap again to snap back to the tight overlap. */
+.compose-recipient-name-reveal{
+  max-width:0;opacity:0;overflow:hidden;white-space:nowrap;
+  height:26px;display:flex;align-items:center;
+  background:#fff;border-radius:999px;
+  font-size:12.5px;font-weight:700;color:var(--text);
+  margin-left:-14px;padding-left:16px;
+  box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  transition:max-width .22s ease,opacity .18s ease,padding-right .22s ease;
+}
+.compose-to-bar-chips.expanded .compose-recipient-name-reveal{max-width:140px;opacity:1;padding-right:10px}
 .compose-to-bar-add{flex:none;width:30px;height:30px;border-radius:50%;border:none;background:var(--surface-3);color:var(--text);display:flex;align-items:center;justify-content:center}
 .compose-to-bar-add svg{width:16px;height:16px}
 .compose-to-bar-add:active{background:var(--active-tint)}

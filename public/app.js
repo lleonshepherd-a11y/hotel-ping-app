@@ -1071,6 +1071,11 @@ var callBtn = document.getElementById("callBtn");
 
 var composeToBar = document.getElementById("composeToBar");
 var composeToBarChips = document.getElementById("composeToBarChips");
+// Tap the whole stack to spread the overstacked icons apart a little and
+// peek each name - tap again to snap back to the tight overlap.
+composeToBarChips.addEventListener("click", function(){
+  composeToBarChips.classList.toggle("expanded");
+});
 function renderComposeToBarChips(){
   composeToBarChips.innerHTML = "";
   // Avatar-only, tightly overlapped - a text pill's width depends on the
@@ -1081,8 +1086,9 @@ function renderComposeToBarChips(){
     if(!d) return;
     var chip = document.createElement("span");
     chip.className = "compose-recipient-chip";
-    chip.title = d.name;
-    chip.innerHTML = '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>';
+    chip.innerHTML =
+      '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
+      '<span class="compose-recipient-name-reveal">'+esc(d.name)+'</span>';
     composeToBarChips.appendChild(chip);
   });
 }
