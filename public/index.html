@@ -262,10 +262,29 @@
     </div>
 
     <div class="sb-page" id="chatPage" hidden>
-    <div class="chatlist-head">
-      <button class="chatlist-burger" id="chatListBurgerBtn" type="button" aria-label="Open menu" title="Menu">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    <div class="chatlist-title-row">
+      <button class="chatlist-back-btn" id="chatListBackBtn" type="button" aria-label="Back to menu" title="Menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5l-6.7 6.5 6.7 6.5"/></svg>
       </button>
+      <div class="chatlist-title">Pings</div>
+      <div class="chatlist-filter-wrap">
+        <button class="chatlist-burger" id="chatListBurgerBtn" type="button" aria-label="Filter messages" title="Filter">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="chat-filter-row" id="chatFilterRow">
+          <button type="button" class="chat-filter-chip active" data-filter="all">All<span class="chat-filter-count" id="filterCountAll"></span></button>
+          <button type="button" class="chat-filter-chip" data-filter="unread">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Unread<span class="chat-filter-count" id="filterCountUnread"></span>
+          </button>
+          <button type="button" class="chat-filter-chip chat-filter-chip-urgent" data-filter="urgent">
+            <span class="chat-filter-dot"></span>
+            Urgent<span class="chat-filter-count" id="filterCountUrgent"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="chatlist-head">
       <div class="sb-search" id="headerSearchWrap">
         <button class="search-toggle-btn" id="searchToggleBtn" type="button" aria-label="Search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -302,33 +321,10 @@
       </div>
     </div>
 
-    <div class="chat-filter-row" id="chatFilterRow">
-      <button type="button" class="chat-filter-chip active" data-filter="all">All<span class="chat-filter-count" id="filterCountAll"></span></button>
-      <button type="button" class="chat-filter-chip" data-filter="unread">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        Unread<span class="chat-filter-count" id="filterCountUnread"></span>
-      </button>
-      <button type="button" class="chat-filter-chip chat-filter-chip-urgent" data-filter="urgent">
-        <span class="chat-filter-dot"></span>
-        Urgent<span class="chat-filter-count" id="filterCountUrgent"></span>
-      </button>
-      <button type="button" class="chat-filter-chip" data-filter="tasks">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2"/></svg>
-        Tasks<span class="chat-filter-count" id="filterCountTasks"></span>
-      </button>
-      <button type="button" class="chat-filter-chip" data-filter="rooms" id="roomsChipBtn" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="17" rx="1" stroke-width="2"/><path d="M4 20h16" stroke-width="2"/><circle cx="14.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
-        Rooms<span class="chat-filter-count" id="filterCountRooms"></span>
-      </button>
-      <button type="button" class="chat-filter-chip" data-filter="jobs" id="jobsChipBtn" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg>
-        Jobs<span class="chat-filter-count" id="filterCountJobs"></span>
-      </button>
-    </div>
     <div class="pull-refresh" id="listPullRefresh">
       <span class="pull-refresh-spinner"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></span>
     </div>
-    <div class="list-header-row">
+    <div class="list-header-row" hidden>
       <div class="list-header-title" id="listLabel">Conversations</div>
       <div class="list-header-right">
         <button class="directory-open-btn" id="directoryBtn" type="button" aria-label="Start a conversation" title="Start a conversation">
@@ -560,7 +556,7 @@
       </div>
     </div>
 
-    <div class="bottom-tabs">
+    <div class="bottom-tabs" id="bottomTabs">
       <button class="bottom-tab" id="tabProfileBtn" type="button" aria-label="Profile" title="Profile">
         <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
         <span class="bottom-tab-label">Profile</span>
@@ -745,30 +741,29 @@
                 <button type="button" class="qr-chip qr-add-chip" id="qrAddChip">+ Add your own</button>
               </div>
             </div>
-          <div class="composer-pill">
-            <button class="icon-btn plus-btn in-pill" id="plusBtn" aria-label="Add attachment" aria-expanded="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          <button class="icon-btn compose-outer-btn" id="optCamera" type="button" aria-label="Take a photo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.8"/><circle cx="12" cy="13.3" r="4" stroke-width="1.8"/></svg>
+          </button>
+          <button class="icon-btn compose-outer-btn plus-btn" id="plusBtn" aria-label="Add attachment" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="plus-menu" id="plusMenu">
+            <button class="plus-opt" id="optPhoto" type="button">
+              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
+              <span class="plus-opt-label">Photo</span>
             </button>
-            <div class="plus-menu" id="plusMenu">
-              <button class="plus-opt" id="optPhoto" type="button">
-                <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.6" stroke-width="1.7"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor" stroke="none"/><path d="M4.6 17.3l4.7-5.6 3 3.4 2-2.3 4.6 4.5" stroke-width="1.7"/></svg></span>
-                <span class="plus-opt-label">Photo</span>
-              </button>
-              <button class="plus-opt" id="optPdf" type="button">
-                <span class="plus-opt-ic plus-opt-ic-pdf"><svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg></span>
-                <span class="plus-opt-label">PDF</span>
-              </button>
-              <input type="file" id="pdfInput" accept="application/pdf" hidden>
-              <button class="plus-opt" id="optCamera" type="button">
-                <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/><circle cx="12" cy="13.3" r="1.5" fill="currentColor" stroke="none"/><circle cx="16.6" cy="8.6" r="0.9" fill="currentColor" stroke="none"/></svg></span>
-                <span class="plus-opt-label">Camera</span>
-              </button>
-            </div>
-            <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
-            <button class="send-btn in-pill" id="sendBtn" aria-label="Send message">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
+            <button class="plus-opt" id="optPdf" type="button">
+              <span class="plus-opt-ic plus-opt-ic-pdf"><svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg></span>
+              <span class="plus-opt-label">PDF</span>
             </button>
+            <input type="file" id="pdfInput" accept="application/pdf" hidden>
           </div>
+          <div class="composer-pill">
+            <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
+          </div>
+          <button class="send-btn" id="sendBtn" aria-label="Send message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+          </button>
         </div>
       </div>
       <div class="hint" id="composerHint"></div>

@@ -532,11 +532,6 @@ var hSub = document.getElementById("hSub");
 var filterCountAll = document.getElementById("filterCountAll");
 var filterCountUnread = document.getElementById("filterCountUnread");
 var filterCountUrgent = document.getElementById("filterCountUrgent");
-var filterCountTasks = document.getElementById("filterCountTasks");
-var filterCountRooms = document.getElementById("filterCountRooms");
-var roomsChipBtn = document.getElementById("roomsChipBtn");
-var jobsChipBtn = document.getElementById("jobsChipBtn");
-var filterCountJobs = document.getElementById("filterCountJobs");
 var searchInput = document.getElementById("searchInput");
 var searchClear = document.getElementById("searchClear");
 var searchEmpty = document.getElementById("searchEmpty");
@@ -575,21 +570,33 @@ if(searchToggleBtn && headerSearchWrap){
 }
 
 var chatFilterRow = document.getElementById("chatFilterRow");
+var chatListBurgerBtn = document.getElementById("chatListBurgerBtn");
+var chatListBackBtn = document.getElementById("chatListBackBtn");
 STATE.chatFilter = "all";
 function applyChatFilter(filter){
   STATE.chatFilter = filter;
   chatFilterRow.querySelectorAll(".chat-filter-chip").forEach(function(c){ c.classList.toggle("active", c.dataset.filter === filter); });
   renderList();
 }
+function closeChatFilterMenu(){
+  chatFilterRow.classList.remove("open");
+  chatListBurgerBtn.classList.remove("active");
+}
+chatListBurgerBtn.addEventListener("click", function(e){
+  e.stopPropagation();
+  var opening = !chatFilterRow.classList.contains("open");
+  chatFilterRow.classList.toggle("open", opening);
+  chatListBurgerBtn.classList.toggle("active", opening);
+});
+document.addEventListener("click", function(e){
+  if(chatFilterRow.classList.contains("open") && !e.target.closest(".chatlist-filter-wrap")) closeChatFilterMenu();
+});
+chatListBackBtn.addEventListener("click", function(){ showTab("profile"); });
 chatFilterRow.addEventListener("click", function(e){
   var btn = e.target.closest(".chat-filter-chip");
   if(!btn) return;
-  // Jobs isn't a conversation filter - a maintenance ticket has no thread of
-  // its own, so tapping it jumps straight to the Maintenance board instead
-  // of narrowing this list, same reasoning as the old Missed section's
-  // Tickets row.
-  if(btn.dataset.filter === "jobs"){ showTab("maintenance"); return; }
   applyChatFilter(btn.dataset.filter);
+  closeChatFilterMenu();
 });
 
 // Admin sees every department to browse ("Viewing as"). Everyone else sees
@@ -727,8 +734,6 @@ function renderList(){
     if(isThreadCleared(id) && !term) return false;
     if(STATE.chatFilter === "unread" && unreadCount(id) === 0) return false;
     if(STATE.chatFilter === "urgent" && !hasUrgentUnread(id)) return false;
-    if(STATE.chatFilter === "tasks" && !hasOutstandingTask(id)) return false;
-    if(STATE.chatFilter === "rooms" && !hasOutstandingRoomClean(id)) return false;
     var r = findSearchMatch(id, term);
     if(r.match) matches[id] = r.message;
     return r.match;
@@ -737,22 +742,9 @@ function renderList(){
   var allIds = sortedDeptIds();
   var unreadIds = allIds.filter(function(id){ return unreadCount(id) > 0; });
   var urgentIds = allIds.filter(function(id){ return hasUrgentUnread(id); });
-  var taskIds = allIds.filter(hasOutstandingTask);
-  var roomIds = allIds.filter(hasOutstandingRoomClean);
   filterCountAll.textContent = allIds.length ? String(allIds.length) : "";
   filterCountUnread.textContent = unreadIds.length ? String(unreadIds.length) : "";
   filterCountUrgent.textContent = urgentIds.length ? String(urgentIds.length) : "";
-  filterCountTasks.textContent = taskIds.length ? String(taskIds.length) : "";
-  filterCountRooms.textContent = roomIds.length ? String(roomIds.length) : "";
-  // Only Reception ever receives a room-clean notice (see the /clean route
-  // in the worker - it always posts to "foh"), so nobody else has a use
-  // for this chip, same reasoning as Jobs being maintenance-only.
-  roomsChipBtn.hidden = STATE.self !== "foh";
-  jobsChipBtn.hidden = STATE.self !== "maintenance";
-  if(STATE.self === "maintenance"){
-    var openJobs = (STATE.tickets || []).filter(function(t){ return t.status !== "fixed"; }).length;
-    filterCountJobs.textContent = openJobs ? String(openJobs) : "";
-  }
   searchEmpty.hidden = ids.length > 0;
   threadList.hidden = ids.length === 0;
   if(ids.length === 0){
@@ -763,10 +755,10 @@ function renderList(){
       searchEmptyMatch.hidden = true;
       return;
     }
-    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent" || STATE.chatFilter === "tasks" || STATE.chatFilter === "rooms") && !term;
+    var filterEmpty = (STATE.chatFilter === "unread" || STATE.chatFilter === "urgent") && !term;
     searchEmptyUnread.hidden = !filterEmpty;
     searchEmptyMatch.hidden = filterEmpty;
-    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : STATE.chatFilter === "tasks" ? "No outstanding tasks" : STATE.chatFilter === "rooms" ? "No rooms marked clean yet" : "No unread conversations";
+    if(filterEmpty) searchEmptyUnread.textContent = STATE.chatFilter === "urgent" ? "No urgent conversations" : "No unread conversations";
     searchEmptyTerm.textContent = STATE.searchTerm;
     return;
   }
@@ -781,12 +773,13 @@ function renderList(){
 
     var el = document.createElement("button");
     var showActive = STATE.threadOpened || window.innerWidth > 720;
-    el.className = "thread-item" + (showActive && id === STATE.active ? " active" : "") + (unread ? " unread" : "");
+    el.className = "thread-item" + (showActive && id === STATE.active ? " active" : "") + (unread ? " unread" : "") + (urgentUnread ? " urgent-row" : "");
     el.setAttribute("data-dept-id", id);
     el.innerHTML =
+      '<span class="t-unread-dot"></span>'+
       '<div class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+(STATE.pinnedThreads[id] ? '<svg class="t-pin-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> ' : '')+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span></div>'+
+        '<div class="t-row1"><span class="t-name">'+(STATE.pinnedThreads[id] ? '<svg class="t-pin-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> ' : '')+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-right"><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span><svg class="t-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
           (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
@@ -1064,10 +1057,6 @@ var offDutyBanner = document.getElementById("offDutyBanner");
 var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
-var chatListBurgerBtn = document.getElementById("chatListBurgerBtn");
-chatListBurgerBtn.addEventListener("click", function(){
-  showTab("profile");
-});
 
 function renderHeader(){
   if(STATE.activeGroupId){
@@ -6202,6 +6191,7 @@ var maintenancePage = document.getElementById("maintenancePage");
 var guestsPage = document.getElementById("guestsPage");
 var requestsPage = document.getElementById("requestsPage");
 var roomsPage = document.getElementById("roomsPage");
+var bottomTabs = document.getElementById("bottomTabs");
 var tabProfileBtn = document.getElementById("tabProfileBtn");
 var tabChatBtn = document.getElementById("tabChatBtn");
 var tabEventsBtn = document.getElementById("tabEventsBtn");
@@ -6210,6 +6200,7 @@ var tabGuestsBtn = document.getElementById("tabGuestsBtn");
 var tabRequestsBtn = document.getElementById("tabRequestsBtn");
 var tabRoomsBtn = document.getElementById("tabRoomsBtn");
 function showTab(tab){
+  bottomTabs.hidden = tab === "chat";
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
   eventsPage.hidden = tab !== "events";
