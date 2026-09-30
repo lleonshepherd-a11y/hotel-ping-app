@@ -2758,7 +2758,7 @@ var dutyTrack = document.getElementById("dutyTrack");
 var dutyKnob = document.getElementById("dutyKnob");
 var dutyCaptionLabel = document.getElementById("dutyCaptionLabel");
 
-function dutyMaxLeft(){ return dutyTrack.clientWidth - 27 - 4; }
+function dutyMaxLeft(){ return dutyTrack.clientWidth - 20 - 4; }
 
 function renderDuty(){
   var on = isOnDuty(STATE.self);
@@ -5646,7 +5646,6 @@ function renderStoriesRow(){
     btn.innerHTML =
       '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInner+'</span>'+
         (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
-        (hasUnseen && !isMine ? '<span class="story-unseen-dot"></span>' : '') +
       '</span>' +
       '<span class="story-item-label">'+(isMine ? "Your story" : esc(d ? d.name : id))+'</span>';
     btn.addEventListener("click", function(e){
