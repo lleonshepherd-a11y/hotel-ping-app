@@ -498,8 +498,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   word-wrap:break-word; white-space:pre-wrap;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
 }
-.msg-row.out .bubble{background:#1c1c1e;color:#fff}
-.msg-row.in .bubble{background:#fff;color:#1c1e26}
+.msg-row.out .bubble{background:#fff;color:#1c1e26;box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border)}
+.msg-row.in .bubble{background:var(--surface-3);color:#1c1e26}
 .msg-row.in.urgent .bubble{background:var(--urgent);color:#fff}
 .msg-row.group-end.in .bubble{border-bottom-left-radius:6px}
 .msg-row.group-end.out .bubble{border-bottom-right-radius:6px}
@@ -515,7 +515,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .msg-status .ticks svg{width:15px;height:10px}
 .bubble-meta-inline{float:right;display:inline-flex;align-items:center;gap:3px;margin:4px 0 0 8px;padding:0;line-height:1;white-space:nowrap;font-size:10.5px}
 .msg-row.in .bubble-meta-inline{color:rgba(28,30,38,.55)}
-.msg-row.out .bubble-meta-inline{color:rgba(255,255,255,.7)}
+.msg-row.out .bubble-meta-inline{color:rgba(28,30,38,.55)}
 .msg-row.in .bubble-meta-inline.read .ticks{color:#fff}
 .msg-row.in .bubble-meta-inline .ticks{color:rgba(255,255,255,.6)}
 
@@ -623,6 +623,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .ptt-float.live .ptt-core{transform:scale(1.04)}
 .ptt-wave-row{display:flex;align-items:center;justify-content:center;gap:2.5px;height:20px}
 .ptt-wave-bar{width:2.6px;border-radius:3px;background:#fff;height:6px;transition:height .09s ease}
+.composer-pill .ptt-float{
+  position:static;flex:none;width:32px;height:32px;margin:0 -1px 0 2px;
+  background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:none;box-shadow:none;
+}
+.composer-pill .ptt-float.live{background:none;box-shadow:none}
+.composer-pill .ptt-float .ptt-ring{border-radius:50%}
+.composer-pill .ptt-float .ptt-core{
+  width:32px;height:32px;
+  background:linear-gradient(155deg,#2c2c30,#0c0c0e);
+}
+.composer-pill .ptt-float .ptt-wave-row{height:14px;gap:2px}
+.composer-pill .ptt-float .ptt-wave-bar{width:2px}
 .composer{
   display:flex;align-items:flex-end;gap:8px;
   max-width:640px;margin:0 auto;
