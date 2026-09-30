@@ -7482,11 +7482,11 @@ function openNewEventScreen(){
 }
 function closeNewEventScreen(){ newEventOverlay.hidden = true; }
 function renderNewEventPeopleList(){
-  if(!newEventRecipients.length){
-    newEventPeopleList.innerHTML = '<div class="new-event-people-empty">Nobody added yet</div>';
-    return;
-  }
+  // Left genuinely empty (no placeholder row) when nobody's added yet, so
+  // the :not(:empty) divider check right above the Add people row only
+  // fires once there's an actual person to divide it from.
   newEventPeopleList.innerHTML = "";
+  if(!newEventRecipients.length) return;
   newEventRecipients.forEach(function(id){
     var d = DEPTS[id];
     if(!d) return;

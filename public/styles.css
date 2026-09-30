@@ -288,24 +288,29 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .compose-modal{display:flex;flex-direction:column}
 .compose-modal .admin-modal-head{justify-content:flex-start}
 .compose-modal .directory-list{max-height:none;flex:1}
-.new-event-form-body{padding:4px 4px 20px;display:flex;flex-direction:column;gap:16px;flex:1;overflow-y:auto}
-.new-event-name-input{border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-size:15px;font-weight:600;background:var(--surface-2)}
-.new-event-people-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);margin-bottom:-8px}
+#newEventOverlay .compose-modal{background:var(--bg)}
+.new-event-form-body{padding:6px 2px 24px;display:flex;flex-direction:column;gap:22px;flex:1;overflow-y:auto}
+.new-event-card{
+  background:#fff;border-radius:16px;
+  box-shadow:var(--shadow-soft),inset 0 0 0 1px rgba(20,20,15,.05);
+}
+.new-event-name-input{width:100%;border:none;border-radius:16px;padding:15px 16px;font-size:16px;font-weight:700;background:none;letter-spacing:-.01em}
+.new-event-name-input::placeholder{color:var(--text-faint);font-weight:600}
+.new-event-people-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);padding:0 4px}
 .new-event-people-list{display:flex;flex-direction:column}
-.new-event-people-empty{font-size:12.5px;color:var(--text-faint);padding:8px 2px}
-.new-event-person-chip{display:flex;align-items:center;gap:10px;padding:8px 2px;position:relative}
-.new-event-person-chip::after{content:"";position:absolute;left:38px;right:0;bottom:0;height:1px;background:var(--border)}
-.new-event-person-chip:last-child::after{display:none}
-.new-event-person-name{flex:1;font-size:14px;font-weight:700;color:var(--text)}
-.new-event-person-remove{flex:none;width:24px;height:24px;border:none;background:var(--surface-2);border-radius:50%;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
-.new-event-person-remove svg{width:12px;height:12px}
+.new-event-person-chip{display:flex;align-items:center;gap:11px;padding:10px 16px;position:relative}
+.new-event-person-chip::after{content:"";position:absolute;left:53px;right:0;bottom:0;height:1px;background:var(--border)}
+.new-event-person-name{flex:1;font-size:14.5px;font-weight:700;color:var(--text)}
+.new-event-person-remove{flex:none;width:24px;height:24px;border:none;background:var(--surface-3);border-radius:50%;color:var(--text-dim);display:flex;align-items:center;justify-content:center}
+.new-event-person-remove svg{width:11px;height:11px}
 .new-event-person-remove:active{transform:scale(.88)}
-.new-event-add-person-btn{display:flex;align-items:center;gap:8px;border:1.5px dashed var(--border);border-radius:12px;padding:11px 14px;background:none;color:var(--accent);font-weight:700;font-size:13.5px;width:100%;justify-content:center}
+.new-event-add-person-btn{display:flex;align-items:center;gap:11px;border:none;padding:13px 16px;background:none;color:var(--accent);font-weight:700;font-size:14.5px;width:100%;text-align:left;position:relative}
+.new-event-people-list:not(:empty) + .new-event-add-person-btn::before{content:"";position:absolute;left:53px;right:0;top:0;height:1px;background:var(--border)}
 .new-event-add-person-btn:active{background:var(--surface-2)}
-.new-event-add-person-icon{display:flex}
-.new-event-add-person-icon svg{width:15px;height:15px}
-.new-event-form-footer{padding:12px 4px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--border)}
-.new-event-create-submit-btn{width:100%;border:none;border-radius:14px;padding:14px;background:var(--accent);color:#fff;font-weight:800;font-size:14.5px}
+.new-event-add-person-icon{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center}
+.new-event-add-person-icon svg{width:13px;height:13px}
+.new-event-form-footer{padding:14px 2px calc(18px + env(safe-area-inset-bottom))}
+.new-event-create-submit-btn{width:100%;border:none;border-radius:16px;padding:15px;background:var(--accent);color:#fff;font-weight:800;font-size:15px;box-shadow:var(--shadow-soft)}
 .new-event-create-submit-btn:active{transform:scale(.98)}
 #headerSearchWrap input{width:0;opacity:0;font-size:16px;transition:width .18s ease,opacity .12s ease}
 #headerSearchWrap.expanded input{width:100%;opacity:1}
