@@ -1073,8 +1073,7 @@ var composeToBarNames = document.getElementById("composeToBarNames");
 function renderHeader(){
   if(composeMode){
     composeToBar.hidden = false;
-    hAvatar.style.background = "none";
-    hAvatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6.5 8-6.5"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 16v3M16 17.5h3"/></svg>';
+    hAvatar.hidden = true;
     hName.textContent = "New Ping";
     hSub.textContent = "";
     hDot.hidden = true;
@@ -1089,6 +1088,7 @@ function renderHeader(){
     return;
   }
   composeToBar.hidden = true;
+  hAvatar.hidden = false;
   if(STATE.activeGroupId){
     var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
     hAvatar.style.background = "linear-gradient(155deg, #2c2c30, #131315)";

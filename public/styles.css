@@ -400,8 +400,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .back-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:none;background:var(--surface-2);color:var(--text);border-radius:50%;box-shadow:0 2px 6px -2px rgba(20,20,16,.2)}
 .back-btn svg{width:19px;height:19px}
-.h-name-wrap{flex:1;min-width:0;overflow:hidden}
-.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px}
+.h-center .h-avatar{width:40px;height:40px}
+.h-name-wrap{flex:none;min-width:0;max-width:100%;overflow:hidden}
+.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.h-name-row{display:flex;justify-content:center}
+.h-sub{justify-content:center}
 .thread-head-actions{flex:none;margin-left:auto;display:flex;align-items:center;gap:2px}
 .mute-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border:none;background:none;color:var(--text-faint);border-radius:50%}
 .header-menu-wrap{position:relative;flex:none}
