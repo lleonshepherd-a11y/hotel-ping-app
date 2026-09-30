@@ -273,16 +273,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .compose-to-bar-label{flex:none;font-size:14.5px;font-weight:700;color:var(--text-faint)}
 .compose-to-bar-chips{flex:1;min-width:0;display:flex;align-items:center;overflow-x:auto;scrollbar-width:none}
 .compose-to-bar-chips::-webkit-scrollbar{display:none}
-.compose-recipient-chip{
-  flex:none;display:flex;align-items:center;gap:6px;
-  background:#fff;border-radius:999px;padding:3px 12px 3px 3px;
-  box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
-  font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;
-  margin-left:-14px;
-}
+.compose-recipient-chip{flex:none;display:flex;margin-left:-10px}
 .compose-recipient-chip:first-child{margin-left:0}
-.compose-recipient-chip .t-avatar{width:24px;height:24px}
-.compose-recipient-chip .t-avatar svg{width:11px;height:11px}
+.compose-recipient-chip .t-avatar{width:30px;height:30px;box-shadow:0 0 0 2px var(--surface), inset 0 0 0 1px rgba(255,255,255,.14)}
+.compose-recipient-chip .t-avatar svg{width:14px;height:14px}
 .compose-to-bar-add{flex:none;width:30px;height:30px;border-radius:50%;border:none;background:var(--surface-3);color:var(--text);display:flex;align-items:center;justify-content:center}
 .compose-to-bar-add svg{width:16px;height:16px}
 .compose-to-bar-add:active{background:var(--active-tint)}

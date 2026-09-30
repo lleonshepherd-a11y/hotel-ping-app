@@ -1073,14 +1073,16 @@ var composeToBar = document.getElementById("composeToBar");
 var composeToBarChips = document.getElementById("composeToBarChips");
 function renderComposeToBarChips(){
   composeToBarChips.innerHTML = "";
+  // Avatar-only, tightly overlapped - a text pill's width depends on the
+  // name ("Reception" vs "General Manager"), so a row of them never lines
+  // up cleanly. Plain circles stack the same regardless of name length.
   composeRecipients.forEach(function(id){
     var d = DEPTS[id];
     if(!d) return;
     var chip = document.createElement("span");
     chip.className = "compose-recipient-chip";
-    chip.innerHTML =
-      '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
-      '<span class="compose-recipient-name">'+esc(d.name)+'</span>';
+    chip.title = d.name;
+    chip.innerHTML = '<span class="t-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>';
     composeToBarChips.appendChild(chip);
   });
 }
