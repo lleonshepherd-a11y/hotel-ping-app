@@ -590,7 +590,9 @@
       </button>
       <div class="h-avatar" id="hAvatar"></div>
       <div class="h-name-wrap">
-        <div class="h-name" id="hName"></div>
+        <div class="h-name-row">
+          <div class="h-name" id="hName"></div>
+        </div>
         <div class="h-sub">
           <span id="hContactWrap"></span>
           <span class="h-dot" id="hDot"></span><span id="hSub">Active now</span>
@@ -641,6 +643,14 @@
         </div>
       </div>
     </header>
+
+    <div class="compose-to-bar" id="composeToBar" hidden>
+      <span class="compose-to-bar-label">To:</span>
+      <span class="compose-to-bar-names" id="composeToBarNames"></span>
+      <button class="compose-to-bar-add" id="composeAddBtn" type="button" aria-label="Add recipient">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
 
     <div class="off-duty-banner" id="offDutyBanner" hidden></div>
     <div class="event-notice" id="eventNotice" hidden>
@@ -937,19 +947,16 @@
 <div class="admin-overlay compose-overlay" id="directoryOverlay" hidden>
   <div class="admin-modal compose-modal">
     <div class="admin-modal-head">
-      <h2>New message</h2>
-      <button class="admin-close" id="directoryClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      <button class="tfeed-back-btn" id="directoryClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
+      <h2>Departments</h2>
     </div>
-    <div class="compose-to-row">
-      <span class="compose-to-label">To:</span>
-      <div class="compose-to-field" id="composeToField">
-        <input type="text" id="directorySearchInput" placeholder="Search departments">
-      </div>
+    <div class="sb-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="text" id="directorySearchInput" placeholder="Search departments">
     </div>
     <div class="directory-list" id="directoryList"></div>
-    <button class="compose-start-btn" id="composeStartBtn" type="button" disabled>Start conversation</button>
   </div>
 </div>
 

@@ -1049,6 +1049,8 @@ function closeThreadView(){
   document.getElementById("sidebar").classList.remove("hide-mobile");
   document.querySelector(".main").classList.remove("show-mobile");
   STATE.activeGroupId = null;
+  composeMode = false;
+  composeRecipients = [];
 }
 
 window.addEventListener("popstate", function(){
@@ -1066,7 +1068,27 @@ var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
 
+var composeToBar = document.getElementById("composeToBar");
+var composeToBarNames = document.getElementById("composeToBarNames");
 function renderHeader(){
+  if(composeMode){
+    composeToBar.hidden = false;
+    hAvatar.style.background = "none";
+    hAvatar.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6.5 8-6.5"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 16v3M16 17.5h3"/></svg>';
+    hName.textContent = "New Ping";
+    hSub.textContent = "";
+    hDot.hidden = true;
+    hContactWrap.innerHTML = "";
+    hGroupAvatars.hidden = true;
+    offDutyBanner.hidden = true;
+    eventNotice.hidden = true;
+    callBtn.hidden = true;
+    optTask.hidden = true;
+    optSignoff.hidden = true;
+    composeToBarNames.textContent = composeRecipients.map(function(id){ return DEPTS[id].name; }).join(", ");
+    return;
+  }
+  composeToBar.hidden = true;
   if(STATE.activeGroupId){
     var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
     hAvatar.style.background = "linear-gradient(155deg, #2c2c30, #131315)";
@@ -3593,6 +3615,39 @@ function saveEditedMessage(){
 }
 
 function doSend(){
+  if(composeMode){
+    if(!composeRecipients.length) return;
+    var typedText = msgInput.value;
+    var typedAttachment = STATE.attachment;
+    if(composeRecipients.length === 1){
+      var soloId = composeRecipients[0];
+      composeMode = false;
+      openThread(soloId);
+      msgInput.value = typedText;
+      STATE.attachment = typedAttachment;
+      autoGrow(); refreshSendState();
+      doSendReal();
+      return;
+    }
+    var names = composeRecipients.map(function(id){ return DEPTS[id].name; });
+    var groupMembers = composeRecipients.slice();
+    apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: groupMembers })
+      .then(function(res){
+        composeMode = false;
+        return loadGroups().then(function(){
+          openGroupThread(res.group.id);
+          msgInput.value = typedText;
+          STATE.attachment = typedAttachment;
+          autoGrow(); refreshSendState();
+          doSendReal();
+        });
+      })
+      .catch(function(){});
+    return;
+  }
+  doSendReal();
+}
+function doSendReal(){
   if(STATE.editingMessage) return saveEditedMessage();
   var text = msgInput.value.trim();
   if(!text && !STATE.attachment) return;
@@ -6728,25 +6783,41 @@ var directoryOverlay = document.getElementById("directoryOverlay");
 var directoryClose = document.getElementById("directoryClose");
 var directoryList = document.getElementById("directoryList");
 var directorySearchInput = document.getElementById("directorySearchInput");
-var composeToField = document.getElementById("composeToField");
-var composeStartBtn = document.getElementById("composeStartBtn");
+var composeAddBtn = document.getElementById("composeAddBtn");
+var composeMode = false;
 var composeRecipients = [];
 
-function renderComposeChips(){
-  composeToField.querySelectorAll(".compose-chip").forEach(function(c){ c.remove(); });
-  composeRecipients.forEach(function(id){
-    var chip = document.createElement("span");
-    chip.className = "compose-chip";
-    chip.innerHTML = esc(DEPTS[id].name) + '<button type="button" aria-label="Remove ' + esc(DEPTS[id].name) + '">&times;</button>';
-    chip.querySelector("button").addEventListener("click", function(){
-      composeRecipients = composeRecipients.filter(function(x){ return x !== id; });
-      renderComposeChips();
-      renderDirectory();
-    });
-    composeToField.insertBefore(chip, directorySearchInput);
-  });
-  composeStartBtn.disabled = composeRecipients.length === 0;
-  composeStartBtn.textContent = composeRecipients.length > 1 ? "Start group (" + composeRecipients.length + ")" : "Start conversation";
+// Tapping the pen-and-paper button opens a blank message screen straight
+// away (composeMode=true, nobody picked yet) instead of a picker you have
+// to get through first. The "+" in that screen's header is what opens the
+// picker, and picking someone there returns straight to the same blank
+// message screen with them added - repeat to build up a small group.
+function openComposeScreen(){
+  clearReplyBar(); clearEditBar(); mentionPopover.hidden = true; saveCurrentDraft();
+  composeRecipients = [];
+  STATE.active = null;
+  STATE.activeGroupId = null;
+  composeMode = true;
+  STATE.threadOpened = true;
+  msgInput.value = "";
+  autoGrow();
+  updateComposerLock();
+  renderHeader();
+  renderComposeBody();
+  document.getElementById("sidebar").classList.add("hide-mobile");
+  document.querySelector(".main").classList.add("show-mobile");
+  focusInput();
+  if(window.innerWidth <= 720 && !(history.state && history.state.dashThread)){
+    history.pushState({ dashThread: true }, "");
+  }
+}
+function renderComposeBody(){
+  threadScroll.innerHTML =
+    '<div class="thread-empty-state">'+
+      '<div class="thread-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>'+
+      '<div class="thread-empty-title">'+(composeRecipients.length ? "No messages yet" : "Choose who to message")+'</div>'+
+      '<div class="thread-empty-sub">'+(composeRecipients.length ? "Say hello to start the conversation." : "Tap the + above to add someone.")+'</div>'+
+    '</div>';
 }
 
 function renderDirectory(){
@@ -6773,18 +6844,17 @@ function renderDirectory(){
       '<span class="directory-row-name">'+esc(d.name)+'</span>';
     row.addEventListener("click", function(){
       composeRecipients.push(id);
-      directorySearchInput.value = "";
-      renderComposeChips();
-      renderDirectory();
-      directorySearchInput.focus();
+      directoryOverlay.hidden = true;
+      renderHeader();
+      renderComposeBody();
+      focusInput();
     });
     directoryList.appendChild(row);
   });
 }
-directoryBtn.addEventListener("click", function(){
-  composeRecipients = [];
+directoryBtn.addEventListener("click", openComposeScreen);
+composeAddBtn.addEventListener("click", function(){
   directorySearchInput.value = "";
-  renderComposeChips();
   renderDirectory();
   directoryOverlay.hidden = false;
   directorySearchInput.focus();
@@ -6792,28 +6862,6 @@ directoryBtn.addEventListener("click", function(){
 directoryClose.addEventListener("click", function(){ directoryOverlay.hidden = true; });
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) directoryOverlay.hidden = true; });
 directorySearchInput.addEventListener("input", renderDirectory);
-composeStartBtn.addEventListener("click", function(){
-  if(!composeRecipients.length) return;
-  if(composeRecipients.length === 1){
-    var id = composeRecipients[0];
-    directoryOverlay.hidden = true;
-    openThread(id);
-    renderList();
-    return;
-  }
-  var names = composeRecipients.map(function(id){ return DEPTS[id].name; });
-  composeStartBtn.disabled = true;
-  composeStartBtn.textContent = "Starting…";
-  apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: composeRecipients })
-    .then(function(res){
-      directoryOverlay.hidden = true;
-      return loadGroups().then(function(){ openGroupThread(res.group.id); });
-    })
-    .catch(function(){
-      composeStartBtn.disabled = false;
-      composeStartBtn.textContent = "Start group (" + composeRecipients.length + ")";
-    });
-});
 
 /* ---------------- Blockers ("waiting on" chains) ---------------- */
 var blockersBtn = document.getElementById("blockersBtn");
