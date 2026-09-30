@@ -1096,6 +1096,7 @@ function renderHeader(){
     hName.textContent = g ? g.name : "Event";
     hSub.textContent = g ? (g.members.length + (g.members.length === 1 ? " person" : " people")) : "";
     hSub.classList.remove("typing");
+    hSub.classList.add("meta");
     hDot.hidden = true;
     hContactWrap.innerHTML = "";
     hGroupAvatars.hidden = false;
@@ -1122,6 +1123,7 @@ function renderHeader(){
   hAvatar.innerHTML = avatarInnerHtml(STATE.active);
   hName.textContent = contactNameFor(STATE.active) || d.name;
   var targetOn = isOnDuty(STATE.active);
+  hSub.classList.remove("meta");
   if(STATE.typingFrom[STATE.active]){
     hSub.textContent = "Typing…";
     hSub.classList.add("typing");
@@ -1195,10 +1197,6 @@ function renderContactName(){
     span.className = "h-contact-name";
     span.textContent = roleLabel;
     hContactWrap.appendChild(span);
-    var sep = document.createElement("span");
-    sep.textContent = " ·";
-    sep.style.color = "var(--text-faint)";
-    hContactWrap.appendChild(sep);
   }
 }
 

@@ -422,12 +422,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 }
 .back-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:none;background:var(--surface-2);color:var(--text);border-radius:50%;box-shadow:0 2px 6px -2px rgba(20,20,16,.2)}
 .back-btn svg{width:19px;height:19px}
-.h-center{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px}
-.h-center .h-avatar{width:40px;height:40px}
-.h-name-wrap{flex:none;min-width:0;max-width:100%;overflow:hidden}
-.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
-.h-name-row{display:flex;justify-content:center}
-.h-sub{justify-content:center}
+.h-center{
+  flex:none;max-width:100%;position:relative;
+  display:flex;align-items:center;gap:9px;
+  background:#fff;border-radius:999px;padding:5px 16px 5px 5px;
+  box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  margin:0 auto;
+}
+.h-center .h-avatar{width:34px;height:34px}
+.h-name-wrap{flex:1;min-width:0;max-width:100%;overflow:hidden}
+.h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:14.5px}
+.h-name-row{display:flex;justify-content:flex-start}
+.h-sub{justify-content:flex-start;font-size:10.5px}
 .thread-head-actions{flex:none;margin-left:auto;display:flex;align-items:center;gap:2px}
 .mute-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border:none;background:none;color:var(--text-faint);border-radius:50%}
 .header-menu-wrap{position:relative;flex:none}
@@ -454,13 +460,21 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .back-btn:active{background:var(--surface-3)}
 .h-avatar{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14), 0 4px 12px -3px rgba(15,15,20,.35)}
 .h-avatar svg{width:19px;height:19px}
-.h-name{font-family:Manrope,sans-serif;font-weight:800;font-size:16px;letter-spacing:-.015em}
-.h-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
+.h-name{font-family:Manrope,sans-serif;font-weight:800;font-size:14.5px;letter-spacing:-.01em}
+.h-sub{font-size:10.5px;color:var(--text-dim);margin-top:1px;display:flex;align-items:center;gap:5px;flex-wrap:nowrap}
 #hContactWrap{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;flex-shrink:1}
-#hSub{flex:none;white-space:nowrap}
-#hSub.typing{color:var(--accent);font-weight:700}
-.h-dot{width:6px;height:6px;border-radius:50%;background:#34c759;transition:background .2s ease}
-.h-dot.off{background:var(--text-faint)}
+/* The status text ("Active now"/"Off duty") is redundant now that the
+   same signal lives as a colored dot badge on the avatar - only the
+   transient "Typing…" state and the group member-count line still earn
+   a place in the pill. */
+#hSub{display:none;flex:none;white-space:nowrap}
+#hSub.typing{display:inline;color:var(--accent);font-weight:700}
+#hSub.meta{display:inline}
+.h-dot{
+  position:absolute;left:28px;top:28px;width:9px;height:9px;border-radius:50%;
+  background:#34c759;border:2px solid #fff;transition:background .2s ease;
+}
+.h-dot.off{background:#c7c7cc}
 
 .off-duty-banner{
   flex:none;display:flex;align-items:center;gap:8px;
