@@ -788,9 +788,8 @@ function renderList(){
       '<span class="t-unread-dot"></span>'+
       '<div class="t-avatar duty-'+(isOnDuty(id)?'on':'off')+'" style="'+avatarStyleAttr(id)+'" title="'+(isOnDuty(id)?'On duty':'Off duty')+'">'+avatarInnerHtml(id)+'</div>'+
       '<div class="t-body">'+
-        '<div class="t-row1"><span class="t-name">'+(STATE.pinnedThreads[id] ? '<svg class="t-pin-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> ' : '')+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+'</span><span class="t-right"><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span><svg class="t-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span></div>'+
+        '<div class="t-row1"><span class="t-name">'+(STATE.pinnedThreads[id] ? '<svg class="t-pin-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg> ' : '')+(urgentUnread ? '<span class="t-urgent-dot"></span> ' : '')+d.name+(hasTask ? ' <svg class="t-task-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" stroke-width="2.2"/><rect x="9" y="3" width="6" height="4" rx="1" stroke-width="2.2"/><path d="M8.5 13l1.5 1.5L13 11" stroke-width="2.2"/></svg>' : '')+(STATE.muted[id] ? ' <svg class="t-mute-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8.7 3A6 6 0 0 1 18 8c0 2.9.6 5 1.3 6.3"/><path d="M6.3 6.3C6.1 6.8 6 7.4 6 8c0 7-3 9-3 9h14"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' : '')+(unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+'</span><span class="t-right"><span class="t-time">'+(last ? fmtRelative(last.t) : '')+'</span><svg class="t-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span></div>'+
         '<div class="t-row2"><span class="t-preview'+(searchHit?' search-hit':'')+'">'+(searchHit ? esc(previewText(searchHit)) : (last ? esc(previewText(last)) : 'No messages yet'))+'</span>'+
-          (unread ? '<span class="t-badge'+(urgentUnread?' urgent':'')+'">'+unread+'</span>' : '')+
         '</div>'+
       '</div>';
     el.addEventListener("click", function(){
@@ -6404,7 +6403,7 @@ var tabGuestsBtn = document.getElementById("tabGuestsBtn");
 var tabRequestsBtn = document.getElementById("tabRequestsBtn");
 var tabRoomsBtn = document.getElementById("tabRoomsBtn");
 function showTab(tab){
-  bottomTabs.hidden = tab === "chat";
+  bottomTabs.hidden = false;
   chatFloatBar.hidden = tab !== "chat";
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";
