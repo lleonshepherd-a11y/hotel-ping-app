@@ -501,21 +501,32 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 @keyframes pullRefreshSpin{to{transform:rotate(360deg)}}
 .pull-refresh.spinning .pull-refresh-spinner{animation:pullRefreshSpin .8s steps(8) infinite}
 .thread-head{
-  display:flex;align-items:center;gap:13px;
+  /* A 1fr/auto/1fr grid, not flex + margin:auto - the back button and
+     the action-button cluster are different widths, so splitting the
+     leftover space evenly (what margin:auto does) shifts the centered
+     name toward whichever side is narrower instead of true center.
+     Two equal 1fr tracks guarantee the middle column sits dead center
+     regardless of how many action buttons are on the right. */
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:13px;
   padding:16px 24px;
   flex:none;
   position:relative;
   z-index:2;
   background:none;
 }
-.back-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:none;background:#f7f7f6;color:var(--text);border-radius:50%;box-shadow:0 4px 14px -5px rgba(20,20,16,.22)}
+.back-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;flex:none;border:none;background:#f7f7f6;color:var(--text);border-radius:50%;box-shadow:0 4px 14px -5px rgba(20,20,16,.22);justify-self:start}
 .back-btn svg{width:19px;height:19px}
 .h-center{
+  /* Explicit, not auto-placed - the back button is position:absolute on
+     mobile, which removes it from the grid's item list entirely, so
+     auto-placement would otherwise slot this into column 1 instead of
+     the centered column 2. */
+  grid-column:2;
   flex:none;max-width:100%;position:relative;
   display:flex;align-items:center;gap:7px;
   background:#fff;border-radius:999px;padding:4px 13px 4px 4px;
   box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
-  margin:0 auto;
+  justify-self:center;
 }
 .h-center .h-avatar{width:26px;height:26px}
 /* The "New Ping" compose title isn't a contact - it shouldn't wear the
@@ -525,7 +536,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .h-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:13px}
 .h-name-row{display:flex;justify-content:flex-start}
 .h-sub{justify-content:flex-start;font-size:10.5px}
-.thread-head-actions{flex:none;margin-left:auto;display:flex;align-items:center;gap:2px}
+.thread-head-actions{grid-column:3;flex:none;justify-self:end;display:flex;align-items:center;gap:2px}
 .mute-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border:none;background:#f7f7f6;color:var(--text-faint);border-radius:50%;box-shadow:0 4px 14px -5px rgba(20,20,16,.22)}
 .header-menu-wrap{position:relative;flex:none}
 .header-menu-btn.open{background:var(--surface-3);color:var(--text)}
@@ -2315,8 +2326,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   .sidebar.hide-mobile{transform:translateX(-100%)}
   .main{position:fixed;inset:0;height:100vh;height:100dvh;z-index:4;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top);transform:translateX(100%)}
   .main.show-mobile{transform:translateX(0)}
+  /* Absolutely positioned, so it floats over the header rather than
+     taking a grid column - the old flex layout compensated with
+     asymmetric padding-left, which is exactly what threw the centered
+     name off-center; the grid's two equal 1fr tracks need symmetric
+     padding to stay centered, so this no longer adds any. */
   .back-btn{display:flex;position:absolute;left:16px;top:50%;transform:translateY(-50%)}
-  .thread-head{padding-left:64px}
   .bubble-wrap{max-width:84%}
 }
 
