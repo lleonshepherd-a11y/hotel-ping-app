@@ -10126,14 +10126,17 @@ function subscribeToPush(){
 if(pushEnableBtn){
   pushEnableBtn.addEventListener("click", function(){
     pushEnableBtn.disabled = true;
-    Notification.requestPermission().then(function(perm){
-      if(perm !== "granted"){ pushPrompt.hidden = true; return; }
-      return subscribeToPush().then(function(){
-        pushPrompt.hidden = true;
-      });
-    }).catch(function(){
+    // Pressed once, gone for good - same dismiss flag the explicit "x"
+    // sets, so it never silently reappears on a later visit (e.g. if the
+    // subscribe call itself fails after permission was granted).
+    var hideForGood = function(){
       pushPrompt.hidden = true;
-    }).finally(function(){ pushEnableBtn.disabled = false; });
+      try{ localStorage.setItem(PUSH_DISMISS_KEY, "1"); }catch(e){}
+    };
+    Notification.requestPermission().then(function(perm){
+      if(perm !== "granted"){ hideForGood(); return; }
+      return subscribeToPush().then(hideForGood);
+    }).catch(hideForGood).finally(function(){ pushEnableBtn.disabled = false; });
   });
 }
 
