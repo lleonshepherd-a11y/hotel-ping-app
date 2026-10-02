@@ -364,6 +364,18 @@ function checkEscalations() {
     if (nextLevel <= (row.escalation_level || 0)) continue;
     console.log('[escalation] unclaimed ticket', row.id, 'level', nextLevel, row.description);
     console.log('[reminder] job needs starting (maintenance dept)', row.id, row.description);
+    // The reporter is "the person at the other end" - without this they
+    // have no way of knowing their job is stuck red/unclaimed.
+    if (row.created_by && row.created_by !== 'maintenance') {
+      const waitWord = nextLevel === 2 ? "still hasn't" : "hasn't yet";
+      const reporterBody = row.description + (row.room_number ? ' (' + row.room_number + ')' : '');
+      console.log('[reminder] still queued for reporter', row.created_by, row.id, row.description);
+      insertMessage({
+        from: 'maintenance', to: row.created_by, type: 'text',
+        body: '⏳ Still queued — this ' + waitWord + ' been picked up: ' + reporterBody,
+        maintTicketId: row.id,
+      });
+    }
     db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?').run(nowIso, nextLevel, row.id);
     escalatedCount++;
   }

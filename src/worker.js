@@ -694,7 +694,7 @@ async function checkOpsPlannerReminders(env, ctx) {
   }
 }
 
-async function checkEscalations(env) {
+async function checkEscalations(env, ctx) {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
   const normalCutoffL1 = new Date(now - NORMAL_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -728,7 +728,9 @@ async function checkEscalations(env) {
   const ticketAtRiskCutoff = new Date(now - TICKET_AT_RISK_MINUTES * 60 * 1000).toISOString();
   const ticketBreachCutoff = new Date(now - TICKET_BREACH_MINUTES * 60 * 1000).toISOString();
   const ticketRows = await env.NOIR_DB.prepare(
-    `SELECT id, description, created_at FROM maintenance_tickets WHERE status = 'reported' AND created_at < ?`
+    `SELECT mt.id, mt.description, mt.room_number, mt.created_at, s.department_id AS creator_dept
+     FROM maintenance_tickets mt LEFT JOIN staff s ON s.id = mt.created_by_staff_id
+     WHERE mt.status = 'reported' AND mt.created_at < ?`
   ).bind(ticketAtRiskCutoff).all();
   if (ticketRows.results.length) {
     const metaByTicket = await ticketMetaMap(env, ticketRows.results.map((r) => r.id));
@@ -752,6 +754,25 @@ async function checkEscalations(env) {
         url: "/",
         tag: "hotel-ping-ticket-reminder-" + row.id + "-" + nextLevel,
       }, null).catch((e) => console.error("notifyDepartment (ticket reminder) error:", e && e.stack || e));
+      // The reporter is "the person at the other end" - without this they
+      // have no way of knowing their job is stuck red/unclaimed, since the
+      // reminders above only reach Maintenance and admins.
+      const creatorDept = fromNoirDept(row.creator_dept);
+      if (creatorDept && creatorDept !== "maintenance") {
+        const waitWord = nextLevel === 2 ? "still hasn't" : "hasn't yet";
+        const reporterBody = row.description + (row.room_number ? " (" + row.room_number + ")" : "");
+        await notifyDepartment(env, creatorDept, {
+          title: nextLevel === 2 ? "🔴 Still queued for Maintenance" : "⏰ Queued for Maintenance",
+          body: reporterBody,
+          url: "/",
+          tag: "hotel-ping-ticket-reporter-wait-" + row.id + "-" + nextLevel,
+        }, null).catch((e) => console.error("notifyDepartment (ticket reporter wait) error:", e && e.stack || e));
+        await insertMessage(env, ctx, {
+          from: "maintenance", to: creatorDept, type: "text",
+          body: "⏳ Still queued — this " + waitWord + " been picked up: " + reporterBody,
+          maintTicketId: row.id,
+        }).catch((e) => console.error("insertMessage (ticket reporter wait) error:", e && e.stack || e));
+      }
       await env.DB.prepare(
         `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
          ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = excluded.escalation_level, escalated_at = excluded.escalated_at`
@@ -4724,7 +4745,7 @@ export default {
 
       if (method === "POST" && p === "/api/escalations/check") {
         if (!request._staff.is_admin) return json({ error: "Admin access required" }, 403);
-        const count = await checkEscalations(env);
+        const count = await checkEscalations(env, ctx);
         const taskRemindersSent = await checkTaskReminders(env, ctx);
         await checkUnnotifiedTickets(env, ctx);
         await checkPlannerAlerts(env, ctx);
@@ -4780,7 +4801,7 @@ export default {
     // stay single-run against the unscoped env.
     for (const hotel of Object.values(hotelRegistry(env))) {
       const hotelEnv = Object.assign({}, env, { DB: hotel.db, NOIR_DB: hotel.noirDb, UPLOADS: hotel.uploads });
-      ctx.waitUntil(checkEscalations(hotelEnv));
+      ctx.waitUntil(checkEscalations(hotelEnv, ctx));
       ctx.waitUntil(checkTaskReminders(hotelEnv, ctx));
       ctx.waitUntil(checkUnnotifiedTickets(hotelEnv, ctx));
       ctx.waitUntil(checkOpsPlannerReminders(hotelEnv, ctx));
