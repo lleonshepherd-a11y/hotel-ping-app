@@ -455,7 +455,20 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .t-badge.urgent{background:var(--urgent)}
 
 /* ---------- Main ---------- */
-.main{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface);position:relative}
+/* The header strip and composer sit in the same grid cell as the
+   scrollable thread, stacked to top/bottom edges with align-self, so
+   messages scroll full-bleed underneath both floating layers instead of
+   stopping at a reserved bar's edge. */
+.main{display:grid;grid-template-rows:1fr;grid-template-columns:1fr;min-width:0;min-height:0;background:var(--surface);position:relative}
+.main>*{grid-area:1/1}
+.thread-top-stack{
+  align-self:start;justify-self:stretch;z-index:3;
+  display:flex;flex-direction:column;
+  pointer-events:none;
+}
+.thread-top-stack>*{pointer-events:auto}
+.thread-top-stack>.thread-head{pointer-events:none}
+.thread-top-stack>.thread-head>*{pointer-events:auto}
 .pull-refresh{position:absolute;left:50%;transform:translateX(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:5;pointer-events:none;opacity:0}
 .pull-refresh-spinner{position:relative;width:18px;height:18px;flex:none}
 .pull-refresh-spinner span{position:absolute;top:0;left:calc(50% - 1.1px);width:2.2px;height:6px;border-radius:2px;background:#232326;transform-origin:1.1px 9px}
@@ -561,7 +574,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .h-contact-name:hover{border-bottom-color:var(--text-faint)}
 
 .thread-scroll{
-  flex:1;overflow-y:auto;padding:20px 22px 10px;display:flex;flex-direction:column;gap:2px;
+  align-self:stretch;justify-self:stretch;z-index:1;
+  overflow-y:auto;padding:96px 22px 104px;display:flex;flex-direction:column;gap:2px;
   background:#fff;
   scrollbar-width:none;
   position:relative;
@@ -664,9 +678,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 /* ---------- Composer ---------- */
 .composer-wrap{
-  flex:none;padding:14px 20px 20px;background:none;
-  position:relative;z-index:2;
+  align-self:end;justify-self:stretch;z-index:3;
+  padding:14px 20px 20px;background:none;
+  position:relative;
+  pointer-events:none;
 }
+.composer-wrap>*{pointer-events:auto}
 
 /* Push-to-talk: floats bottom-left so it never sits over the send button in
    the composer pill, and is draggable (see setupPtt in app.js) so it can sit

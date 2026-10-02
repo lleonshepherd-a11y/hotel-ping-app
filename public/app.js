@@ -2075,17 +2075,22 @@ function setupPullToRefresh(scrollEl, spinnerEl, onRefresh){
     if(scrollEl.scrollTop > 0){ pulling = false; return; }
     e.preventDefault();
     var dist = Math.min(dy * 0.5, PULL_MAX);
-    spinnerEl.style.top = (scrollEl.offsetTop - 34 + dist) + "px";
+    // scrollEl.offsetTop reads 0 now that the thread-scroll spans the full
+    // floating-header grid cell - pullTopOffset re-adds its own padding-top
+    // so the spinner still lands just under the floating header, not under it.
+    var pullTopOffset = parseFloat(getComputedStyle(scrollEl).paddingTop) || 0;
+    spinnerEl.style.top = (scrollEl.offsetTop + pullTopOffset - 34 + dist) + "px";
     spinnerEl.style.opacity = Math.min(dist / PULL_THRESHOLD, 1);
   }, { passive: false });
   scrollEl.addEventListener("touchend", function(e){
     if(!pulling || startY === null) return;
+    var pullTopOffset = parseFloat(getComputedStyle(scrollEl).paddingTop) || 0;
     var finalTop = parseFloat(spinnerEl.style.top || "0");
-    var dist = finalTop - (scrollEl.offsetTop - 34);
+    var dist = finalTop - (scrollEl.offsetTop + pullTopOffset - 34);
     pulling = false; startY = null;
     if(dist >= PULL_THRESHOLD){
       refreshing = true;
-      spinnerEl.style.top = (scrollEl.offsetTop + 14) + "px";
+      spinnerEl.style.top = (scrollEl.offsetTop + pullTopOffset + 14) + "px";
       spinnerEl.style.opacity = "1";
       spinnerEl.classList.add("spinning");
       onRefresh().catch(function(){});
