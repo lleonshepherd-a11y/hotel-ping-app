@@ -8847,6 +8847,7 @@ function renderTicketDetail(){
     html += '<div class="ticket-detail-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
   }
   html += '<div class="ticket-detail-meta">' + (t.ticketNumber ? 'HP-' + String(t.ticketNumber).padStart(4,"0") + ' · ' : '') + 'Raised by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
+  html += maintTrackerHtml(t);
   var detailTagsHtml = "";
   if(t.priority === "safety") detailTagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
   else if(t.priority === "guest") detailTagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';

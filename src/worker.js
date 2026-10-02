@@ -464,6 +464,13 @@ const URGENT_ESCALATION_L2_MINUTES = 20;
 const NORMAL_ESCALATION_L2_MINUTES = 50;
 const TICKET_AT_RISK_MINUTES = 15;
 const TICKET_BREACH_MINUTES = 35;
+// "Taken on" and "Fixed, awaiting your confirmation" are active/paused
+// states rather than neglected-at-the-start ones, so they get a longer
+// leash than an unclaimed ticket before anyone gets chased about them.
+const TICKET_INPROGRESS_AT_RISK_MINUTES = 60;
+const TICKET_INPROGRESS_BREACH_MINUTES = 180;
+const TICKET_AWAITING_CONFIRM_AT_RISK_MINUTES = 60;
+const TICKET_AWAITING_CONFIRM_BREACH_MINUTES = 240;
 const TASK_START_REMINDER_MINUTES = 30;
 
 // Hotel Ping's 8 departments are hardcoded (DEPT_IDS/NOIR_DEPT_ID_MAP) rather
@@ -694,6 +701,44 @@ async function checkOpsPlannerReminders(env, ctx) {
   }
 }
 
+// Shared by every maintenance-ticket stage watch below: tells admins,
+// Maintenance, and (if they're not the same department) the reporter,
+// then records the new escalation level so the next run doesn't repeat
+// itself. `row` needs id/description/room_number/creator_dept.
+async function notifyTicketStageEscalation(env, ctx, row, nextLevel, opts) {
+  await notifyAdmins(env, {
+    title: nextLevel === 2 ? opts.adminBreachTitle : opts.adminAtRiskTitle,
+    body: row.description,
+    url: "/",
+    tag: "hotel-ping-ticket-" + opts.tag + "-" + row.id + "-" + nextLevel,
+  });
+  await notifyDepartment(env, "maintenance", {
+    title: nextLevel === 2 ? opts.maintBreachTitle : opts.maintAtRiskTitle,
+    body: row.description,
+    url: "/",
+    tag: "hotel-ping-ticket-" + opts.tag + "-maint-" + row.id + "-" + nextLevel,
+  }, null).catch((e) => console.error("notifyDepartment (" + opts.tag + ") error:", e && e.stack || e));
+  const creatorDept = fromNoirDept(row.creator_dept);
+  if (creatorDept && creatorDept !== "maintenance") {
+    const reporterBody = row.description + (row.room_number ? " (" + row.room_number + ")" : "");
+    await notifyDepartment(env, creatorDept, {
+      title: nextLevel === 2 ? opts.reporterBreachTitle : opts.reporterAtRiskTitle,
+      body: reporterBody,
+      url: "/",
+      tag: "hotel-ping-ticket-" + opts.tag + "-reporter-" + row.id + "-" + nextLevel,
+    }, null).catch((e) => console.error("notifyDepartment (" + opts.tag + " reporter) error:", e && e.stack || e));
+    await insertMessage(env, ctx, {
+      from: "maintenance", to: creatorDept, type: "text",
+      body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
+      maintTicketId: row.id,
+    }).catch((e) => console.error("insertMessage (" + opts.tag + " reporter) error:", e && e.stack || e));
+  }
+  await env.DB.prepare(
+    `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
+     ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = excluded.escalation_level, escalated_at = excluded.escalated_at`
+  ).bind(row.id, nextLevel, new Date().toISOString()).run();
+}
+
 async function checkEscalations(env, ctx) {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -739,44 +784,71 @@ async function checkEscalations(env, ctx) {
       if (level >= 2) continue;
       const nextLevel = level === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : level);
       if (nextLevel <= level) continue;
-      await notifyAdmins(env, {
-        title: nextLevel === 2 ? "🔴 Maintenance ticket still unclaimed" : "🟡 Maintenance ticket needs claiming",
-        body: row.description,
-        url: "/",
-        tag: "hotel-ping-ticket-escalation-" + row.id + "-" + nextLevel,
+      await notifyTicketStageEscalation(env, ctx, row, nextLevel, {
+        tag: "unclaimed",
+        adminAtRiskTitle: "🟡 Maintenance ticket needs claiming", adminBreachTitle: "🔴 Maintenance ticket still unclaimed",
+        maintAtRiskTitle: "⏰ Job needs starting", maintBreachTitle: "🔴 Job still not started",
+        reporterAtRiskTitle: "⏰ Queued for Maintenance", reporterBreachTitle: "🔴 Still queued for Maintenance",
+        reporterMsgAtRisk: "⏳ Still queued — this hasn't yet been picked up: ",
+        reporterMsgBreach: "⏳ Still queued — this still hasn't been picked up: ",
       });
-      // Admins get told something's slipping, but the people who can
-      // actually start the job need their own direct nudge too - not
-      // just a management-side alert they may never see.
-      await notifyDepartment(env, "maintenance", {
-        title: nextLevel === 2 ? "🔴 Job still not started" : "⏰ Job needs starting",
-        body: row.description,
-        url: "/",
-        tag: "hotel-ping-ticket-reminder-" + row.id + "-" + nextLevel,
-      }, null).catch((e) => console.error("notifyDepartment (ticket reminder) error:", e && e.stack || e));
-      // The reporter is "the person at the other end" - without this they
-      // have no way of knowing their job is stuck red/unclaimed, since the
-      // reminders above only reach Maintenance and admins.
-      const creatorDept = fromNoirDept(row.creator_dept);
-      if (creatorDept && creatorDept !== "maintenance") {
-        const waitWord = nextLevel === 2 ? "still hasn't" : "hasn't yet";
-        const reporterBody = row.description + (row.room_number ? " (" + row.room_number + ")" : "");
-        await notifyDepartment(env, creatorDept, {
-          title: nextLevel === 2 ? "🔴 Still queued for Maintenance" : "⏰ Queued for Maintenance",
-          body: reporterBody,
-          url: "/",
-          tag: "hotel-ping-ticket-reporter-wait-" + row.id + "-" + nextLevel,
-        }, null).catch((e) => console.error("notifyDepartment (ticket reporter wait) error:", e && e.stack || e));
-        await insertMessage(env, ctx, {
-          from: "maintenance", to: creatorDept, type: "text",
-          body: "⏳ Still queued — this " + waitWord + " been picked up: " + reporterBody,
-          maintTicketId: row.id,
-        }).catch((e) => console.error("insertMessage (ticket reporter wait) error:", e && e.stack || e));
-      }
-      await env.DB.prepare(
-        `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
-         ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = excluded.escalation_level, escalated_at = excluded.escalated_at`
-      ).bind(row.id, nextLevel, new Date().toISOString()).run();
+      escalatedCount++;
+    }
+  }
+
+  // Taken on but sitting there unfinished - the reporter and Maintenance
+  // both watched the claim happen, so silence after that reads as "it's
+  // handled" when it might just be stalled.
+  const inProgressAtRiskCutoff = new Date(now - TICKET_INPROGRESS_AT_RISK_MINUTES * 60 * 1000).toISOString();
+  const inProgressBreachCutoff = new Date(now - TICKET_INPROGRESS_BREACH_MINUTES * 60 * 1000).toISOString();
+  const inProgressRows = await env.NOIR_DB.prepare(
+    `SELECT mt.id, mt.description, mt.room_number, mt.updated_at, s.department_id AS creator_dept
+     FROM maintenance_tickets mt LEFT JOIN staff s ON s.id = mt.created_by_staff_id
+     WHERE mt.status = 'in_progress' AND mt.updated_at < ?`
+  ).bind(inProgressAtRiskCutoff).all();
+  if (inProgressRows.results.length) {
+    const metaByTicket = await ticketMetaMap(env, inProgressRows.results.map((r) => r.id));
+    for (const row of inProgressRows.results) {
+      const level = metaByTicket[row.id] ? metaByTicket[row.id].escalation_level : 0;
+      if (level >= 2) continue;
+      const nextLevel = level === 0 ? 1 : (row.updated_at < inProgressBreachCutoff ? 2 : level);
+      if (nextLevel <= level) continue;
+      await notifyTicketStageEscalation(env, ctx, row, nextLevel, {
+        tag: "stalled",
+        adminAtRiskTitle: "🟡 Maintenance job stalled", adminBreachTitle: "🔴 Maintenance job stalled a while",
+        maintAtRiskTitle: "⏰ Still on this job?", maintBreachTitle: "🔴 Job taken on, still not finished",
+        reporterAtRiskTitle: "⏰ Still being worked on", reporterBreachTitle: "🔴 Still not finished",
+        reporterMsgAtRisk: "🔧 Taken on a while ago, no update yet: ",
+        reporterMsgBreach: "🔧 Still not finished, taken on a while ago: ",
+      });
+      escalatedCount++;
+    }
+  }
+
+  // Fixed, but the reporter hasn't confirmed it's actually sorted - if
+  // that sits too long the two-step close flow just silently never closes.
+  const awaitingConfirmAtRiskCutoff = new Date(now - TICKET_AWAITING_CONFIRM_AT_RISK_MINUTES * 60 * 1000).toISOString();
+  const awaitingConfirmBreachCutoff = new Date(now - TICKET_AWAITING_CONFIRM_BREACH_MINUTES * 60 * 1000).toISOString();
+  const awaitingConfirmRows = await env.NOIR_DB.prepare(
+    `SELECT mt.id, mt.description, mt.room_number, mt.updated_at, s.department_id AS creator_dept
+     FROM maintenance_tickets mt LEFT JOIN staff s ON s.id = mt.created_by_staff_id
+     WHERE mt.status = 'fixed' AND mt.needs_reporter_check = 1 AND mt.updated_at < ?`
+  ).bind(awaitingConfirmAtRiskCutoff).all();
+  if (awaitingConfirmRows.results.length) {
+    const metaByTicket = await ticketMetaMap(env, awaitingConfirmRows.results.map((r) => r.id));
+    for (const row of awaitingConfirmRows.results) {
+      const level = metaByTicket[row.id] ? metaByTicket[row.id].escalation_level : 0;
+      if (level >= 2) continue;
+      const nextLevel = level === 0 ? 1 : (row.updated_at < awaitingConfirmBreachCutoff ? 2 : level);
+      if (nextLevel <= level) continue;
+      await notifyTicketStageEscalation(env, ctx, row, nextLevel, {
+        tag: "awaiting-confirm",
+        adminAtRiskTitle: "🟡 Fixed job awaiting confirmation", adminBreachTitle: "🔴 Fixed job still unconfirmed",
+        maintAtRiskTitle: "⏰ Still awaiting reporter sign-off", maintBreachTitle: "🔴 Still awaiting reporter sign-off",
+        reporterAtRiskTitle: "✅ Please confirm this is fixed", reporterBreachTitle: "🔴 Please confirm this is fixed",
+        reporterMsgAtRisk: "✅ Marked fixed a while ago - can you confirm it's sorted? ",
+        reporterMsgBreach: "✅ Still waiting on your confirmation that this is sorted: ",
+      });
       escalatedCount++;
     }
   }
@@ -4419,6 +4491,16 @@ export default {
           status === "fixed" ? 1 : 0,
           id
         ).run();
+        // Each status is watched on its own clock (unclaimed / taken-on-too-
+        // long / fixed-awaiting-confirmation) - moving to a new one always
+        // starts that clock fresh rather than inheriting however escalated
+        // the ticket got stuck at its last stage.
+        if (existing.status !== status) {
+          await env.DB.prepare(
+            `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, 0, NULL)
+             ON CONFLICT(ticket_id) DO UPDATE SET escalation_level = 0, escalated_at = NULL`
+          ).bind(id).run();
+        }
         const row = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`

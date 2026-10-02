@@ -330,6 +330,25 @@ const URGENT_ESCALATION_L2_MINUTES = 20;
 const NORMAL_ESCALATION_L2_MINUTES = 50;
 const TICKET_AT_RISK_MINUTES = 15;
 const TICKET_BREACH_MINUTES = 35;
+const TICKET_INPROGRESS_AT_RISK_MINUTES = 60;
+const TICKET_INPROGRESS_BREACH_MINUTES = 180;
+const TICKET_AWAITING_CONFIRM_AT_RISK_MINUTES = 60;
+const TICKET_AWAITING_CONFIRM_BREACH_MINUTES = 240;
+
+function notifyTicketStageEscalation(row, nextLevel, opts) {
+  console.log('[escalation]', opts.tag, row.id, 'level', nextLevel, row.description);
+  if (row.created_by && row.created_by !== 'maintenance') {
+    const reporterBody = row.description + (row.room_number ? ' (' + row.room_number + ')' : '');
+    insertMessage({
+      from: 'maintenance', to: row.created_by, type: 'text',
+      body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
+      maintTicketId: row.id,
+    });
+  }
+  db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?')
+    .run(new Date().toISOString(), nextLevel, row.id);
+}
+
 function checkEscalations() {
   const now = Date.now();
   const urgentCutoffL1 = new Date(now - URGENT_ESCALATION_MINUTES * 60 * 1000).toISOString();
@@ -362,21 +381,43 @@ function checkEscalations() {
   for (const row of ticketRows) {
     const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.created_at < ticketBreachCutoff ? 2 : (row.escalation_level || 0));
     if (nextLevel <= (row.escalation_level || 0)) continue;
-    console.log('[escalation] unclaimed ticket', row.id, 'level', nextLevel, row.description);
-    console.log('[reminder] job needs starting (maintenance dept)', row.id, row.description);
-    // The reporter is "the person at the other end" - without this they
-    // have no way of knowing their job is stuck red/unclaimed.
-    if (row.created_by && row.created_by !== 'maintenance') {
-      const waitWord = nextLevel === 2 ? "still hasn't" : "hasn't yet";
-      const reporterBody = row.description + (row.room_number ? ' (' + row.room_number + ')' : '');
-      console.log('[reminder] still queued for reporter', row.created_by, row.id, row.description);
-      insertMessage({
-        from: 'maintenance', to: row.created_by, type: 'text',
-        body: '⏳ Still queued — this ' + waitWord + ' been picked up: ' + reporterBody,
-        maintTicketId: row.id,
-      });
-    }
-    db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?').run(nowIso, nextLevel, row.id);
+    notifyTicketStageEscalation(row, nextLevel, {
+      tag: 'unclaimed',
+      reporterMsgAtRisk: '⏳ Still queued — this hasn\'t yet been picked up: ',
+      reporterMsgBreach: '⏳ Still queued — this still hasn\'t been picked up: ',
+    });
+    escalatedCount++;
+  }
+
+  const inProgressAtRiskCutoff = new Date(now - TICKET_INPROGRESS_AT_RISK_MINUTES * 60 * 1000).toISOString();
+  const inProgressBreachCutoff = new Date(now - TICKET_INPROGRESS_BREACH_MINUTES * 60 * 1000).toISOString();
+  const inProgressRows = db.prepare(`
+    SELECT * FROM maintenance_tickets WHERE status = 'in_progress' AND escalation_level < 2 AND updated_at < ?
+  `).all(inProgressAtRiskCutoff);
+  for (const row of inProgressRows) {
+    const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.updated_at < inProgressBreachCutoff ? 2 : (row.escalation_level || 0));
+    if (nextLevel <= (row.escalation_level || 0)) continue;
+    notifyTicketStageEscalation(row, nextLevel, {
+      tag: 'stalled',
+      reporterMsgAtRisk: '🔧 Taken on a while ago, no update yet: ',
+      reporterMsgBreach: '🔧 Still not finished, taken on a while ago: ',
+    });
+    escalatedCount++;
+  }
+
+  const awaitingConfirmAtRiskCutoff = new Date(now - TICKET_AWAITING_CONFIRM_AT_RISK_MINUTES * 60 * 1000).toISOString();
+  const awaitingConfirmBreachCutoff = new Date(now - TICKET_AWAITING_CONFIRM_BREACH_MINUTES * 60 * 1000).toISOString();
+  const awaitingConfirmRows = db.prepare(`
+    SELECT * FROM maintenance_tickets WHERE status = 'fixed' AND needs_reporter_check = 1 AND escalation_level < 2 AND updated_at < ?
+  `).all(awaitingConfirmAtRiskCutoff);
+  for (const row of awaitingConfirmRows) {
+    const nextLevel = (row.escalation_level || 0) === 0 ? 1 : (row.updated_at < awaitingConfirmBreachCutoff ? 2 : (row.escalation_level || 0));
+    if (nextLevel <= (row.escalation_level || 0)) continue;
+    notifyTicketStageEscalation(row, nextLevel, {
+      tag: 'awaiting-confirm',
+      reporterMsgAtRisk: '✅ Marked fixed a while ago - can you confirm it\'s sorted? ',
+      reporterMsgBreach: '✅ Still waiting on your confirmation that this is sorted: ',
+    });
     escalatedCount++;
   }
 
@@ -2945,6 +2986,11 @@ const server = http.createServer(async (req, res) => {
           status === 'fixed' ? (maintRequester.name || null) : null,
           status === 'fixed' ? 1 : 0,
           id);
+      // Each status is watched on its own clock - moving to a new one
+      // always starts that clock fresh. See the same note in src/worker.js.
+      if (existing.status !== status) {
+        db.prepare('UPDATE maintenance_tickets SET escalation_level = 0, escalated_at = NULL WHERE id = ?').run(id);
+      }
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
 
       // A provable, per-transition record of who changed this ticket's
