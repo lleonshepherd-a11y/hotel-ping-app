@@ -1454,12 +1454,6 @@ function renderThread(){
   var prevDay = null;
   var msgsById = {};
   msgs.forEach(function(m){ msgsById[m.id] = m; });
-  // Reserved up front (not in the deferred line-drawing pass) so the extra
-  // space is there from first paint instead of popping in and shoving
-  // later messages down a moment after they've already rendered.
-  var repliedToIds = {};
-  if(STATE.activeGroupId) msgs.forEach(function(m){ if(m.replyTo) repliedToIds[m.replyTo] = true; });
-
   msgs.forEach(function(m, i){
     if(!prevDay || !sameDay(prevDay, m.t)){
       var div = document.createElement("div");
@@ -1473,84 +1467,10 @@ function renderThread(){
     var groupEnd = !next || next.from !== m.from || !sameDay(next.t, m.t);
     var groupStart = !prev || prev.from !== m.from || !sameDay(prev.t, m.t);
     var row = buildMessageRow(m, groupEnd, msgsById, groupStart);
-    if(repliedToIds[m.id]) row.classList.add("has-reply-thread-badge");
     threadScroll.appendChild(row);
   });
   if(!STATE.activeGroupId && STATE.typingFrom[STATE.active]) threadScroll.appendChild(buildTypingBubble());
-  // Deferred: rows animate in (bubbleIn, translateY over .3s), so measuring
-  // positions synchronously here would catch them mid-slide - wait for that
-  // to settle first, or the line lands ~8px off from the avatar it's aiming for.
-  if(replyLineTimer) clearTimeout(replyLineTimer);
-  replyLineTimer = setTimeout(function(){ renderReplyThreadLines(msgs); }, 320);
   threadScroll.scrollTop = threadScroll.scrollHeight;
-}
-var replyLineTimer = null;
-
-// In a group (an Event or an ad-hoc multi-department chat - same thread
-// view either way), a reply to an earlier message gets a blue L-shaped
-// line: down from a "N Replies" label under the original, then across
-// into the avatar of whoever replied - so it's visually obvious who
-// answered what without following the flat timeline back up.
-function renderReplyThreadLines(msgs){
-  if(!STATE.activeGroupId) return;
-  var byParent = {};
-  msgs.forEach(function(m){
-    if(m.replyTo) (byParent[m.replyTo] = byParent[m.replyTo] || []).push(m);
-  });
-  var parentIds = Object.keys(byParent);
-  if(!parentIds.length) return;
-  var scrollRect = threadScroll.getBoundingClientRect();
-  function relRect(el){
-    var r = el.getBoundingClientRect();
-    return { top: r.top - scrollRect.top + threadScroll.scrollTop, left: r.left - scrollRect.left + threadScroll.scrollLeft, width: r.width, height: r.height };
-  }
-  parentIds.forEach(function(parentId){
-    var parentRow = threadScroll.querySelector('[data-msg-id="' + parentId + '"]');
-    if(!parentRow) return;
-    var replies = byParent[parentId];
-    var replyRow = threadScroll.querySelector('[data-msg-id="' + replies[0].id + '"]');
-    var avatarEl = replyRow && replyRow.querySelector(".group-sender-avatar");
-    if(!replyRow || !avatarEl) return;
-
-    var avRect = relRect(avatarEl);
-    var parentRect = relRect(parentRow);
-    // Both the label and the drop live in the gutter just left of the
-    // avatar column, regardless of which side the original message's own
-    // bubble is on - then a short hook bends right into the avatar. Stays
-    // in the empty margin the whole way, never crossing any bubble or text.
-    var gutterX = avRect.left - 7;
-
-    var badge = document.createElement("div");
-    badge.className = "reply-thread-badge";
-    badge.textContent = replies.length === 1 ? "1 Reply" : replies.length + " Replies";
-    badge.style.left = gutterX + "px";
-    badge.style.top = (parentRect.top + parentRect.height + 8) + "px";
-    threadScroll.appendChild(badge);
-
-    var badgeRect = relRect(badge);
-    var lineTop = badgeRect.top + badgeRect.height;
-    var avCenterY = avRect.top + avRect.height / 2;
-    // Guaranteed minimum, not just whatever's left over - the reserved
-    // margin below the parent row is generous, but this is the safety net
-    // that keeps the segment from silently collapsing to 0px if it isn't.
-    var vHeight = Math.max(10, avCenterY - lineTop);
-
-    var vLine = document.createElement("div");
-    vLine.className = "reply-thread-line reply-thread-line-v";
-    vLine.style.left = gutterX + "px";
-    vLine.style.top = lineTop + "px";
-    vLine.style.height = vHeight + "px";
-    threadScroll.appendChild(vLine);
-
-    var hLine = document.createElement("div");
-    hLine.className = "reply-thread-line reply-thread-line-h";
-    hLine.style.left = gutterX + "px";
-    hLine.style.top = (avCenterY - 1) + "px";
-    // Stop right at the avatar's own edge, so the line points at it
-    // instead of running across/under the icon.
-    hLine.style.width = Math.max(0, avRect.left - gutterX) + "px";
-    threadScroll.appendChild(hLine);
-  });
 }
 
 function buildTypingBubble(){
@@ -2689,28 +2609,23 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   pinBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M8 3h8l-1 7 3 3H6l3-3-1-7z"/></svg>';
   pinBtn.addEventListener("click", function(e){ e.stopPropagation(); togglePinMessage(m); });
 
-  var replyBtn = null;
-  if(!m.deleted && !m.pending && !m.failed){
-    // A visible, always-there reply button - the long-press menu still has
-    // "Reply" in it too, but staff won't reliably discover a hidden gesture
-    // on their own, so replying needs a button they can just see and tap.
-    replyBtn = document.createElement("button");
-    replyBtn.type = "button";
-    replyBtn.className = "msg-reply-btn";
-    replyBtn.setAttribute("aria-label", "Reply to this message");
-    replyBtn.title = "Reply";
-    replyBtn.innerHTML = ACTION_ICONS.reply;
-    replyBtn.addEventListener("click", function(e){ e.stopPropagation(); showReplyBar(m); });
-  }
-
   if(out){
-    if(replyBtn) row.appendChild(replyBtn);
     row.appendChild(pinBtn);
     row.appendChild(wrap);
   } else {
     row.appendChild(wrap);
     row.appendChild(pinBtn);
-    if(replyBtn) row.appendChild(replyBtn);
+  }
+  // No separate reply-arrow button - tap a text bubble itself to reply
+  // (long-press still opens the full action menu, Reply included there too).
+  // Image/file/audio bubbles keep their own tap behavior (view, download,
+  // play) untouched.
+  if(m.type === "text" && !m.deleted && !m.pending && !m.failed){
+    wrap.style.cursor = "pointer";
+    wrap.addEventListener("click", function(e){
+      if(e.target.closest(".reply-quote")) return;
+      showReplyBar(m);
+    });
   }
   return row;
 }
@@ -3120,6 +3035,8 @@ document.addEventListener("click", function(e){
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
 optPdf.addEventListener("click", function(){ closePlusMenu(); pdfInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
+var railPdfBtn = document.getElementById("railPdfBtn");
+if(railPdfBtn) railPdfBtn.addEventListener("click", function(){ pdfInput.click(); });
 urgentToggleBtn.addEventListener("click", function(){
   urgentActive = !urgentActive;
   urgentToggleBtn.classList.toggle("active", urgentActive);

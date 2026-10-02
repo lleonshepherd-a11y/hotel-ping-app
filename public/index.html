@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20261001t235722">
+<link rel="stylesheet" href="/styles.css?v=20261002t114025">
 </head>
 <body>
 
@@ -668,6 +668,17 @@
     <div class="thread-scroll" id="threadScroll"></div>
 
     <div class="composer-wrap">
+      <div class="thread-side-rail" id="threadSideRail">
+        <button type="button" class="rail-btn" id="railPdfBtn" aria-label="Attach a PDF">
+          <svg viewBox="0 0 24 24"><path d="M5 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6H5z" fill="#e5342a"/><path d="M15 2v5a1 1 0 0 0 1 1h5" fill="#a91f18"/><text x="12" y="17.3" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="900" fill="#fff">PDF</text></svg>
+        </button>
+        <div class="ptt-float" id="pttFloatBtn" aria-label="Push to talk">
+          <div class="ptt-ring"></div>
+          <div class="ptt-core">
+            <div class="ptt-wave-row" id="pttWaveRow"></div>
+          </div>
+        </div>
+      </div>
       <div id="attachPreview"></div>
 
       <div class="reply-preview-bar" id="replyPreviewBar" hidden>
@@ -763,12 +774,6 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             </button>
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
-            <div class="ptt-float" id="pttFloatBtn" aria-label="Push to talk">
-              <div class="ptt-ring"></div>
-              <div class="ptt-core">
-                <div class="ptt-wave-row" id="pttWaveRow"></div>
-              </div>
-            </div>
           </div>
           <button class="send-btn" id="sendBtn" aria-label="Send message">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
@@ -1629,6 +1634,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20261001t235722"></script>
+<script src="/app.js?v=20261002t114025"></script>
 </body>
 </html>
