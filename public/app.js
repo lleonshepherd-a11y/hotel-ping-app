@@ -3037,8 +3037,6 @@ document.addEventListener("click", function(e){
 optPhoto.addEventListener("click", function(){ closePlusMenu(); fileInput.click(); });
 optPdf.addEventListener("click", function(){ closePlusMenu(); pdfInput.click(); });
 optCamera.addEventListener("click", function(){ closePlusMenu(); cameraInput.click(); });
-var railPdfBtn = document.getElementById("railPdfBtn");
-if(railPdfBtn) railPdfBtn.addEventListener("click", function(){ pdfInput.click(); });
 urgentToggleBtn.addEventListener("click", function(){
   urgentActive = !urgentActive;
   urgentToggleBtn.classList.toggle("active", urgentActive);
