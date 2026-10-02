@@ -2390,7 +2390,6 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
       }
       var senderLabel = document.createElement("div");
       senderLabel.className = "group-sender-name";
-      if(senderDept) senderLabel.style.color = senderDept.color;
       senderLabel.textContent = labelText;
       senderRow.appendChild(senderLabel);
       wrap.appendChild(senderRow);
