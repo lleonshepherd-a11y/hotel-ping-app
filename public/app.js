@@ -2315,6 +2315,10 @@ var MAINT_URGENCY_DISPLAY = {
   routine: { label: "Routine", cls: "routine" },
 };
 var MAINT_TRACKER_STAGES = ["Reported", "Taken on", "Fixed", "Confirmed"];
+// Same red/amber/green language as the maintenance board's own status
+// accent (status-reported/in_progress/fixed) - nothing picked up yet is
+// red (needs attention), being worked is amber, done is green.
+var MAINT_TRACKER_COLORS = ["red", "amber", "green", "green"];
 function maintTrackerStage(t){
   if(t.status === "fixed" && !t.needsReporterCheck) return 3;
   if(t.status === "fixed") return 2;
@@ -2325,9 +2329,9 @@ function maintTrackerHtml(t){
   var stage = maintTrackerStage(t);
   var parts = [];
   MAINT_TRACKER_STAGES.forEach(function(label, i){
-    var state = i < stage ? "done" : (i === stage ? "current" : "upcoming");
+    var state = i < stage ? "done" : (i === stage ? "current-" + MAINT_TRACKER_COLORS[i] : "upcoming");
     parts.push('<div class="tk-track-step ' + state + '"><span class="tk-track-dot">' +
-      (state === "done" ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') +
+      (i < stage ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') +
       '</span><span class="tk-track-label">' + label + '</span></div>');
     if(i < MAINT_TRACKER_STAGES.length - 1){
       parts.push('<div class="tk-track-line' + (i < stage ? ' done' : '') + '"></div>');
