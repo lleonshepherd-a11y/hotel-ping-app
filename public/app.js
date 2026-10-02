@@ -597,6 +597,8 @@ chatListBurgerBtn.addEventListener("click", function(e){
   chatFilterRow.classList.toggle("open", opening);
   chatListBurgerBtn.classList.toggle("active", opening);
 });
+var chatSearchFilterBtn = document.getElementById("chatSearchFilterBtn");
+if(chatSearchFilterBtn) chatSearchFilterBtn.addEventListener("click", function(e){ e.stopPropagation(); chatListBurgerBtn.click(); });
 document.addEventListener("click", function(e){
   if(chatFilterRow.classList.contains("open") && !e.target.closest(".chatlist-filter-wrap")) closeChatFilterMenu();
 });
