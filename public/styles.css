@@ -88,9 +88,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;
   z-index:1;
 }
-.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 .chatlist-float-bar{
-  position:absolute;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:6;
+  position:absolute;right:16px;bottom:calc(100px + env(safe-area-inset-bottom));z-index:6;
   display:flex;align-items:center;pointer-events:none;
 }
 .chatlist-float-bar > *{pointer-events:auto}
@@ -145,23 +145,36 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .help-hold-ring{position:absolute;inset:0;pointer-events:none}
 
 .bottom-tabs{
-  position:absolute;left:0;right:0;bottom:0;z-index:5;
+  position:absolute;left:14px;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:5;
   display:flex;justify-content:space-around;touch-action:none;
-  margin:0;padding:7px 4px calc(6px + env(safe-area-inset-bottom));
-  background:rgba(249,249,247,.94);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
-  box-shadow:inset 0 1px 0 var(--border);
+  margin:0;padding:6px;border-radius:999px;
+  background:rgba(249,249,247,.72);backdrop-filter:blur(20px) saturate(1.7);-webkit-backdrop-filter:blur(20px) saturate(1.7);
+  box-shadow:0 14px 30px -10px rgba(20,20,15,.28),0 2px 10px -2px rgba(20,20,15,.1),inset 0 0 0 1px rgba(255,255,255,.55);
 }
 .bottom-tab{
   flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  padding:2px;border:none;background:none;color:#8a8a85;
-  transition:color .18s ease;
+  padding:7px 2px;border:none;background:none;border-radius:999px;color:#8a8a85;
+  transition:color .18s ease,background .18s ease,box-shadow .18s ease;
 }
 .bottom-tab-icon{position:relative;display:flex;align-items:center;justify-content:center;width:24px;height:24px}
 .bottom-tab-icon svg{width:23px;height:23px}
 .bottom-tab-label{display:block;font-size:10px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .bottom-tab:active{opacity:.6}
-.bottom-tab.active{color:var(--text)}
-.bottom-tab.drag-hover{color:var(--text)}
+/* Resting selection: a solid white pill behind the chosen tab. While a
+   drag-to-select gesture is passing over a *different* tab (not yet
+   committed), that tab previews as frosted glass instead - only the
+   tab you actually land on and release over turns solid white. */
+.bottom-tab.active{
+  color:var(--text);
+  background:#fff;
+  box-shadow:0 3px 10px -3px rgba(20,20,15,.22);
+}
+.bottom-tab.drag-hover:not(.active){
+  color:var(--text);
+  background:rgba(255,255,255,.4);
+  backdrop-filter:blur(10px) saturate(1.6);-webkit-backdrop-filter:blur(10px) saturate(1.6);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.5);
+}
 .bottom-tab .tab-badge{
   position:absolute;top:-3px;right:-7px;min-width:15px;height:15px;padding:0 3px;
   border-radius:8px;background:var(--urgent);color:#fff;font-size:9px;font-weight:800;
@@ -394,7 +407,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #pushPrompt .push-prompt-dismiss svg{width:7px;height:7px}
 #pushPrompt .push-prompt-dismiss:hover{background:var(--text)}
 .inline-share-ic{width:13px;height:13px;vertical-align:-2px;color:var(--accent)}
-.thread-list{flex:1;overflow-y:auto;padding:0 0 calc(94px + env(safe-area-inset-bottom));scrollbar-width:none}
+.thread-list{flex:1;overflow-y:auto;padding:0 0 calc(118px + env(safe-area-inset-bottom));scrollbar-width:none}
 .thread-list::-webkit-scrollbar{display:none}
 .thread-item-wrap{position:relative;overflow:hidden}
 .thread-item{
@@ -1443,7 +1456,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .events-page{overflow:hidden}
 .events-page-header{flex:none}
 #eventsFilterRow{margin-bottom:12px}
-.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.events-page-scroll{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;padding-top:2px;padding-bottom:calc(52px + env(safe-area-inset-bottom))}
 .events-page-scroll::-webkit-scrollbar{display:none}
 .events-hint{padding:0 20px;margin:0 0 14px}
 .new-event-trigger-btn{flex:none;width:38px;height:38px;border:none;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px -4px rgba(20,20,16,.4)}
@@ -1482,7 +1495,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .event-card-hint{font-size:11px;color:var(--text-faint);padding:2px 2px}
 .event-card-tap-hint{margin-top:6px;opacity:.75}
 .event-drop-zone{
-  position:absolute;left:50%;bottom:calc(112px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
+  position:absolute;left:50%;bottom:calc(130px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(140%) scale(1);opacity:0;
   display:flex;flex-direction:column;align-items:center;gap:4px;
   background:var(--urgent);color:#fff;font-weight:700;font-size:11px;padding:14px 22px;border-radius:22px;
   box-shadow:0 10px 28px -8px rgba(20,20,16,.45);pointer-events:none;
