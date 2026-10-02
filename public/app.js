@@ -9913,10 +9913,7 @@ var newRequestDesc = document.getElementById("newRequestDesc");
 var newRequestFile = document.getElementById("newRequestFile");
 var requestError = document.getElementById("requestError");
 var tabRequestsBadge = document.getElementById("tabRequestsBadge");
-var gmReqToCard = document.getElementById("gmReqToCard");
-var gmReqToAvatar = document.getElementById("gmReqToAvatar");
-var gmReqToName = document.getElementById("gmReqToName");
-var gmReqToSub = document.getElementById("gmReqToSub");
+var gmReqToLineText = document.getElementById("gmReqToLineText");
 var gmReqTitleLabel = document.getElementById("gmReqTitleLabel");
 var gmReqDescLabel = document.getElementById("gmReqDescLabel");
 var gmReqCharCount = document.getElementById("gmReqCharCount");
@@ -9953,10 +9950,7 @@ var cachedGmReqFloors = null;
 function updateGmReqToCard(){
   var id = newRequestTo.value;
   var d = DEPTS[id];
-  gmReqToAvatar.textContent = d ? d.initials : (id || "").slice(0,2).toUpperCase();
-  gmReqToAvatar.style.background = d ? d.color : "#777";
-  gmReqToName.textContent = d ? d.name : id;
-  gmReqToSub.textContent = "Your request will be sent to " + (d ? d.name : id);
+  gmReqToLineText.textContent = "This request goes to " + (d ? d.name : id);
 }
 
 function populateRequestToOptions(){

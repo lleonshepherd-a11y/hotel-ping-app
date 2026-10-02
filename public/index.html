@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20261002t215215">
+<link rel="stylesheet" href="/styles.css?v=20261002t215649">
 </head>
 <body>
 
@@ -511,15 +511,11 @@
         </div>
       </div>
       <form class="gmreq-form" id="newRequestForm">
-        <label class="gmreq-to-card" id="gmReqToCard">
-          <span class="gmreq-to-avatar" id="gmReqToAvatar">GM</span>
-          <span class="gmreq-to-text">
-            <span class="gmreq-to-name" id="gmReqToName">General Manager</span>
-            <span class="gmreq-to-sub" id="gmReqToSub">Your request will be sent to the GM</span>
-          </span>
-          <svg class="gmreq-to-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          <select id="newRequestTo" class="gmreq-to-select" aria-label="Send to"></select>
-        </label>
+        <div class="gmreq-to-line" id="gmReqToLine">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          <span id="gmReqToLineText">This request goes to the General Manager</span>
+        </div>
+        <select id="newRequestTo" hidden aria-hidden="true"></select>
 
         <div class="gmreq-f-label">Request type</div>
         <div class="gmreq-type-row" id="gmReqTypeRow">
@@ -1745,6 +1741,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20261002t215215"></script>
+<script src="/app.js?v=20261002t215649"></script>
 </body>
 </html>

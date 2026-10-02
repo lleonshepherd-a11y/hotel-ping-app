@@ -1663,16 +1663,8 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .gmreq-f-label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--text-dim);margin-top:4px}
 .gmreq-optional{font-weight:600;color:var(--text-faint);text-transform:none;letter-spacing:0}
 
-.gmreq-to-card{
-  display:flex;align-items:center;gap:11px;position:relative;cursor:pointer;
-  background:var(--surface-2);border-radius:16px;padding:10px 12px;box-shadow:inset 0 0 0 1px var(--border);
-}
-.gmreq-to-avatar{flex:none;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:.02em}
-.gmreq-to-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.gmreq-to-name{font-size:14.5px;font-weight:800;color:var(--text)}
-.gmreq-to-sub{font-size:11.5px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gmreq-to-chev{flex:none;width:16px;height:16px;color:var(--text-faint)}
-.gmreq-to-select{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;appearance:none;-webkit-appearance:none;border:none}
+.gmreq-to-line{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--text-dim)}
+.gmreq-to-line svg{flex:none;width:14px;height:14px;color:var(--text-faint)}
 
 .gmreq-type-row{display:flex;flex-wrap:wrap;gap:8px}
 .gmreq-type-chip{
