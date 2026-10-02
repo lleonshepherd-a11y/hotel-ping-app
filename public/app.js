@@ -2113,11 +2113,22 @@ var TICK_SVG = '<svg viewBox="0 0 18 12" fill="none" stroke="currentColor" strok
 function fmtSignoffAmount(n){
   return "£" + Number(n).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// A big, impossible-to-miss red/amber/green status pill - the thin left
+// border alone wasn't visible enough at a glance.
+function ragBadgeHtml(ragClass, status){
+  var label = ragClass === "rag-red" ? "Urgent · pending"
+    : ragClass === "rag-amber" ? "Pending"
+    : (status === "declined" ? "Declined" : "Approved");
+  return '<div class="rag-badge ' + ragClass + '"><span class="rag-dot"></span>' + label + '</div>';
+}
 function buildSignoffCard(m){
   var s = m.signoff;
   var card = document.createElement("div");
   var signoffRag = s.status !== "pending" ? "rag-green" : (m.urgent ? "rag-red" : "rag-amber");
   card.className = "signoff-card " + s.status + " " + signoffRag;
+  var ragBadgeEl = document.createElement("div");
+  ragBadgeEl.innerHTML = ragBadgeHtml(signoffRag, s.status);
+  card.appendChild(ragBadgeEl.firstChild);
   var head = document.createElement("div");
   head.className = "signoff-head";
   head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Sign-off request' +
@@ -10294,6 +10305,7 @@ function buildRequestCard(m){
   var card = document.createElement("div");
   var ragClass = s.status !== "pending" ? "rag-green" : (m.urgent ? "rag-red" : "rag-amber");
   card.className = "missed-msg-card request-card " + ragClass + (m.pinned ? " pinned" : "");
+  var ragBadge = ragBadgeHtml(ragClass, s.status);
   var statusHtml;
   if(s.status === "pending" && !mine){
     statusHtml = '<div class="missed-approval-actions">' +
@@ -10314,6 +10326,7 @@ function buildRequestCard(m){
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
     '<div class="missed-msg-body">' +
+      ragBadge +
       (s.amount != null ? '<div class="request-amount-hero">' + esc(fmtSignoffAmount(s.amount)) + '</div>' : '<div class="request-amount-hero no-amount">No amount given</div>') +
       '<div class="missed-msg-top">' +
         (s.code ? '<span class="request-code-badge">' + esc(s.code) + '</span>' : '') +
