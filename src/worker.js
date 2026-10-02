@@ -721,20 +721,16 @@ async function notifyTicketStageEscalation(env, ctx, row, nextLevel, opts) {
   const creatorDept = fromNoirDept(row.creator_dept);
   if (creatorDept && creatorDept !== "maintenance") {
     const reporterBody = row.description + (row.room_number ? " (" + row.room_number + ")" : "");
+    // A ping only, not a chat message - this stays tied to the ticket
+    // (the push opens it straight to "/") instead of adding a loose line
+    // to the conversation; the ticket's own card already shows the
+    // current stage live, and the full history lives in its handoff trail.
     await notifyDepartment(env, creatorDept, {
       title: nextLevel === 2 ? opts.reporterBreachTitle : opts.reporterAtRiskTitle,
-      body: reporterBody,
+      body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
       url: "/",
       tag: "hotel-ping-ticket-" + opts.tag + "-reporter-" + row.id + "-" + nextLevel,
     }, null).catch((e) => console.error("notifyDepartment (" + opts.tag + " reporter) error:", e && e.stack || e));
-    // Plain text, not a card - the ticket's own card (posted when it was
-    // created) already updates live wherever it's pinned; attaching
-    // maintTicketId here would post a second full card every time this
-    // nudge fires instead of a one-line reminder.
-    await insertMessage(env, ctx, {
-      from: "maintenance", to: creatorDept, type: "text",
-      body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
-    }).catch((e) => console.error("insertMessage (" + opts.tag + " reporter) error:", e && e.stack || e));
   }
   await env.DB.prepare(
     `INSERT INTO maintenance_ticket_meta (ticket_id, escalation_level, escalated_at) VALUES (?, ?, ?)
@@ -4521,11 +4517,17 @@ export default {
         const creatorDept = fromNoirDept(existing.creator_dept);
         const statusNotice = { in_progress: "Started work on: ", fixed: "Fixed: " };
         if (statusNotice[status] && creatorDept !== "maintenance") {
+          // A ping, not a chat message - the ticket's own card (posted once,
+          // at creation) already updates live wherever it's pinned, so a
+          // separate text line here would just be the same update floating
+          // loose in the conversation instead of staying attached to it.
           const byName = request._staff.name ? request._staff.name + " – " : "";
-          await insertMessage(env, ctx, {
-            from: "maintenance", to: creatorDept, type: "text",
-            body: byName + statusNotice[status] + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
-          });
+          await notifyDepartment(env, creatorDept, {
+            title: status === "fixed" ? "✅ Fixed" : "🔧 Started work on this",
+            body: byName + existing.description + (existing.room_number ? " (" + existing.room_number + ")" : ""),
+            url: "/",
+            tag: "hotel-ping-ticket-status-" + id + "-" + status,
+          }, null).catch((e) => console.error("notifyDepartment (ticket status) error:", e && e.stack || e));
         }
 
         return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });

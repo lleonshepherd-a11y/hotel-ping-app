@@ -339,11 +339,8 @@ function notifyTicketStageEscalation(row, nextLevel, opts) {
   console.log('[escalation]', opts.tag, row.id, 'level', nextLevel, row.description);
   if (row.created_by && row.created_by !== 'maintenance') {
     const reporterBody = row.description + (row.room_number ? ' (' + row.room_number + ')' : '');
-    // Plain text, not a card - see the same note in src/worker.js.
-    insertMessage({
-      from: 'maintenance', to: row.created_by, type: 'text',
-      body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
-    });
+    // A ping only, not a chat message - see the same note in src/worker.js.
+    console.log('[notify]', row.created_by, (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody);
   }
   db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?')
     .run(new Date().toISOString(), nextLevel, row.id);
@@ -2999,12 +2996,10 @@ const server = http.createServer(async (req, res) => {
         'INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       ).run(crypto.randomUUID(), id, existing.status, status, maintRequester.id, maintRequester.name || null, maintRequester.department_id, now);
 
+      // A ping, not a chat message - see the same note in src/worker.js.
       const statusNotice = { in_progress: 'Started work on: ', fixed: 'Fixed: ' };
       if (statusNotice[status] && existing.created_by !== 'maintenance') {
-        insertMessage({
-          from: 'maintenance', to: existing.created_by, type: 'text',
-          body: statusNotice[status] + existing.description + (existing.room_number ? ' (' + existing.room_number + ')' : ''),
-        });
+        console.log('[notify]', existing.created_by, statusNotice[status] + existing.description);
       }
 
       return send(res, 200, { ticket: rowToTicket(row) });
