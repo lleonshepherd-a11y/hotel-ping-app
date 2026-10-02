@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20261002t153741">
+<link rel="stylesheet" href="/styles.css?v=20261002t182235">
 </head>
 <body>
 
@@ -380,22 +380,52 @@
         <span><b>Maintenance</b> is off duty right now. They'll still get this, just not until they're back on.</span>
       </div>
       <form class="maint-new-form" id="newMaintForm">
-        <div class="maint-input-icon-wrap">
-          <svg class="maint-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
-          <input type="text" id="newMaintRoom" placeholder="Location" required maxlength="40">
+        <div class="maint-form-title">Report an issue</div>
+        <div class="maint-form-sub">Report a maintenance job and track it through to fixed.</div>
+
+        <div class="maint-f-section">
+          <div class="maint-f-label"><span class="maint-f-label-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.3"/></svg></span>Where is the issue?</div>
+          <div class="maint-input-icon-wrap">
+            <svg class="maint-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/></svg>
+            <input type="text" id="newMaintRoom" placeholder="Type it in - e.g. &quot;Floor 1, Room 2&quot;" required maxlength="40">
+          </div>
+          <div class="maint-area-row" id="maintAreaRow">
+            <button type="button" class="maint-area-chip" data-area="guest_room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 10l9-7 9 7"/><path d="M5 9v11h14V9"/></svg>Guest room</button>
+            <button type="button" class="maint-area-chip" data-area="shared_space">Shared space</button>
+            <button type="button" class="maint-area-chip" data-area="back_of_house">Back of house</button>
+          </div>
         </div>
-        <div class="maint-input-icon-wrap">
-          <svg class="maint-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-          <textarea id="newMaintDesc" placeholder="What's wrong?" required maxlength="300" rows="2"></textarea>
+
+        <div class="maint-f-section">
+          <div class="maint-f-label"><span class="maint-f-label-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg></span>Type of issue</div>
+          <div class="maint-type-grid" id="maintTypeRow">
+            <button type="button" class="maint-type-chip" data-issue="plumbing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5S6 9 6 13.5a6 6 0 0 0 12 0C18 9 12 2.5 12 2.5z"/></svg>Plumbing</button>
+            <button type="button" class="maint-type-chip" data-issue="electrical"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 10-12h-7l1-8z"/></svg>Electrical</button>
+            <button type="button" class="maint-type-chip" data-issue="heating"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="9" width="4" height="9" rx="1"/><rect x="10" y="5" width="4" height="13" rx="1"/><rect x="16" y="12" width="4" height="6" rx="1"/></svg>Heating</button>
+            <button type="button" class="maint-type-chip" data-issue="furniture"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M5 18v2M19 18v2M3 12V9a2 2 0 0 1 2-2h3"/></svg>Furniture</button>
+            <button type="button" class="maint-type-chip wide" data-issue="other"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Other</button>
+          </div>
         </div>
-        <div class="maint-priority-row" id="maintPriorityRow">
-          <button type="button" class="maint-priority-chip" data-priority="safety">⚠ Safety</button>
-          <button type="button" class="maint-priority-chip" data-priority="guest">Guest impact</button>
-          <button type="button" class="maint-priority-chip active" data-priority="problem">Problem</button>
-          <button type="button" class="maint-priority-chip" data-priority="routine">Routine</button>
+
+        <div class="maint-f-section">
+          <div class="maint-f-label"><span class="maint-f-label-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg></span>What's happening?</div>
+          <div class="maint-input-icon-wrap maint-desc-wrap">
+            <svg class="maint-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <textarea id="newMaintDesc" placeholder="What's wrong?" required maxlength="300" rows="2"></textarea>
+          </div>
         </div>
+
+        <div class="maint-f-section">
+          <div class="maint-f-label"><span class="maint-f-label-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/></svg></span>How urgent is it?</div>
+          <div class="maint-priority-row" id="maintPriorityRow">
+            <button type="button" class="maint-priority-chip active" data-priority="routine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>Routine</button>
+            <button type="button" class="maint-priority-chip" data-priority="problem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l6 7-6 7M5 5l6 7-6 7"/></svg>Soon</button>
+            <button type="button" class="maint-priority-chip urgent-opt" data-priority="safety"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Urgent</button>
+          </div>
+        </div>
+
         <div class="maint-extra-row">
-          <label class="maint-checkbox"><input type="checkbox" id="newMaintGuestPresent"> Guest in room</label>
+          <label class="maint-checkbox"><input type="checkbox" id="newMaintGuestPresent"> Guest in room right now</label>
           <label class="maint-deadline-label">Needed by <input type="time" id="newMaintDeadline"></label>
         </div>
         <div class="maint-form-row">
@@ -407,10 +437,10 @@
           <button type="button" class="maint-voice-btn" id="maintVoiceBtn" aria-label="Record a voice note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M19 11a7 7 0 0 1-14 0"/><path d="M12 18v3"/></svg>
           </button>
-          <button type="submit" class="admin-add-btn maint-report-submit">Report issue
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </button>
         </div>
+        <button type="submit" class="maint-report-submit">Send request
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
         <div class="maint-voice-recording" id="maintVoiceRecording" hidden>
           <span class="maint-voice-dot"></span>
           <span class="maint-voice-timer" id="maintVoiceTimer">0:00</span>
@@ -1645,6 +1675,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20261002t153741"></script>
+<script src="/app.js?v=20261002t182235"></script>
 </body>
 </html>

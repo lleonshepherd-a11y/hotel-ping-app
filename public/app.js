@@ -224,6 +224,7 @@ function mapServerMessage(row, self){
     escalationLevel: row.escalationLevel || 0,
     affectsGuest: !!row.affectsGuest,
     staffName: row.staffName || undefined,
+    maintTicketId: row.maintTicketId || undefined,
     reactions: (row.reactions || []).map(function(r){ return { emoji: r.emoji, from: r.from === self ? "self" : r.from }; })
   };
 }
@@ -2275,6 +2276,81 @@ function buildTaskCard(m){
   return card;
 }
 
+// A maintenance ticket posted into chat only ever carries its id (see
+// insertMessage's maintTicketId) - the rich card itself is built from the
+// live ticket, cached here so repeated scrolls/renders of the same message
+// don't refetch, and refreshed in place (refreshMaintTicketCardInChat)
+// whenever an action elsewhere (take/fix/reporter-check) changes it.
+var maintTicketCache = {};
+var MAINT_URGENCY_DISPLAY = {
+  safety: { label: "Urgent", cls: "urgent" },
+  problem: { label: "Soon", cls: "soon" },
+  guest: { label: "Soon", cls: "soon" },
+  routine: { label: "Routine", cls: "routine" },
+};
+function buildMaintTicketCard(m){
+  var card = document.createElement("div");
+  card.className = "maint-ticket-card";
+  card.setAttribute("data-maint-ticket-id", m.maintTicketId);
+  var t = maintTicketCache[m.maintTicketId] || (STATE.tickets || []).find(function(x){ return x.id === m.maintTicketId; });
+  if(!t){
+    card.innerHTML = '<div class="maint-ticket-loading">Loading job…</div>';
+    apiGet('/api/maintenance/' + encodeURIComponent(m.maintTicketId)).then(function(res){
+      maintTicketCache[m.maintTicketId] = res.ticket;
+      renderMaintTicketCardInto(card, res.ticket);
+    }).catch(function(){
+      card.innerHTML = '<div class="maint-ticket-loading">Couldn\'t load this job</div>';
+    });
+    return card;
+  }
+  renderMaintTicketCardInto(card, t);
+  return card;
+}
+function renderMaintTicketCardInto(card, t){
+  maintTicketCache[t.id] = t;
+  var urg = MAINT_URGENCY_DISPLAY[t.priority] || MAINT_URGENCY_DISPLAY.routine;
+  var code = t.ticketNumber ? "HP-" + String(t.ticketNumber).padStart(4, "0") : "";
+  var html = '<div class="tk-head">' +
+      '<span class="tk-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg></span>' +
+      '<div><div class="tk-eyebrow">Maintenance request</div>' + (code ? '<div class="tk-code">' + esc(code) + '</div>' : '') + '</div>' +
+      '<span class="tk-urgency ' + urg.cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>' + urg.label + '</span>' +
+    '</div>' +
+    (t.roomNumber ? '<div class="tk-loc">' + esc(t.roomNumber) + '</div>' : '') +
+    '<div class="tk-desc">' + esc(t.description) + '</div>';
+
+  var midHtml = "";
+  if(t.photoUrl && !isTicketVideo(t)) midHtml += '<img class="tk-photo" src="' + esc(mediaUrl(t.photoUrl)) + '" alt="Issue photo">';
+  midHtml += t.ownerStaffId
+    ? '<div class="tk-owner-box ok"><div class="tk-owner-row"><span class="tk-owner-ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span><span class="tk-owner-title">Maintenance has this</span></div><div class="tk-owner-sub">' + (t.ownerNextNote ? esc(t.ownerNextNote) : "In progress") + (t.ownerEta ? " · ETA " + esc(t.ownerEta) : "") + '</div></div>'
+    : '<div class="tk-owner-box"><div class="tk-owner-row"><span class="tk-owner-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5"/></svg></span><span class="tk-owner-title">Maintenance stuff</span></div><div class="tk-owner-sub">Not picked up yet</div></div>';
+  html += '<div class="tk-mid">' + midHtml + '</div>';
+
+  if(t.status === "fixed"){
+    html += '<div class="tk-status-line fixed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Fixed' + (t.fixedByName ? " by " + esc(t.fixedByName) : "") + '</div>';
+  } else if(!t.ownerStaffId && canManageMaintenanceView()){
+    html += '<button type="button" class="tk-take-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2 20c0-3.3 3-5.5 7-5.5"/><path d="M17 7v6M14 10h6"/></svg>Take this request</button>';
+  }
+
+  html += '<div class="tk-foot"><span class="tk-foot-text">Raised by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</span>' +
+    '<span class="tk-foot-link">View handoff trail<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span></div>';
+
+  // card.querySelector, not document.getElementById - at this point the
+  // card may not be attached to the document yet (buildMaintTicketCard
+  // runs this before its caller appends the returned element), and
+  // getElementById only ever finds elements already in the live document.
+  card.innerHTML = html;
+  var takeBtn = card.querySelector(".tk-take-btn");
+  if(takeBtn) takeBtn.addEventListener("click", function(e){ e.stopPropagation(); takeTicketOwnership(t.id); });
+  var trailLink = card.querySelector(".tk-foot-link");
+  if(trailLink) trailLink.addEventListener("click", function(e){ e.stopPropagation(); openTicketDetail(t.id); });
+}
+function refreshMaintTicketCardInChat(ticket){
+  maintTicketCache[ticket.id] = ticket;
+  document.querySelectorAll('[data-maint-ticket-id="' + ticket.id + '"]').forEach(function(card){
+    renderMaintTicketCardInto(card, ticket);
+  });
+}
+
 function voteOnPoll(m, index){
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/vote', 'POST', { optionIndex: index }).then(function(res){
     var msgs = currentMessagesArray();
@@ -2575,6 +2651,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   if(m.poll) wrap.appendChild(buildPollCard(m));
   if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
   if(m.taskStatus) wrap.appendChild(buildTaskCard(m));
+  if(m.maintTicketId) wrap.appendChild(buildMaintTicketCard(m));
 
   if(m.reactions && m.reactions.length){
     var mine = m.reactions.filter(function(r){ return r.from === "self"; })[0];
@@ -8268,12 +8345,33 @@ var maintError = document.getElementById("maintError");
 var maintPhotoFile = null;
 var newMaintGuestPresent = document.getElementById("newMaintGuestPresent");
 var newMaintDeadline = document.getElementById("newMaintDeadline");
-var maintSelectedPriority = "problem";
+var maintSelectedPriority = "routine";
 var maintPriorityChips = document.querySelectorAll(".maint-priority-chip");
 maintPriorityChips.forEach(function(chip){
   chip.addEventListener("click", function(){
     maintSelectedPriority = chip.getAttribute("data-priority");
     maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
+  });
+});
+// Area/issue type are new, optional classifiers (neither blocks submit) -
+// tapping a selected chip again clears it, same toggle feel as the photo
+// attach button, rather than forcing one to always stay chosen.
+var maintSelectedArea = null;
+var maintAreaChips = document.querySelectorAll(".maint-area-chip");
+maintAreaChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    var val = chip.getAttribute("data-area");
+    maintSelectedArea = maintSelectedArea === val ? null : val;
+    maintAreaChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-area") === maintSelectedArea); });
+  });
+});
+var maintSelectedIssue = null;
+var maintTypeChips = document.querySelectorAll(".maint-type-chip");
+maintTypeChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    var val = chip.getAttribute("data-issue");
+    maintSelectedIssue = maintSelectedIssue === val ? null : val;
+    maintTypeChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-issue") === maintSelectedIssue); });
   });
 });
 STATE.tickets = STATE.tickets || [];
@@ -8644,12 +8742,27 @@ STATE.ticketDetailIndex = -1;
 
 function openTicketDetail(ticketId){
   var t = STATE.tickets.find(function(x){ return x.id === ticketId; });
-  if(!t) return;
-  STATE.ticketDetailQueue = sortedTickets().map(function(x){ return x.id; });
-  STATE.ticketDetailIndex = STATE.ticketDetailQueue.indexOf(ticketId);
-  ticketDetailOverlay.hidden = false;
-  appToast.classList.add("above-modal");
-  renderTicketDetail();
+  if(t){
+    STATE.ticketDetailQueue = sortedTickets().map(function(x){ return x.id; });
+    STATE.ticketDetailIndex = STATE.ticketDetailQueue.indexOf(ticketId);
+    ticketDetailOverlay.hidden = false;
+    appToast.classList.add("above-modal");
+    renderTicketDetail();
+    return;
+  }
+  // A reporter tapping "View handoff trail" from their own ticket's chat
+  // card never fetched the board (canManageMaintenanceView), so the ticket
+  // isn't in STATE.tickets yet - fetch just that one and open a single-item
+  // queue, rather than needing the whole (maintenance-only) board loaded.
+  apiGet('/api/maintenance/' + encodeURIComponent(ticketId)).then(function(res){
+    STATE.tickets = STATE.tickets || [];
+    STATE.tickets.push(res.ticket);
+    STATE.ticketDetailQueue = [ticketId];
+    STATE.ticketDetailIndex = 0;
+    ticketDetailOverlay.hidden = false;
+    appToast.classList.add("above-modal");
+    renderTicketDetail();
+  }).catch(function(){ showToast("Couldn't open that job"); });
 }
 function closeTicketDetail(){
   ticketDetailOverlay.hidden = true;
@@ -8662,7 +8775,7 @@ function renderTicketDetail(){
   var t = id && STATE.tickets.find(function(x){ return x.id === id; });
   if(!t){ closeTicketDetail(); return; }
 
-  var html = (t.ticketNumber ? '<div class="ticket-detail-number">Ticket #' + t.ticketNumber + '</div>' : '')
+  var html = (t.ticketNumber ? '<div class="ticket-detail-number">HP-' + String(t.ticketNumber).padStart(4,"0") + '</div>' : '')
     + '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
   var detailTagsHtml = "";
   if(t.priority === "safety") detailTagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
@@ -8683,6 +8796,19 @@ function renderTicketDetail(){
   }
   if(t.voiceUrl) html += '<div id="ticketVoicePlaceholder"></div>';
   html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
+  html += buildOwnerCardHtml(t);
+  if(t.status === "fixed" && t.needsReporterCheck){
+    html +=
+      '<div class="reporter-check-card">' +
+        '<div class="reporter-check-eyebrow"><span class="reporter-check-eyebrow-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>Once fixed, the reporter checks</div>' +
+        '<div class="reporter-check-title">Needs reporter check</div>' +
+        '<div class="reporter-check-sub">Confirm it\'s sorted, or send it back if it isn\'t.</div>' +
+        '<div class="reporter-check-actions">' +
+          '<button type="button" class="reporter-check-btn good" id="reporterCheckConfirmBtn"><span class="reporter-check-btn-top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>Fixed for me</span><span class="reporter-check-btn-sub">Close this job</span></button>' +
+          '<button type="button" class="reporter-check-btn bad" id="reporterCheckReopenBtn"><span class="reporter-check-btn-top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Still needs attention</span><span class="reporter-check-btn-sub">Reopen for the team</span></button>' +
+        '</div>' +
+      '</div>';
+  }
   if(t.status === "fixed" && (t.fixedReport || t.fixedPhotoUrl || t.fixedVoiceUrl)){
     html += '<div class="ticket-fixed-report">' +
       '<div class="ticket-fixed-report-label">Completion report' + (t.fixedByName ? ' · ' + esc(t.fixedByName) : '') + '</div>' +
@@ -8692,6 +8818,14 @@ function renderTicketDetail(){
       '</div>';
   }
   ticketDetailBody.innerHTML = html;
+  var ownerTakeBtn = document.getElementById("ticketOwnerTakeBtn");
+  if(ownerTakeBtn) ownerTakeBtn.addEventListener("click", function(){ takeTicketOwnership(t.id); });
+  var ownerEditBtn = document.getElementById("ticketOwnerEditBtn");
+  if(ownerEditBtn) ownerEditBtn.addEventListener("click", function(){ promptTicketNextStep(t.id, t); });
+  var reporterConfirmBtn = document.getElementById("reporterCheckConfirmBtn");
+  if(reporterConfirmBtn) reporterConfirmBtn.addEventListener("click", function(){ resolveReporterCheck(t.id, "confirm"); });
+  var reporterReopenBtn = document.getElementById("reporterCheckReopenBtn");
+  if(reporterReopenBtn) reporterReopenBtn.addEventListener("click", function(){ resolveReporterCheck(t.id, "reopen"); });
   if(t.voiceUrl){
     // Same rich waveform player used for voice messages in chat, rather
     // than a bare native <audio controls> - play/pause, seek, speed.
@@ -8716,22 +8850,16 @@ function renderTicketDetail(){
     renderTicketDetail();
   }));
 
-  var historyWrap = document.createElement("div");
-  historyWrap.className = "ticket-history";
-  historyWrap.innerHTML = '<div class="ticket-history-label">History</div><div class="ticket-history-list" id="ticketHistoryList"><div class="ticket-replies-loading">Loading…</div></div>';
-  ticketDetailBody.appendChild(historyWrap);
-  loadAndRenderTicketHistory(t.id);
-
-  var repliesWrap = document.createElement("div");
-  repliesWrap.className = "ticket-replies";
-  repliesWrap.innerHTML = '<div class="ticket-replies-list" id="ticketRepliesList"><div class="ticket-replies-loading">Loading…</div></div>' +
+  var trailWrap = document.createElement("div");
+  trailWrap.className = "ticket-trail";
+  trailWrap.innerHTML = '<div class="ticket-trail-label">Handoff trail</div><div class="ticket-trail-list" id="ticketTrailList"><div class="ticket-replies-loading">Loading…</div></div>' +
     '<div class="ticket-reply-row">'+
-      '<input type="text" id="ticketReplyInput" placeholder="Reply about this job…" maxlength="500">'+
+      '<input type="text" id="ticketReplyInput" placeholder="Add an update…" maxlength="500">'+
       '<button type="button" id="ticketReplyVoiceBtn" aria-label="Record a voice reply"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg></button>'+
       '<button type="button" id="ticketReplySendBtn">Send</button>'+
     '</div>';
-  ticketDetailBody.appendChild(repliesWrap);
-  loadAndRenderTicketReplies(t.id);
+  ticketDetailBody.appendChild(trailWrap);
+  loadAndRenderHandoffTrail(t.id);
   document.getElementById("ticketReplySendBtn").addEventListener("click", function(){ sendTicketReply(t.id); });
   document.getElementById("ticketReplyInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); sendTicketReply(t.id); } });
   setupTicketReplyVoiceBtn(t.id);
@@ -8740,58 +8868,73 @@ function renderTicketDetail(){
   ticketDetailPrev.disabled = STATE.ticketDetailIndex <= 0;
   ticketDetailNext.disabled = STATE.ticketDetailIndex >= STATE.ticketDetailQueue.length - 1;
 }
-function renderTicketReplies(list){
-  var el = document.getElementById("ticketRepliesList");
+var TRAIL_LABELS = {
+  started: "Started work", fixed: "Marked fixed", owner_assigned: "Assigned",
+  confirmed_fixed: "Confirmed fixed", reopened: "Reopened", reported: "Reported",
+};
+function trailEventKind(h){
+  if(!h.fromStatus) return "reported";
+  if(h.toStatus === "in_progress" && h.fromStatus === "fixed") return "reopened";
+  if(h.toStatus === "in_progress") return "started";
+  if(h.toStatus === "fixed") return "fixed";
+  if(h.toStatus === "owner_assigned") return "owner_assigned";
+  if(h.toStatus === "confirmed_fixed") return "confirmed_fixed";
+  return "started";
+}
+var TRAIL_ICONS = {
+  reported: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.4-3.4a5 5 0 0 1-6.4 6.4l-6.9 6.9a2 2 0 0 1-2.8-2.8l6.9-6.9a5 5 0 0 1 6.4-6.4l-3.4 3.4z"/></svg>',
+  started: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  owner_assigned: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5"/></svg>',
+  fixed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  confirmed_fixed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  reopened: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+};
+function renderHandoffTrail(ticketId, history, replies){
+  var el = document.getElementById("ticketTrailList");
   if(!el) return;
-  if(!list.length){ el.innerHTML = '<div class="ticket-replies-empty">No replies yet</div>'; return; }
+  var items = history.map(function(h){
+    return { kind: "status", eventKind: trailEventKind(h), who: h.byName || (DEPTS[h.byDepartment] ? DEPTS[h.byDepartment].name : h.byDepartment), createdAt: h.createdAt };
+  }).concat(replies.map(function(r){
+    return { kind: "reply", who: DEPTS[r.from] ? DEPTS[r.from].name : r.from, createdAt: r.createdAt, text: r.text, voiceUrl: r.voiceUrl, voiceDuration: r.voiceDuration };
+  })).sort(function(a, b){ return new Date(a.createdAt) - new Date(b.createdAt); });
+
+  if(!items.length){ el.innerHTML = '<div class="ticket-replies-empty">Nothing logged yet</div>'; return; }
   el.innerHTML = "";
-  list.forEach(function(r){
-    var name = DEPTS[r.from] ? DEPTS[r.from].name : r.from;
+  items.forEach(function(item, i){
     var row = document.createElement("div");
-    row.className = "ticket-reply";
-    row.innerHTML = '<div class="ticket-reply-head"><b>'+esc(name)+'</b><span>'+fmtClock(new Date(r.createdAt).getTime())+'</span></div>';
-    if(r.text){
-      var textEl = document.createElement("div");
-      textEl.className = "ticket-reply-text";
-      textEl.textContent = r.text;
-      row.appendChild(textEl);
-    }
-    if(r.voiceUrl){
-      var voiceNode = buildAudioNode({ url: r.voiceUrl, duration: r.voiceDuration });
+    row.className = "trail-item";
+    var dotClass = item.kind === "reply" ? "" : " " + item.eventKind;
+    var icon = item.kind === "reply"
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4A8.4 8.4 0 1 1 21 11.5z"/></svg>'
+      : (TRAIL_ICONS[item.eventKind] || "");
+    row.innerHTML =
+      '<div class="trail-rail"><div class="trail-dot' + dotClass + '">' + icon + '</div>' + (i < items.length - 1 ? '<div class="trail-line"></div>' : '') + '</div>' +
+      '<div class="trail-body">' +
+        '<div class="trail-top"><span class="trail-time">' + fmtClock(new Date(item.createdAt).getTime()) + '</span><span class="trail-name">' + esc(item.who || "") + '</span></div>' +
+        '<div class="trail-text">' + esc(item.kind === "reply" ? (item.text || "") : (TRAIL_LABELS[item.eventKind] || item.eventKind)) + '</div>' +
+      '</div>';
+    if(item.kind === "reply" && item.voiceUrl){
+      var voiceNode = buildAudioNode({ url: item.voiceUrl, duration: item.voiceDuration });
       voiceNode.classList.add("ticket-reply-voice");
-      row.appendChild(voiceNode);
+      row.querySelector(".trail-body").appendChild(voiceNode);
     }
     el.appendChild(row);
   });
-  el.scrollTop = el.scrollHeight;
 }
-function renderTicketHistory(list){
-  var el = document.getElementById("ticketHistoryList");
-  if(!el) return;
-  if(!list.length){ el.innerHTML = '<div class="ticket-replies-empty">No history yet</div>'; return; }
-  el.innerHTML = list.map(function(h){
-    var who = h.byName ? h.byName : (DEPTS[h.byDepartment] ? DEPTS[h.byDepartment].name : h.byDepartment);
-    var label = h.fromStatus ? "Reported" : "Reported";
-    if(h.toStatus === "in_progress") label = "Started work";
-    else if(h.toStatus === "fixed") label = "Marked fixed";
-    else if(h.toStatus === "reported" && h.fromStatus) label = "Reopened";
-    return '<div class="ticket-history-row"><b>'+esc(label)+'</b> by '+esc(who)+' · '+fmtNoteTime(h.createdAt)+'</div>';
-  }).join("");
-}
-function loadAndRenderTicketHistory(ticketId){
-  apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/history').then(function(res){
-    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketHistory(res.history);
-  }).catch(function(){
-    var el = document.getElementById("ticketHistoryList");
-    if(el) el.innerHTML = '<div class="ticket-replies-empty">Couldn\'t load history</div>';
-  });
-}
-function loadAndRenderTicketReplies(ticketId){
-  apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies').then(function(res){
+function loadAndRenderHandoffTrail(ticketId){
+  Promise.all([
+    apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/history'),
+    apiGet('/api/maintenance/' + encodeURIComponent(ticketId) + '/replies'),
+  ]).then(function(results){
     STATE.ticketReplies = STATE.ticketReplies || {};
-    STATE.ticketReplies[ticketId] = res.replies;
-    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(res.replies);
-  }).catch(function(){});
+    STATE.ticketReplies[ticketId] = results[1].replies;
+    STATE.ticketHistory = STATE.ticketHistory || {};
+    STATE.ticketHistory[ticketId] = results[0].history;
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderHandoffTrail(ticketId, results[0].history, results[1].replies);
+  }).catch(function(){
+    var el = document.getElementById("ticketTrailList");
+    if(el) el.innerHTML = '<div class="ticket-replies-empty">Couldn\'t load the trail</div>';
+  });
 }
 function sendTicketReply(ticketId){
   var input = document.getElementById("ticketReplyInput");
@@ -8803,7 +8946,7 @@ function sendTicketReply(ticketId){
     STATE.ticketReplies = STATE.ticketReplies || {};
     STATE.ticketReplies[ticketId] = STATE.ticketReplies[ticketId] || [];
     STATE.ticketReplies[ticketId].push(res.reply);
-    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(STATE.ticketReplies[ticketId]);
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderHandoffTrail(ticketId, STATE.ticketHistory[ticketId] || [], STATE.ticketReplies[ticketId]);
   }).catch(function(){ showToast("Couldn't send that"); });
 }
 function sendTicketVoiceReply(ticketId, blob, duration){
@@ -8815,8 +8958,62 @@ function sendTicketVoiceReply(ticketId, blob, duration){
     STATE.ticketReplies = STATE.ticketReplies || {};
     STATE.ticketReplies[ticketId] = STATE.ticketReplies[ticketId] || [];
     STATE.ticketReplies[ticketId].push(res.reply);
-    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderTicketReplies(STATE.ticketReplies[ticketId]);
+    if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === ticketId) renderHandoffTrail(ticketId, STATE.ticketHistory[ticketId] || [], STATE.ticketReplies[ticketId]);
   }).catch(function(){ showToast("Couldn't send that voice reply"); });
+}
+function buildOwnerCardHtml(t){
+  var canManage = canManageMaintenanceView();
+  if(!t.ownerStaffId){
+    return '<div class="ticket-owner-card unassigned">' +
+      '<div class="ticket-owner-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5"/></svg></div>' +
+      '<div class="ticket-owner-body"><div class="ticket-owner-title">Not yet assigned</div><div class="ticket-owner-sub">' + (canManage ? "Tap to take this job on." : "Maintenance hasn't picked this up yet.") + '</div></div>' +
+      (canManage ? '<button type="button" class="ticket-owner-take-btn" id="ticketOwnerTakeBtn">Take this</button>' : '') +
+    '</div>';
+  }
+  var mine = AUTH.staff && t.ownerStaffId === AUTH.staff.id;
+  var nextHtml = (t.ownerNextNote || t.ownerEta)
+    ? '<div class="ticket-owner-next">' + (t.ownerNextNote ? 'Next: <b>' + esc(t.ownerNextNote) + '</b>' : 'In progress') + (t.ownerEta ? ' · ETA ' + esc(t.ownerEta) : '') + '</div>'
+    : '<div class="ticket-owner-next">In progress</div>';
+  return '<div class="ticket-owner-card">' +
+    '<div class="ticket-owner-dot"></div>' +
+    '<div class="ticket-owner-body"><div class="ticket-owner-title">' + (mine ? "You own this job" : "Owned by Maintenance") + '</div>' + nextHtml + '</div>' +
+    (mine ? '<button type="button" class="ticket-owner-edit-btn" id="ticketOwnerEditBtn" aria-label="Update next step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>' : '') +
+  '</div>';
+}
+function takeTicketOwnership(ticketId){
+  // Reuses /status rather than /owner - moving a job to in_progress already
+  // auto-assigns owner_staff_id to whoever made the call (see that
+  // handler), so "taking" a request and starting work on it are the same
+  // action here, exactly like tapping "Start work" on the Repairs board.
+  apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/status', 'POST', { status: "in_progress" }).then(function(res){
+    updateLocalTicket(res.ticket);
+    showToast("You've got this job");
+  }).catch(function(){ showToast("Couldn't take that job"); });
+}
+function promptTicketNextStep(ticketId, t){
+  showPrompt({ title: "What's the next step?", placeholder: "e.g. Check the tap and post an update", value: t.ownerNextNote || "", maxLength: 200, confirmLabel: "Next" }).then(function(note){
+    if(note === null) return;
+    showPrompt({ title: "ETA (optional)", placeholder: "e.g. 11:30", value: t.ownerEta || "", maxLength: 40, confirmLabel: "Save" }).then(function(eta){
+      if(eta === null) eta = t.ownerEta || "";
+      apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/owner', 'POST', { nextNote: note, eta: eta }).then(function(res){
+        updateLocalTicket(res.ticket);
+      }).catch(function(){ showToast("Couldn't save that"); });
+    });
+  });
+}
+function resolveReporterCheck(ticketId, action){
+  apiSend('/api/maintenance/' + encodeURIComponent(ticketId) + '/reporter-check', 'POST', { action: action }).then(function(res){
+    updateLocalTicket(res.ticket);
+    showToast(action === "confirm" ? "Closed - thanks!" : "Reopened for the team");
+  }).catch(function(){ showToast("Couldn't update that"); });
+}
+function updateLocalTicket(updated){
+  STATE.tickets = STATE.tickets || [];
+  var idx = STATE.tickets.findIndex(function(x){ return x.id === updated.id; });
+  if(idx !== -1) STATE.tickets[idx] = updated; else STATE.tickets.unshift(updated);
+  if(STATE.ticketDetailQueue[STATE.ticketDetailIndex] === updated.id) renderTicketDetail();
+  if(canManageMaintenanceView()) renderMaintenanceBoard();
+  refreshMaintTicketCardInChat(updated);
 }
 // Tap to start, tap again to stop and send straight away - kept deliberately
 // simple (no preview/re-record step) to match how quick a text reply is.
@@ -9406,10 +9603,12 @@ newMaintForm.addEventListener("submit", function(e){
     description: description,
     roomNumber: roomNumber,
     priority: maintSelectedPriority,
+    areaType: maintSelectedArea || undefined,
+    issueType: maintSelectedIssue || undefined,
     guestPresent: newMaintGuestPresent.checked,
     deadline: newMaintDeadline.value || undefined,
   };
-  var submitBtn = newMaintForm.querySelector(".admin-add-btn");
+  var submitBtn = newMaintForm.querySelector(".maint-report-submit");
   var originalBtnLabel = submitBtn.textContent;
   submitBtn.disabled = true;
   submitBtn.textContent = "Reporting…";
@@ -9452,8 +9651,12 @@ newMaintForm.addEventListener("submit", function(e){
     maintVoiceClear();
     newMaintGuestPresent.checked = false;
     newMaintDeadline.value = "";
-    maintSelectedPriority = "problem";
-    maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "problem"); });
+    maintSelectedPriority = "routine";
+    maintPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "routine"); });
+    maintSelectedArea = null;
+    maintAreaChips.forEach(function(c){ c.classList.remove("active"); });
+    maintSelectedIssue = null;
+    maintTypeChips.forEach(function(c){ c.classList.remove("active"); });
     showToast(res.merged ? "Already reported. Added your note to it" : (isOnDuty("maintenance") ? "Reported" : "Reported. Maintenance is off duty, they'll see it once they're back on"));
     // The toast alone is easy to miss while still looking at the form that
     // was just filled in - a clear confirmation right on the button itself

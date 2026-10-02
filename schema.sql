@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS messages (
   poll_votes TEXT,
   escalation_level INTEGER NOT NULL DEFAULT 0,
   affects_guest INTEGER NOT NULL DEFAULT 0,
+  maint_ticket_id TEXT,
   dashboard_conversation_id TEXT,
   room_clean TEXT,
   from_staff_name TEXT,
@@ -250,7 +251,12 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
   fixed_photo_path TEXT,
   fixed_voice_path TEXT,
   fixed_voice_duration INTEGER,
-  fixed_by_name TEXT
+  fixed_by_name TEXT,
+  area_type TEXT,
+  issue_type TEXT,
+  owner_eta TEXT,
+  owner_next_note TEXT,
+  needs_reporter_check INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_maintenance_status ON maintenance_tickets(status, created_at);
 

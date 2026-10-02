@@ -607,6 +607,25 @@ if (!maintenanceColumns.includes('fixed_report')) {
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_voice_duration INTEGER');
   db.exec('ALTER TABLE maintenance_tickets ADD COLUMN fixed_by_name TEXT');
 }
+if (!maintenanceColumns.includes('area_type')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN area_type TEXT');
+}
+if (!maintenanceColumns.includes('issue_type')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN issue_type TEXT');
+}
+if (!maintenanceColumns.includes('owner_eta')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN owner_eta TEXT');
+}
+if (!maintenanceColumns.includes('owner_next_note')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN owner_next_note TEXT');
+}
+if (!maintenanceColumns.includes('needs_reporter_check')) {
+  db.exec('ALTER TABLE maintenance_tickets ADD COLUMN needs_reporter_check INTEGER NOT NULL DEFAULT 0');
+}
+
+if (!messageColumns.includes('maint_ticket_id')) {
+  db.exec('ALTER TABLE messages ADD COLUMN maint_ticket_id TEXT');
+}
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS blockers (

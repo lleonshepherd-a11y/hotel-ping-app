@@ -93,6 +93,8 @@ const TASK_STATUSES = ['not_started', 'in_progress', 'completed'];
 const MAINT_STATUSES = ['reported', 'in_progress', 'fixed'];
 const MAINT_PRIORITIES = ['safety', 'guest', 'problem', 'routine'];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
+const MAINT_AREA_TYPES = ['guest_room', 'shared_space', 'back_of_house'];
+const MAINT_ISSUE_TYPES = ['plumbing', 'electrical', 'heating', 'furniture', 'other'];
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ['new', 'in_progress', 'completed'];
 const ASSET_STATUSES = ['requested', 'borrowed', 'returned'];
@@ -152,6 +154,11 @@ function rowToTicket(row) {
     fixedVoiceUrl: row.fixed_voice_path ? '/uploads/' + row.fixed_voice_path : undefined,
     fixedVoiceDuration: row.fixed_voice_duration || undefined,
     fixedByName: row.fixed_by_name || undefined,
+    areaType: row.area_type || undefined,
+    issueType: row.issue_type || undefined,
+    ownerEta: row.owner_eta || undefined,
+    ownerNextNote: row.owner_next_note || undefined,
+    needsReporterCheck: !!row.needs_reporter_check,
   };
 }
 function rowToBlocker(row) {
@@ -258,6 +265,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
     staffName: hide ? null : (row.from_staff_name || undefined),
+    maintTicketId: row.maint_ticket_id || undefined,
   };
 }
 function reactionsMap(messageIds) {
@@ -434,8 +442,8 @@ function insertMessage(opts) {
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
   try {
     db.prepare(`
-      INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id, maint_ticket_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, opts.from, opts.to || null, opts.type,
       opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -454,7 +462,8 @@ function insertMessage(opts) {
       opts.dashboardConversationId || null,
       opts.roomClean || null,
       opts.fromStaffName || null,
-      opts.clientMessageId || null
+      opts.clientMessageId || null,
+      opts.maintTicketId || null
     );
   } catch (err) {
     // A retried send carries the same clientMessageId as the original -
@@ -576,6 +585,13 @@ function canViewAsSelf(requester, self) {
 }
 function canManageMaintenance(requester) {
   return requester.department_id === 'maintenance' || requester.department_id === 'gm' || !!requester.is_admin;
+}
+// Local dev tracks a ticket's reporter at department level only (created_by
+// is a department id here, not a staff id like production's NOIR_DB table) -
+// so the reporter check here is "same department", the closest local
+// equivalent of src/worker.js's per-staff canViewTicket.
+function canViewTicket(requester, ticket) {
+  return canManageMaintenance(requester) || requester.department_id === ticket.created_by;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -2750,6 +2766,8 @@ const server = http.createServer(async (req, res) => {
       const guestPresent = !!body.guestPresent;
       let deadline = body.deadline ? String(body.deadline).trim() : null;
       if (deadline && !DEADLINE_RE.test(deadline)) deadline = null;
+      const areaType = MAINT_AREA_TYPES.includes(body.areaType) ? body.areaType : null;
+      const issueType = MAINT_ISSUE_TYPES.includes(body.issueType) ? body.issueType : null;
 
       if (roomNumber) {
         const dup = db.prepare(
@@ -2791,8 +2809,8 @@ const server = http.createServer(async (req, res) => {
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
       db.prepare(
-        "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
-      ).run(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now);
+        "INSERT INTO maintenance_tickets (id, room_number, description, photo_path, status, priority, guest_present, deadline, created_by, created_at, updated_at, area_type, issue_type) VALUES (?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(id, roomNumber, description, photoPath, priority, guestPresent ? 1 : 0, deadline, requester.department_id, now, now, areaType, issueType);
       db.prepare(
         "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, NULL, 'reported', ?, ?, ?, ?)"
       ).run(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, now);
@@ -2801,13 +2819,25 @@ const server = http.createServer(async (req, res) => {
       if (guestPresent) notifyBody += ' · Guest in room';
       if (deadline) notifyBody += ' · Needed by ' + deadline;
       console.log('[maintenance notify] maintenance department:', notifyBody);
+      if (requester.department_id !== 'maintenance') {
+        let chatBody = description;
+        if (guestPresent) chatBody += ' · Guest in room';
+        if (deadline) chatBody += ' · Needed by ' + deadline;
+        insertMessage({
+          from: requester.department_id, to: 'maintenance', type: photoPath ? 'image' : 'text',
+          body: '🔧 New ticket: ' + chatBody, maintTicketId: id,
+          fileName: photoPath ? 'Issue photo' : undefined, filePath: photoPath || undefined,
+          roomNumber: roomNumber || null,
+        });
+      }
       return send(res, 201, { ticket: rowToTicket(row) });
     }
 
     if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.endsWith('/replies')) {
-      const replyRequester = staffFromToken(req);
-      if (!canManageMaintenance(replyRequester)) return send(res, 403, { error: 'Not authorized' });
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
+      const ticketForAuth = db.prepare('SELECT id, created_by FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!ticketForAuth) return send(res, 404, { error: 'Ticket not found' });
+      if (!canViewTicket(staffFromToken(req), ticketForAuth)) return send(res, 403, { error: 'Not authorized' });
       const rows = db.prepare('SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC').all(id);
       return send(res, 200, { replies: rows.map(rowToTicketReply) });
     }
@@ -2816,7 +2846,7 @@ const server = http.createServer(async (req, res) => {
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/replies'.length));
       const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       if (!existing) return send(res, 404, { error: 'Ticket not found' });
-      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
+      if (!canViewTicket(staffFromToken(req), existing)) return send(res, 403, { error: 'Not authorized' });
       const body = await readJsonBody(req);
       const text = String(body.text || '').trim();
       let voicePath = null;
@@ -2890,11 +2920,12 @@ const server = http.createServer(async (req, res) => {
       db.prepare(`UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ?,
           fixed_report = COALESCE(?, fixed_report), fixed_photo_path = COALESCE(?, fixed_photo_path),
           fixed_voice_path = COALESCE(?, fixed_voice_path), fixed_voice_duration = COALESCE(?, fixed_voice_duration),
-          fixed_by_name = COALESCE(?, fixed_by_name)
+          fixed_by_name = COALESCE(?, fixed_by_name), needs_reporter_check = ?
         WHERE id = ?`)
         .run(status, now, status === 'fixed' ? now : null, newOwner,
           fixedReport || null, fixedPhotoPath, fixedVoicePath, fixedVoiceDuration,
           status === 'fixed' ? (maintRequester.name || null) : null,
+          status === 'fixed' ? 1 : 0,
           id);
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
 
@@ -2916,8 +2947,10 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.endsWith('/history')) {
-      if (!canManageMaintenance(staffFromToken(req))) return send(res, 403, { error: 'Not authorized' });
       const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/history'.length));
+      const ticketForAuth = db.prepare('SELECT id, created_by FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!ticketForAuth) return send(res, 404, { error: 'Ticket not found' });
+      if (!canViewTicket(staffFromToken(req), ticketForAuth)) return send(res, 403, { error: 'Not authorized' });
       const rows = db.prepare('SELECT * FROM maintenance_ticket_status_log WHERE ticket_id = ? ORDER BY created_at ASC').all(id);
       return send(res, 200, {
         history: rows.map((r) => ({
@@ -2940,12 +2973,66 @@ const server = http.createServer(async (req, res) => {
         return send(res, 403, { error: "Only Maintenance or the GM can assign a ticket's owner" });
       }
       const body = await readJsonBody(req);
+      const reassigning = Object.prototype.hasOwnProperty.call(body, 'staffId');
       const staffId = body.staffId || null;
-      if (staffId) {
+      if (reassigning && staffId && staffId !== requester.id) {
         const staffRow = db.prepare("SELECT id FROM staff WHERE id = ? AND department_id = 'maintenance'").get(staffId);
         if (!staffRow) return send(res, 400, { error: 'Not a Maintenance staff member' });
       }
-      db.prepare('UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?').run(staffId, id);
+      // node:sqlite's run() rejects an undefined bind value outright (unlike
+      // D1, which tolerates it) - null is the only valid "leave it alone"
+      // signal here, same effect via the COALESCE in the UPDATE.
+      const eta = body.eta != null ? (String(body.eta).trim().slice(0, 40) || null) : null;
+      const nextNote = body.nextNote != null ? (String(body.nextNote).trim().slice(0, 200) || null) : null;
+      db.prepare(
+        'UPDATE maintenance_tickets SET owner_staff_id = ?, owner_eta = COALESCE(?, owner_eta), owner_next_note = COALESCE(?, owner_next_note) WHERE id = ?'
+      ).run(reassigning ? staffId : existing.owner_staff_id, eta, nextNote, id);
+      if (reassigning && staffId && staffId !== existing.owner_staff_id) {
+        db.prepare(
+          "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, NULL, 'owner_assigned', ?, ?, ?, ?)"
+        ).run(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, new Date().toISOString());
+      }
+      const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'GET' && p.startsWith('/api/maintenance/') && p.split('/').length === 4) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length));
+      const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!row) return send(res, 404, { error: 'Ticket not found' });
+      if (!canViewTicket(staffFromToken(req), row)) return send(res, 403, { error: 'Not authorized' });
+      return send(res, 200, { ticket: rowToTicket(row) });
+    }
+
+    if (req.method === 'POST' && p.startsWith('/api/maintenance/') && p.endsWith('/reporter-check')) {
+      const id = decodeURIComponent(p.slice('/api/maintenance/'.length, -'/reporter-check'.length));
+      const existing = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
+      if (!existing) return send(res, 404, { error: 'Ticket not found' });
+      const requester = staffFromToken(req);
+      if (!canViewTicket(requester, existing)) return send(res, 403, { error: 'Not authorized' });
+      if (existing.status !== 'fixed' || !existing.needs_reporter_check) {
+        return send(res, 400, { error: "This job isn't waiting on a reporter check" });
+      }
+      const body = await readJsonBody(req);
+      const action = body.action;
+      if (action !== 'confirm' && action !== 'reopen') return send(res, 400, { error: 'Invalid action' });
+      const now = new Date().toISOString();
+      if (action === 'confirm') {
+        db.prepare('UPDATE maintenance_tickets SET needs_reporter_check = 0, updated_at = ? WHERE id = ?').run(now, id);
+        db.prepare(
+          "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, 'fixed', 'confirmed_fixed', ?, ?, ?, ?)"
+        ).run(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, now);
+      } else {
+        db.prepare(
+          "UPDATE maintenance_tickets SET status = 'in_progress', needs_reporter_check = 0, resolved_at = NULL, updated_at = ? WHERE id = ?"
+        ).run(now, id);
+        db.prepare(
+          "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, 'fixed', 'in_progress', ?, ?, ?, ?)"
+        ).run(crypto.randomUUID(), id, requester.id, requester.name || null, requester.department_id, now);
+        if (existing.created_by !== 'maintenance') {
+          console.log('[maintenance notify] maintenance department: Reopened: still needs attention -', existing.description);
+        }
+      }
       const row = db.prepare('SELECT * FROM maintenance_tickets WHERE id = ?').get(id);
       return send(res, 200, { ticket: rowToTicket(row) });
     }

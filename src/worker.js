@@ -85,6 +85,13 @@ const TASK_STATUSES = ["not_started", "in_progress", "completed"];
 const MAINT_STATUSES = ["reported", "in_progress", "fixed"];
 const MAINT_PRIORITIES = ["safety", "guest", "problem", "routine"];
 const MAINT_PRIORITY_RANK = { safety: 0, guest: 1, problem: 2, routine: 3 };
+// Newer, simpler fields shown on the redesigned report form - independent of
+// the (unchanged) priority enum above, which the client maps its 3-option
+// urgency picker onto (routine->routine, soon->problem, urgent->safety) so
+// every existing priority-driven feature (card color, overdue tags, the
+// "safety issue reported" notification title) keeps working untouched.
+const MAINT_AREA_TYPES = ["guest_room", "shared_space", "back_of_house"];
+const MAINT_ISSUE_TYPES = ["plumbing", "electrical", "heating", "furniture", "other"];
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ["new", "in_progress", "completed"];
 const ASSET_STATUSES = ["requested", "borrowed", "returned"];
@@ -140,6 +147,13 @@ function extractRoomNumberFromText(text) {
 // whoever happens to be signed in.
 function canManageMaintenance(requester) {
   return requester.department_id === "maintenance" || requester.department_id === "gm" || !!requester.is_admin;
+}
+// The reporter of a job can always see its own live status and handoff
+// trail (and confirm/reopen it once fixed) even though they can't see the
+// rest of the Maintenance board - it's their request, not Maintenance's
+// internal queue.
+function canViewTicket(requester, ticket) {
+  return canManageMaintenance(requester) || requester.id === ticket.created_by_staff_id;
 }
 function bytesToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -548,9 +562,10 @@ async function checkUnnotifiedTickets(env, ctx) {
       await insertMessage(env, ctx, {
         from: originDept, to: "maintenance", type: t.photo_path ? (isVideoFile ? "file" : "image") : "text",
         body: "🔧 New ticket #" + ticketNumber + ": " + chatBody,
+        maintTicketId: t.id,
         fileName: t.photo_path ? (isVideoFile ? "Issue video" : "Issue photo") : undefined,
         filePath: t.photo_path || undefined,
-        roomNumber: t.room_number || null, taskStatus: "not_started",
+        roomNumber: t.room_number || null,
       });
     } else {
       console.error("Unnotified ticket " + t.id + ": reporting department could not be resolved (creator_dept=" + t.creator_dept + "), no chat message sent");
@@ -830,8 +845,8 @@ async function insertMessage(env, ctx, opts) {
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   try {
     await env.DB.prepare(
-      `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id, maint_ticket_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       id, opts.from, opts.to || null, opts.type,
       opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -850,7 +865,8 @@ async function insertMessage(env, ctx, opts) {
       opts.dashboardConversationId || null,
       opts.roomClean || null,
       opts.fromStaffName || null,
-      opts.clientMessageId || null
+      opts.clientMessageId || null,
+      opts.maintTicketId || null
     ).run();
   } catch (err) {
     // A retried send (e.g. the app resending after a dropped connection)
@@ -887,7 +903,7 @@ async function insertMessage(env, ctx, opts) {
     poll_question: opts.poll ? opts.poll.question : null, poll_options: pollOptionsJson, poll_votes: opts.poll ? "{}" : null,
     escalation_level: 0, affects_guest: opts.affectsGuest ? 1 : 0,
     dashboard_conversation_id: opts.dashboardConversationId || null, from_staff_name: opts.fromStaffName || null,
-    client_message_id: opts.clientMessageId || null,
+    client_message_id: opts.clientMessageId || null, maint_ticket_id: opts.maintTicketId || null,
   };
   if (opts.hotelId) {
     const auditPromise = logAuditEvent(env, opts.hotelId, {
@@ -976,6 +992,12 @@ function mergeTicketRow(core, meta) {
     fixed_voice_path: core.fixed_voice_path,
     fixed_voice_duration: core.fixed_voice_duration,
     fixed_by_name: core.fixed_by_name,
+    area_type: core.area_type,
+    issue_type: core.issue_type,
+    owner_eta: core.owner_eta,
+    owner_next_note: core.owner_next_note,
+    needs_reporter_check: core.needs_reporter_check,
+    created_by_staff_id: core.created_by_staff_id,
   };
 }
 function rowToTicket(row) {
@@ -1005,6 +1027,12 @@ function rowToTicket(row) {
     fixedVoiceUrl: row.fixed_voice_path ? "/uploads/" + row.fixed_voice_path : undefined,
     fixedVoiceDuration: row.fixed_voice_duration || undefined,
     fixedByName: row.fixed_by_name || undefined,
+    areaType: row.area_type || undefined,
+    issueType: row.issue_type || undefined,
+    ownerEta: row.owner_eta || undefined,
+    ownerNextNote: row.owner_next_note || undefined,
+    needsReporterCheck: !!row.needs_reporter_check,
+    createdByStaffId: row.created_by_staff_id || undefined,
   };
 }
 function rowToBlocker(row) {
@@ -1252,6 +1280,7 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
     staffName: hide ? null : (row.from_staff_name || undefined),
+    maintTicketId: row.maint_ticket_id || undefined,
   };
 }
 function rowToStaff(row) {
@@ -4092,6 +4121,8 @@ export default {
         const guestPresent = !!body.guestPresent;
         let deadline = body.deadline ? String(body.deadline).trim() : null;
         if (deadline && !DEADLINE_RE.test(deadline)) deadline = null;
+        const areaType = MAINT_AREA_TYPES.includes(body.areaType) ? body.areaType : null;
+        const issueType = MAINT_ISSUE_TYPES.includes(body.issueType) ? body.issueType : null;
 
         if (roomNumber) {
           const dup = await env.NOIR_DB.prepare(
@@ -4163,8 +4194,8 @@ export default {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
         await env.NOIR_DB.prepare(
-          "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, voice_path, voice_duration, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?)"
-        ).bind(id, resolvedNoirHotelId, roomNumber, description, photoPath, voicePath, voiceDuration, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now).run();
+          "INSERT INTO maintenance_tickets (id, hotel_id, room_number, description, photo_path, voice_path, voice_duration, status, priority, guest_present, deadline, created_by_staff_id, created_at, updated_at, area_type, issue_type) VALUES (?, ?, ?, ?, ?, ?, ?, 'reported', ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(id, resolvedNoirHotelId, roomNumber, description, photoPath, voicePath, voiceDuration, priority, guestPresent ? 1 : 0, deadline, requester.id, now, now, areaType, issueType).run();
         // The meta row's own rowid is a free, guaranteed-unique, always-
         // incrementing integer - reused as the ticket's human-facing
         // number (#N) rather than adding a separate counter to track.
@@ -4178,6 +4209,8 @@ export default {
           status: "reported", priority,
           guest_present: guestPresent ? 1 : 0, deadline, creator_dept: toNoirDept(requester.department_id),
           created_at: now, updated_at: now, resolved_at: null, owner_staff_id: null,
+          area_type: areaType, issue_type: issueType, owner_eta: null, owner_next_note: null,
+          needs_reporter_check: 0, created_by_staff_id: requester.id,
         };
 
         let notifyBody = "#" + ticketNumber + " " + (roomNumber ? "Room " + roomNumber + ": " : "") + description;
@@ -4203,9 +4236,10 @@ export default {
           const chatMessagePromise = insertMessage(env, ctx, {
             from: requester.department_id, to: "maintenance", type: photoPath ? (isVideoAttachment ? "file" : "image") : "text",
             body: "🔧 New ticket #" + ticketNumber + ": " + chatBody,
+            maintTicketId: id,
             fileName: photoPath ? (isVideoAttachment ? "Issue video" : "Issue photo") : undefined,
             filePath: photoPath || undefined, fileSize: photoSize || undefined,
-            roomNumber: roomNumber || null, taskStatus: "not_started",
+            roomNumber: roomNumber || null,
           }).catch((e) => console.error("insertMessage (new maintenance ticket) error:", e && e.stack || e));
           if (ctx && ctx.waitUntil) ctx.waitUntil(chatMessagePromise); else await chatMessagePromise;
           // A voice note rides along as its own ping right behind the main
@@ -4233,20 +4267,22 @@ export default {
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
-        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
+        const ticketForAuth = await env.NOIR_DB.prepare("SELECT id, created_by_staff_id FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!ticketForAuth) return json({ error: "Ticket not found" }, 404);
+        if (!canViewTicket(request._staff, ticketForAuth)) return json({ error: "Not authorized" }, 403);
         const rows = await env.NOIR_DB.prepare("SELECT * FROM maintenance_replies WHERE ticket_id = ? ORDER BY created_at ASC").bind(id).all();
         return json({ replies: rows.results.map((r) => rowToTicketReply(noirReplyRow(r))) });
       }
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/replies")) {
-        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/replies".length));
         const existing = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
         ).bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
+        if (!canViewTicket(request._staff, existing)) return json({ error: "Not authorized" }, 403);
         const body = await readJsonBody(request);
         const text = String(body.text || "").trim();
         let voicePath = null;
@@ -4341,12 +4377,17 @@ export default {
           `UPDATE maintenance_tickets SET status = ?, updated_at = ?, resolved_at = ?, owner_staff_id = ?,
              fixed_report = COALESCE(?, fixed_report), fixed_photo_path = COALESCE(?, fixed_photo_path),
              fixed_voice_path = COALESCE(?, fixed_voice_path), fixed_voice_duration = COALESCE(?, fixed_voice_duration),
-             fixed_by_name = COALESCE(?, fixed_by_name)
+             fixed_by_name = COALESCE(?, fixed_by_name), needs_reporter_check = ?
            WHERE id = ?`
         ).bind(
           status, now, status === "fixed" ? now : null, newOwner,
           fixedReport || null, fixedPhotoPath, fixedVoicePath, fixedVoiceDuration,
           status === "fixed" ? (request._staff.name || null) : null,
+          // Fixing a job opens the two-step reporter-confirm flow; moving it
+          // any other way (reopened, restarted) always clears it, so a stale
+          // "needs reporter check" card never lingers on a ticket that's no
+          // longer actually marked fixed.
+          status === "fixed" ? 1 : 0,
           id
         ).run();
         const row = await env.NOIR_DB.prepare(
@@ -4377,8 +4418,10 @@ export default {
       }
 
       if (method === "GET" && p.startsWith("/api/maintenance/") && p.endsWith("/history")) {
-        if (!canManageMaintenance(request._staff)) return json({ error: "Not authorized" }, 403);
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/history".length));
+        const ticketForAuth = await env.NOIR_DB.prepare("SELECT id, created_by_staff_id FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        if (!ticketForAuth) return json({ error: "Ticket not found" }, 404);
+        if (!canViewTicket(request._staff, ticketForAuth)) return json({ error: "Not authorized" }, 403);
         const rows = await env.DB.prepare(
           "SELECT * FROM maintenance_ticket_status_log WHERE ticket_id = ? ORDER BY created_at ASC"
         ).bind(id).all();
@@ -4396,19 +4439,106 @@ export default {
 
       if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/owner")) {
         const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/owner".length));
-        const existing = await env.NOIR_DB.prepare("SELECT id FROM maintenance_tickets WHERE id = ?").bind(id).first();
+        const existing = await env.NOIR_DB.prepare("SELECT id, owner_staff_id FROM maintenance_tickets WHERE id = ?").bind(id).first();
         if (!existing) return json({ error: "Ticket not found" }, 404);
         if (!canManageMaintenance(request._staff)) {
           return json({ error: "Only Maintenance or the GM can assign a ticket's owner" }, 403);
         }
         const body = await readJsonBody(request);
+        // staffId is only present when actually reassigning ownership - a
+        // viewer just updating their own "next step/ETA" note sends neither
+        // key, which the COALESCE(?, owner_staff_id) below leaves untouched.
+        const reassigning = Object.prototype.hasOwnProperty.call(body, "staffId");
         const staffId = body.staffId || null;
-        if (staffId) {
+        // Self-assigning ("Take this request") needs no extra check - the
+        // actor already passed canManageMaintenance above, same as the
+        // existing auto-assign-on-status-change behaviour below, which has
+        // never restricted owner_staff_id to maintenance-department staff
+        // specifically (a GM taking something on is a normal case). Naming
+        // a *different* staff member as owner is the rarer, more consequential
+        // action - that one still has to actually be on Maintenance.
+        if (reassigning && staffId && staffId !== request._staff.id) {
           const staffRow = await env.NOIR_DB.prepare("SELECT id FROM staff WHERE id = ? AND department_id = ? AND active = 1")
             .bind(staffId, NOIR_DEPT_ID_MAP.maintenance).first();
           if (!staffRow) return json({ error: "Not a Maintenance staff member" }, 400);
         }
-        await env.NOIR_DB.prepare("UPDATE maintenance_tickets SET owner_staff_id = ? WHERE id = ?").bind(staffId, id).run();
+        const eta = body.eta != null ? String(body.eta).trim().slice(0, 40) || null : null;
+        const nextNote = body.nextNote != null ? String(body.nextNote).trim().slice(0, 200) || null : null;
+        await env.NOIR_DB.prepare(
+          `UPDATE maintenance_tickets SET
+             owner_staff_id = ?,
+             owner_eta = COALESCE(?, owner_eta),
+             owner_next_note = COALESCE(?, owner_next_note)
+           WHERE id = ?`
+        ).bind(reassigning ? staffId : existing.owner_staff_id, eta, nextNote, id).run();
+        if (reassigning && staffId && staffId !== existing.owner_staff_id) {
+          await env.DB.prepare(
+            "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, NULL, 'owner_assigned', ?, ?, ?, ?)"
+          ).bind(crypto.randomUUID(), id, request._staff.id, request._staff.name || null, request._staff.department_id, new Date().toISOString()).run();
+        }
+        const row = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
+        const meta = (await ticketMetaMap(env, [id]))[id];
+        return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
+      }
+
+      if (method === "GET" && p.startsWith("/api/maintenance/") && p.split("/").length === 4) {
+        // Single-ticket fetch, scoped to whoever can see it - used to resolve
+        // the rich card on a maintenance-ticket chat message for a reporter
+        // who never opened the Repairs board (so has no cached ticket list).
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length));
+        const row = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
+        if (!row) return json({ error: "Ticket not found" }, 404);
+        if (!canViewTicket(request._staff, row)) return json({ error: "Not authorized" }, 403);
+        const meta = (await ticketMetaMap(env, [id]))[id];
+        return json({ ticket: rowToTicket(mergeTicketRow(row, meta)) });
+      }
+
+      if (method === "POST" && p.startsWith("/api/maintenance/") && p.endsWith("/reporter-check")) {
+        const id = decodeURIComponent(p.slice("/api/maintenance/".length, -"/reporter-check".length));
+        const existing = await env.NOIR_DB.prepare(
+          `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
+           LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
+        ).bind(id).first();
+        if (!existing) return json({ error: "Ticket not found" }, 404);
+        // The two-step close is the reporter's call - maintenance can also
+        // act on their behalf (e.g. reporter's off shift), same as every
+        // other ticket action a department head can cover for their team.
+        if (!canViewTicket(request._staff, existing)) return json({ error: "Not authorized" }, 403);
+        if (existing.status !== "fixed" || !existing.needs_reporter_check) {
+          return json({ error: "This job isn't waiting on a reporter check" }, 400);
+        }
+        const body = await readJsonBody(request);
+        const action = body.action;
+        if (action !== "confirm" && action !== "reopen") return json({ error: "Invalid action" }, 400);
+        const now = new Date().toISOString();
+        if (action === "confirm") {
+          await env.NOIR_DB.prepare("UPDATE maintenance_tickets SET needs_reporter_check = 0, updated_at = ? WHERE id = ?").bind(now, id).run();
+          await env.DB.prepare(
+            "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, 'fixed', 'confirmed_fixed', ?, ?, ?, ?)"
+          ).bind(crypto.randomUUID(), id, request._staff.id, request._staff.name || null, request._staff.department_id, now).run();
+        } else {
+          await env.NOIR_DB.prepare(
+            "UPDATE maintenance_tickets SET status = 'in_progress', needs_reporter_check = 0, resolved_at = NULL, updated_at = ? WHERE id = ?"
+          ).bind(now, id).run();
+          await env.DB.prepare(
+            "INSERT INTO maintenance_ticket_status_log (id, ticket_id, from_status, to_status, changed_by_staff_id, changed_by_name, changed_by_department_id, created_at) VALUES (?, ?, 'fixed', 'in_progress', ?, ?, ?, ?)"
+          ).bind(crypto.randomUUID(), id, request._staff.id, request._staff.name || null, request._staff.department_id, now).run();
+          const creatorDept = fromNoirDept(existing.creator_dept);
+          if (creatorDept !== "maintenance") {
+            const notifyPromise = notifyDepartment(env, "maintenance", {
+              title: "🔧 Reopened: still needs attention",
+              body: (request._staff.name ? request._staff.name + " – " : "") + existing.description,
+              url: "/", tag: "hotel-ping-maintenance-" + id,
+            }, creatorDept).catch(function(e){ console.error("notifyDepartment (reporter reopen) error:", e && e.stack || e); });
+            if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
+          }
+        }
         const row = await env.NOIR_DB.prepare(
           `SELECT mt.*, s.department_id AS creator_dept FROM maintenance_tickets mt
            LEFT JOIN staff s ON s.id = mt.created_by_staff_id WHERE mt.id = ?`
