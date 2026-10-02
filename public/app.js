@@ -6323,7 +6323,7 @@ var tabGuestsBtn = document.getElementById("tabGuestsBtn");
 var tabRequestsBtn = document.getElementById("tabRequestsBtn");
 var tabRoomsBtn = document.getElementById("tabRoomsBtn");
 function showTab(tab){
-  bottomTabs.hidden = tab === "chat";
+  bottomTabs.hidden = false;
   chatFloatBar.hidden = tab !== "chat";
   profilePage.hidden = tab !== "profile";
   chatPage.hidden = tab !== "chat";

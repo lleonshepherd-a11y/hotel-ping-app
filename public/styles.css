@@ -88,9 +88,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   position:relative;
   z-index:1;
 }
-.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+.sb-page{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;scrollbar-width:none;padding-bottom:calc(60px + env(safe-area-inset-bottom))}
 .chatlist-float-bar{
-  position:absolute;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:6;
+  position:absolute;right:16px;bottom:calc(60px + env(safe-area-inset-bottom));z-index:6;
   display:flex;align-items:center;pointer-events:none;
 }
 .chatlist-float-bar > *{pointer-events:auto}
@@ -213,11 +213,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 .chatlist-title-row{display:flex;align-items:center;gap:2px;padding:14px 10px 0 6px}
 .chatlist-title{font-size:19px;font-weight:800;letter-spacing:-.2px;color:var(--text);flex:1;text-align:center}
-.chatlist-back-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text);flex:none;margin-left:-2px}
+.chatlist-back-btn{width:34px;height:34px;border-radius:50%;border:none;background:#fff;box-shadow:0 1px 3px rgba(20,20,15,.1), inset 0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;color:var(--text);flex:none;margin-left:-2px}
 .chatlist-back-btn svg{width:23px;height:23px}
 .chatlist-filter-wrap{position:relative;flex:none}
 .chatlist-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px 0}
-.chatlist-burger,.chatlist-dots-btn{width:34px;height:34px;border-radius:50%;border:none;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--text);flex:none}
+.chatlist-burger,.chatlist-dots-btn{width:34px;height:34px;border-radius:50%;border:none;background:#fff;box-shadow:0 1px 3px rgba(20,20,15,.1), inset 0 0 0 1px var(--border);display:flex;align-items:center;justify-content:center;color:var(--text);flex:none}
 .chatlist-burger:active,.chatlist-burger.active,.chatlist-dots-btn:active,.chatlist-dots-btn.active{background:var(--surface-3)}
 .chatlist-burger svg{width:20px;height:20px;flex:none}
 .chatlist-dots-btn svg{width:18px;height:18px;flex:none}
@@ -389,7 +389,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 #pushPrompt .push-prompt-dismiss svg{width:8px;height:8px}
 #pushPrompt .push-prompt-dismiss:hover{background:var(--text)}
 .inline-share-ic{width:13px;height:13px;vertical-align:-2px;color:var(--accent)}
-.thread-list{flex:1;overflow-y:auto;padding:0 0 14px;scrollbar-width:none}
+.thread-list{flex:1;overflow-y:auto;padding:0 0 calc(76px + env(safe-area-inset-bottom));scrollbar-width:none}
 .thread-list::-webkit-scrollbar{display:none}
 .thread-item-wrap{position:relative;overflow:hidden}
 .thread-item{
