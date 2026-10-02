@@ -2113,7 +2113,7 @@ function buildSignoffCard(m){
   card.className = "signoff-card " + s.status;
   var head = document.createElement("div");
   head.className = "signoff-head";
-  head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg> HOD SIGN-OFF REQUEST' +
+  head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Sign-off request' +
     (s.code ? ' <span class="signoff-code">'+esc(s.code)+'</span>' : '') + '</span>' +
     (s.amount != null ? '<span class="signoff-amount">'+fmtSignoffAmount(s.amount)+'</span>' : '<span class="signoff-amount no-amount">No amount given</span>');
   card.appendChild(head);
@@ -2133,14 +2133,14 @@ function buildSignoffCard(m){
   if(s.target){
     var target = document.createElement("div");
     target.className = "signoff-target";
-    target.innerHTML = 'Target: <b>'+esc(s.target)+'</b>';
+    target.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>'+esc(s.target);
     card.appendChild(target);
   }
 
   if(s.guestInfo){
     var guestInfo = document.createElement("div");
     guestInfo.className = "signoff-target";
-    guestInfo.innerHTML = 'Guest: <b>'+esc(s.guestInfo)+'</b>';
+    guestInfo.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg>'+esc(s.guestInfo);
     card.appendChild(guestInfo);
   }
 

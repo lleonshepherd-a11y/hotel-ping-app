@@ -822,26 +822,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .task-card.done{--task-stage-color:#2f9a5c}
 .task-card.done .task-card-chip{color:#2f9a5c;background:rgba(47,154,92,.14)}
 
-.signoff-card{margin-top:2px;margin-bottom:4px;width:min(300px,78vw);border-radius:16px;padding:12px 14px;background:linear-gradient(160deg,rgba(77,132,245,.16),rgba(77,132,245,.05));border:1px solid rgba(77,132,245,.4);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-.signoff-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
-.signoff-head-label{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.05em;color:#5d94f6}
-.signoff-head-label svg{width:12px;height:12px}
-.signoff-amount{font-size:18px;font-weight:800;color:#7dabf8;font-variant-numeric:tabular-nums}
-.signoff-amount.no-amount{font-size:12.5px;font-weight:700;color:var(--text-faint);opacity:.85}
-.signoff-code{font-weight:800;margin-left:2px;color:#3a63b8;background:rgba(77,132,245,.16);border-radius:6px;padding:2px 6px;letter-spacing:.02em}
-.signoff-category{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#5d94f6;background:rgba(77,132,245,.16);padding:2px 8px;border-radius:8px;margin-bottom:5px}
-.signoff-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
-.signoff-target{font-size:12px;color:var(--text-dim);margin-bottom:8px}
-.signoff-actions{display:flex;gap:8px;margin-top:2px}
-.signoff-decline-btn{flex:1;border:1px solid var(--border);background:var(--surface);color:#c0392b;font-size:12.5px;font-weight:700;border-radius:12px;padding:8px 10px}
-.signoff-approve-btn{flex:1.3;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:none;background:linear-gradient(150deg,var(--accent),var(--accent-2));color:#fff;font-size:12.5px;font-weight:700;border-radius:12px;padding:8px 10px}
-.signoff-approve-btn svg{width:13px;height:13px}
-.signoff-status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.03em;padding:6px 10px;border-radius:10px}
-.signoff-status-badge svg{width:12px;height:12px}
-.signoff-status-badge.pending{color:var(--text-dim);background:var(--surface-3);font-weight:600;letter-spacing:normal}
-.signoff-status-badge.approved{color:#2f9a5c;background:rgba(47,154,92,.14)}
-.signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.12)}
-.signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 .signoff-accent{background:linear-gradient(180deg,#e0902c,#b3760f)}
 .room-clean-card{margin-top:2px;margin-bottom:4px;width:min(320px,82vw);display:flex;align-items:center;gap:10px;padding:12px;border-radius:18px;background:#fff;box-shadow:0 6px 20px -6px rgba(15,15,20,.22),0 0 0 1px rgba(20,20,15,.06);-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 .room-clean-icon{flex:none;width:44px;height:44px;border-radius:50%;background:rgba(77,132,245,.14);color:#4d84f5;display:flex;align-items:center;justify-content:center}
@@ -1258,6 +1238,53 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-btn.success{background:#2f9a5c}
 .admin-add-form .admin-add-btn{width:100%;padding:10px 14px}
 .admin-add-error{width:100%;font-size:12px;color:var(--urgent);font-weight:600}
+
+/* ---- Sign-off request form ---- */
+.signoff-modal{width:460px}
+.admin-modal-head:has(.signoff-modal-head-text){align-items:flex-start}
+.signoff-modal-head-text h2{margin-bottom:6px}
+.signoff-modal-head-text .broadcast-hint{margin:0}
+.signoff-form{gap:10px}
+.signoff-field{position:relative}
+.signoff-field-ic{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--text-faint);pointer-events:none}
+.signoff-form input,.signoff-form select{padding:11px 12px 11px 40px;border-radius:13px;font-size:15px}
+.signoff-submit{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  border-radius:999px;background:var(--text);padding:12px 16px;font-size:14px;
+}
+.signoff-submit svg{width:16px;height:16px}
+
+/* ---- Sign-off card (in the thread) ---- */
+.signoff-card{
+  position:relative;margin-top:2px;margin-bottom:4px;width:min(300px,78vw);
+  border-radius:16px;padding:14px 14px 14px 18px;
+  background:#fff;box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+}
+.signoff-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3.5px;border-radius:3px;background:#e0902c}
+.signoff-card.approved::before{background:#2f9a5c}
+.signoff-card.declined::before{background:#c0392b}
+.signoff-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.signoff-head-label{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--text-faint)}
+.signoff-head-label svg{width:12px;height:12px}
+.signoff-amount{font-size:19px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;line-height:1}
+.signoff-amount.no-amount{font-size:11.5px;font-weight:700;color:var(--text-faint);opacity:.85}
+.signoff-code{font-weight:800;margin-left:2px;color:var(--text-dim);background:var(--surface-2);border-radius:6px;padding:2px 6px;letter-spacing:.02em}
+.signoff-category{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--text-dim);background:var(--surface-2);padding:4px 9px;border-radius:999px;margin-bottom:7px}
+.signoff-category::before{content:"";width:6px;height:6px;border-radius:50%;background:#e0902c;flex:none}
+.signoff-title{font-size:15px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:6px}
+.signoff-target{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-dim);margin-bottom:4px}
+.signoff-target svg{width:13px;height:13px;flex:none;color:var(--text-faint)}
+.signoff-actions{display:flex;gap:8px;margin-top:8px}
+.signoff-decline-btn{flex:1;border:1.5px solid var(--border);background:#fff;color:#c0392b;font-size:12.5px;font-weight:700;border-radius:999px;padding:9px 10px}
+.signoff-approve-btn{flex:1.3;display:inline-flex;align-items:center;justify-content:center;gap:5px;border:none;background:#2f9a5c;color:#fff;font-size:12.5px;font-weight:700;border-radius:999px;padding:9px 10px}
+.signoff-approve-btn svg{width:13px;height:13px}
+.signoff-status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;letter-spacing:.03em;padding:7px 11px;border-radius:999px;width:100%;box-sizing:border-box;justify-content:center}
+.signoff-status-badge svg{width:12px;height:12px}
+.signoff-status-badge.pending{color:var(--text-dim);background:var(--surface-2);font-weight:600;letter-spacing:normal}
+.signoff-status-badge.approved{color:#2f9a5c;background:rgba(47,154,92,.12)}
+.signoff-status-badge.declined{color:#c0392b;background:rgba(192,57,43,.1)}
+.signoff-decided-by{font-weight:600;text-transform:none;letter-spacing:normal;opacity:.8}
 #pollOptionsList{display:flex;flex-direction:column;gap:8px}
 .poll-option-input{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px}
 .handover-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;max-height:340px;overflow-y:auto;padding:2px}
@@ -1654,6 +1681,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card{position:relative;background:#fff;border:1px solid var(--border);border-radius:18px;padding:14px 16px 14px 38px;box-shadow:0 2px 10px -5px rgba(15,15,20,.1);touch-action:pan-y;transition:transform .18s ease;will-change:transform;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:pointer}
 .maint-card-handle{position:absolute;left:0;top:0;bottom:0;width:34px;display:flex;align-items:center;justify-content:center;color:var(--text-faint);touch-action:none;cursor:grab}
 .maint-card-handle::before{content:"";position:absolute;left:5px;top:50%;transform:translateY(-50%);width:20px;height:34px;border-radius:9px;background:var(--surface-2)}
+/* Handle's pill track doubles as an at-a-glance status accent, same
+   red/amber/green language as task cards elsewhere in the app. */
+.status-reported .maint-card-handle::before{background:rgba(214,73,60,.16)}
+.status-in_progress .maint-card-handle::before{background:rgba(224,144,44,.2)}
+.status-fixed .maint-card-handle::before{background:rgba(47,154,92,.18)}
 .maint-card-handle svg{position:relative;width:14px;height:18px}
 .maint-card.dragging .maint-card-handle{color:var(--accent)}
 .maint-card.dragging{z-index:20;box-shadow:0 22px 40px -12px rgba(0,0,0,.45),0 8px 16px -6px rgba(0,0,0,.3)}
@@ -1675,13 +1707,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .maint-card-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
 .maint-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;background:var(--surface-2);color:var(--text-dim)}
 .maint-tag-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
-.tag-safety{color:#d6493c}
-.tag-guest{color:#b3760f}
+.tag-safety{color:#d6493c;background:rgba(214,73,60,.12)}
+.tag-guest{color:#b3760f;background:rgba(224,144,44,.14)}
 .tag-routine{color:var(--text-dim)}
 .tag-present{color:var(--text-dim)}
 .tag-deadline{color:var(--text-dim)}
-.tag-overdue{color:#c62828}
-.tag-stale{color:#c62828}
+.tag-overdue{color:#c62828;background:rgba(198,40,40,.12)}
+.tag-stale{color:#c62828;background:rgba(198,40,40,.12)}
 .maint-card-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:8px;padding-top:1px}
 .maint-status-chip{flex:none;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap}
 .status-reported .maint-status-chip{background:rgba(214,73,60,.14);color:#c0392b}
