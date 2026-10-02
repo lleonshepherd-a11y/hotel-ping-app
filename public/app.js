@@ -308,7 +308,18 @@ function buildData(self){
     // assigned someone - an unassigned one would be a dead end to message.
     var assignedHeads = Object.keys(DEPT_HEADS).map(function(id){ return "head_" + id; })
       .filter(function(id){ return id !== self; });
-    others = others.concat(assignedHeads);
+    // Interleaved (two departments, two heads, repeating) rather than every
+    // head dumped after all the departments - this is only the base order
+    // behind whatever's actually driving the list (recency, or a saved
+    // custom drag order), so it mainly shows while nothing has a more
+    // recent message to sort by yet.
+    var merged = [];
+    var di = 0, hi = 0;
+    while(di < others.length || hi < assignedHeads.length){
+      for(var k = 0; k < 2 && di < others.length; k++) merged.push(others[di++]);
+      for(var k2 = 0; k2 < 2 && hi < assignedHeads.length; k2++) merged.push(assignedHeads[hi++]);
+    }
+    others = merged;
     // Fetch the currently open thread first so it's ready fastest, then the
     // rest in small batches - firing all of them at once (there can be 15+
     // once heads are assigned) queues behind the browser's per-host
