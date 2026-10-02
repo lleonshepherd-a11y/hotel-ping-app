@@ -339,10 +339,10 @@ function notifyTicketStageEscalation(row, nextLevel, opts) {
   console.log('[escalation]', opts.tag, row.id, 'level', nextLevel, row.description);
   if (row.created_by && row.created_by !== 'maintenance') {
     const reporterBody = row.description + (row.room_number ? ' (' + row.room_number + ')' : '');
+    // Plain text, not a card - see the same note in src/worker.js.
     insertMessage({
       from: 'maintenance', to: row.created_by, type: 'text',
       body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
-      maintTicketId: row.id,
     });
   }
   db.prepare('UPDATE maintenance_tickets SET escalated_at = ?, escalation_level = ? WHERE id = ?')

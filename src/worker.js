@@ -727,10 +727,13 @@ async function notifyTicketStageEscalation(env, ctx, row, nextLevel, opts) {
       url: "/",
       tag: "hotel-ping-ticket-" + opts.tag + "-reporter-" + row.id + "-" + nextLevel,
     }, null).catch((e) => console.error("notifyDepartment (" + opts.tag + " reporter) error:", e && e.stack || e));
+    // Plain text, not a card - the ticket's own card (posted when it was
+    // created) already updates live wherever it's pinned; attaching
+    // maintTicketId here would post a second full card every time this
+    // nudge fires instead of a one-line reminder.
     await insertMessage(env, ctx, {
       from: "maintenance", to: creatorDept, type: "text",
       body: (nextLevel === 2 ? opts.reporterMsgBreach : opts.reporterMsgAtRisk) + reporterBody,
-      maintTicketId: row.id,
     }).catch((e) => console.error("insertMessage (" + opts.tag + " reporter) error:", e && e.stack || e));
   }
   await env.DB.prepare(
