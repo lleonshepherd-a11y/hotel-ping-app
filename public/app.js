@@ -2799,7 +2799,6 @@ var optPhoto = document.getElementById("optPhoto");
 var optPdf = document.getElementById("optPdf");
 var optCamera = document.getElementById("optCamera");
 var urgentToggleBtn = document.getElementById("urgentToggleBtn");
-var optAffectsGuest = document.getElementById("optAffectsGuest");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
 var optSignoff = document.getElementById("optSignoff");
@@ -2810,7 +2809,6 @@ var attachPreviewHost = document.getElementById("attachPreview");
 var composer = document.getElementById("composer");
 var composerLocked = document.getElementById("composerLocked");
 var urgentActive = false;
-var affectsGuestActive = false;
 var taskActive = false;
 
 function focusInput(){ setTimeout(function(){ try{ msgInput.focus(); }catch(e){} }, 30); }
@@ -3053,11 +3051,6 @@ urgentToggleBtn.addEventListener("click", function(){
   urgentToggleBtn.classList.toggle("active", urgentActive);
   composer.classList.toggle("urgent-mode", urgentActive);
   refreshSendState();
-});
-optAffectsGuest.addEventListener("click", function(){
-  affectsGuestActive = !affectsGuestActive;
-  optAffectsGuest.classList.toggle("active", affectsGuestActive);
-  closeHeaderMenu();
 });
 optRoom.addEventListener("click", function(){
   closeHeaderMenu();
@@ -3723,7 +3716,6 @@ function doSendReal(){
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
-  var wasAffectsGuest = affectsGuestActive;
   var wasTask = taskActive;
   var wasSignoff = signoffActive;
   var signoffPayload = signoffData;
@@ -3735,11 +3727,9 @@ function doSendReal(){
   urgentActive = false;
   urgentToggleBtn.classList.remove("active");
   composer.classList.remove("urgent-mode");
-  affectsGuestActive = false;
-  optAffectsGuest.classList.remove("active");
   refreshSendState();
 
-  var payload = { from: STATE.self, urgent: wasUrgent, affectsGuest: wasAffectsGuest };
+  var payload = { from: STATE.self, urgent: wasUrgent, affectsGuest: false };
   if(groupId){ payload.groupId = groupId; payload.mentions = extractMentions(text, groupId); } else payload.to = deptId;
   if(STATE.replyingTo) payload.replyToId = STATE.replyingTo.id;
   clearReplyBar();
