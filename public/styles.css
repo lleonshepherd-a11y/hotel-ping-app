@@ -227,7 +227,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   color:var(--text-faint);
 }
 .chatlist-search-bar svg{width:15px;height:15px;flex:none}
-.chatlist-search-bar input{flex:1;min-width:0;border:none;background:none;font-size:13.5px;color:var(--text);font-family:inherit}
+.chatlist-search-bar input{flex:1;min-width:0;border:none;background:none;font-size:16px;color:var(--text);font-family:inherit}
 .chatlist-search-bar input::placeholder{color:var(--text-faint)}
 .chatlist-search-bar input:focus{outline:none}
 .chatlist-search-bar button{flex:none;border:none;background:none;color:var(--text-faint);display:flex;align-items:center;justify-content:center;padding:2px}
@@ -758,7 +758,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .task-tag-bar-icon{flex:none;width:30px;height:30px;border-radius:50%;background:#d6493c;color:#fff;display:flex;align-items:center;justify-content:center}
 .task-tag-bar-icon svg{width:15px;height:15px}
 #taskTagClose{color:#c0392b}
-.room-tag-input{border:none;background:none;color:var(--text);font-size:13px;font-family:inherit;width:100%;padding:0;outline:none}
+.room-tag-input{border:none;background:none;color:var(--text);font-size:16px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
 .mention-popover{position:absolute;left:20px;right:20px;bottom:100%;margin-bottom:6px;max-width:640px;margin-left:auto;margin-right:auto;background:var(--surface-3);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden;max-height:220px;overflow-y:auto;z-index:25}
 .mention-popover-opt{display:flex;align-items:center;gap:9px;width:100%;padding:10px 14px;border:none;background:none;text-align:left;font:inherit;font-size:14px;cursor:pointer;color:var(--text)}
