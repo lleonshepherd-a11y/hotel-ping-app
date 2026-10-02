@@ -2116,7 +2116,8 @@ function fmtSignoffAmount(n){
 function buildSignoffCard(m){
   var s = m.signoff;
   var card = document.createElement("div");
-  card.className = "signoff-card " + s.status;
+  var signoffRag = s.status !== "pending" ? "rag-green" : (m.urgent ? "rag-red" : "rag-amber");
+  card.className = "signoff-card " + s.status + " " + signoffRag;
   var head = document.createElement("div");
   head.className = "signoff-head";
   head.innerHTML = '<span class="signoff-head-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Sign-off request' +
@@ -2127,7 +2128,7 @@ function buildSignoffCard(m){
   if(s.category){
     var category = document.createElement("div");
     category.className = "signoff-category";
-    category.textContent = s.category;
+    category.textContent = REQUEST_TYPE_LABELS[s.category] || s.category;
     card.appendChild(category);
   }
 
@@ -2148,6 +2149,20 @@ function buildSignoffCard(m){
     guestInfo.className = "signoff-target";
     guestInfo.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-6.2 7-6.2s7 2.6 7 6.2"/></svg>'+esc(s.guestInfo);
     card.appendChild(guestInfo);
+  }
+
+  if(s.description){
+    var desc = document.createElement("div");
+    desc.className = "signoff-description";
+    desc.textContent = s.description;
+    card.appendChild(desc);
+  }
+
+  if(s.neededBy){
+    var needed = document.createElement("div");
+    needed.className = "signoff-needed-badge needed-" + s.neededBy;
+    needed.textContent = "Needed: " + (NEEDED_BY_LABELS[s.neededBy] || s.neededBy);
+    card.appendChild(needed);
   }
 
   var actions = document.createElement("div");
@@ -2288,6 +2303,40 @@ var MAINT_URGENCY_DISPLAY = {
   guest: { label: "Soon", cls: "soon" },
   routine: { label: "Routine", cls: "routine" },
 };
+var MAINT_TRACKER_STAGES = ["Reported", "Taken on", "Fixed", "Confirmed"];
+function maintTrackerStage(t){
+  if(t.status === "fixed" && !t.needsReporterCheck) return 3;
+  if(t.status === "fixed") return 2;
+  if(t.status === "in_progress" || t.ownerStaffId) return 1;
+  return 0;
+}
+function maintTrackerHtml(t){
+  var stage = maintTrackerStage(t);
+  var parts = [];
+  MAINT_TRACKER_STAGES.forEach(function(label, i){
+    var state = i < stage ? "done" : (i === stage ? "current" : "upcoming");
+    parts.push('<div class="tk-track-step ' + state + '"><span class="tk-track-dot">' +
+      (state === "done" ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') +
+      '</span><span class="tk-track-label">' + label + '</span></div>');
+    if(i < MAINT_TRACKER_STAGES.length - 1){
+      parts.push('<div class="tk-track-line' + (i < stage ? ' done' : '') + '"></div>');
+    }
+  });
+  return '<div class="tk-tracker">' + parts.join('') + '</div>';
+}
+// Lets anyone watching the Ping see where a job is at without opening the
+// detail view - polled on the slow (6s) timer below so it updates live even
+// when no new chat message has come in to trigger a re-render.
+function refreshVisibleMaintTickets(){
+  var ids = Array.prototype.slice.call(document.querySelectorAll('[data-maint-ticket-id]'))
+    .map(function(c){ return c.getAttribute("data-maint-ticket-id"); });
+  var unique = ids.filter(function(id, i){ return id && ids.indexOf(id) === i; });
+  unique.forEach(function(id){
+    apiGet('/api/maintenance/' + encodeURIComponent(id)).then(function(res){
+      refreshMaintTicketCardInChat(res.ticket);
+    }).catch(function(){});
+  });
+}
 function buildMaintTicketCard(m){
   var card = document.createElement("div");
   card.className = "maint-ticket-card";
@@ -2315,8 +2364,9 @@ function renderMaintTicketCardInto(card, t){
       '<div><div class="tk-eyebrow">Maintenance request</div>' + (code ? '<div class="tk-code">' + esc(code) + '</div>' : '') + '</div>' +
       '<span class="tk-urgency ' + urg.cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>' + urg.label + '</span>' +
     '</div>' +
+    '<div class="tk-title">' + esc(t.description) + '</div>' +
     (t.roomNumber ? '<div class="tk-loc">' + esc(t.roomNumber) + '</div>' : '') +
-    '<div class="tk-desc">' + esc(t.description) + '</div>';
+    maintTrackerHtml(t);
 
   var midHtml = "";
   if(t.photoUrl && !isTicketVideo(t)) midHtml += '<img class="tk-photo" src="' + esc(mediaUrl(t.photoUrl)) + '" alt="Issue photo">';
@@ -4339,6 +4389,7 @@ function startPolling(){
     if(!tabGuestsBtn.hidden) refreshGuestsBadge();
     if(AUTH.staff && AUTH.staff.isAdmin) refreshSignupsBadge();
     loadOperational();
+    refreshVisibleMaintTickets();
   }, 6000);
   startTypingPoll();
 }
@@ -8775,8 +8826,12 @@ function renderTicketDetail(){
   var t = id && STATE.tickets.find(function(x){ return x.id === id; });
   if(!t){ closeTicketDetail(); return; }
 
-  var html = (t.ticketNumber ? '<div class="ticket-detail-number">HP-' + String(t.ticketNumber).padStart(4,"0") + '</div>' : '')
-    + '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div>';
+  var html = '<div class="ticket-detail-title-row"><div class="ticket-detail-title">' + esc(t.description) + '</div>' +
+    '<div class="ticket-detail-status status-' + t.status + '">' + MAINT_STATUS_LABEL[t.status] + '</div></div>';
+  if(t.roomNumber){
+    html += '<div class="ticket-detail-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
+  }
+  html += '<div class="ticket-detail-meta">' + (t.ticketNumber ? 'HP-' + String(t.ticketNumber).padStart(4,"0") + ' · ' : '') + 'Raised by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   var detailTagsHtml = "";
   if(t.priority === "safety") detailTagsHtml += '<span class="maint-tag tag-safety">Safety</span>';
   else if(t.priority === "guest") detailTagsHtml += '<span class="maint-tag tag-guest">Guest impact</span>';
@@ -8784,10 +8839,6 @@ function renderTicketDetail(){
   if(t.guestPresent) detailTagsHtml += '<span class="maint-tag tag-present">Guest in room</span>';
   if(t.deadline) detailTagsHtml += '<span class="maint-tag ' + (isTicketOverdue(t) ? "tag-overdue" : "tag-deadline") + '">' + (isTicketOverdue(t) ? "Overdue " : "Due ") + fmtDeadline(t.deadline) + '</span>';
   if(detailTagsHtml) html += '<div class="maint-card-tags ticket-detail-tags">' + detailTagsHtml + '</div>';
-  if(t.roomNumber){
-    html += '<div class="ticket-detail-room"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg> ' + esc(t.roomNumber) + '</div>';
-  }
-  html += '<div class="ticket-detail-desc">' + esc(t.description) + '</div>';
   var isVideo = isTicketVideo(t);
   if(t.photoUrl && isVideo){
     html += '<video class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" controls playsinline></video>';
@@ -8795,7 +8846,6 @@ function renderTicketDetail(){
     html += '<img class="ticket-detail-media" src="' + mediaUrl(t.photoUrl) + '" alt="Issue photo">';
   }
   if(t.voiceUrl) html += '<div id="ticketVoicePlaceholder"></div>';
-  html += '<div class="ticket-detail-meta">Reported by ' + esc(DEPTS[t.createdBy] ? DEPTS[t.createdBy].name : t.createdBy) + ' · ' + fmtNoteTime(t.createdAt) + '</div>';
   html += buildOwnerCardHtml(t);
   if(t.status === "fixed" && t.needsReporterCheck){
     html +=
@@ -9843,12 +9893,56 @@ var newRequestForm = document.getElementById("newRequestForm");
 var newRequestTitle = document.getElementById("newRequestTitle");
 var newRequestAmount = document.getElementById("newRequestAmount");
 var newRequestTo = document.getElementById("newRequestTo");
-var newRequestCategory = document.getElementById("newRequestCategory");
 var newRequestTarget = document.getElementById("newRequestTarget");
-var newRequestGuest = document.getElementById("newRequestGuest");
+var newRequestDesc = document.getElementById("newRequestDesc");
+var newRequestFile = document.getElementById("newRequestFile");
 var requestError = document.getElementById("requestError");
 var tabRequestsBadge = document.getElementById("tabRequestsBadge");
+var gmReqToCard = document.getElementById("gmReqToCard");
+var gmReqToAvatar = document.getElementById("gmReqToAvatar");
+var gmReqToName = document.getElementById("gmReqToName");
+var gmReqToSub = document.getElementById("gmReqToSub");
+var gmReqTitleLabel = document.getElementById("gmReqTitleLabel");
+var gmReqDescLabel = document.getElementById("gmReqDescLabel");
+var gmReqCharCount = document.getElementById("gmReqCharCount");
+var gmReqTypeChips = Array.prototype.slice.call(document.querySelectorAll("#gmReqTypeRow .gmreq-type-chip"));
+var gmReqNeededChips = Array.prototype.slice.call(document.querySelectorAll("#gmReqNeededRow .gmreq-needed-chip"));
+var gmReqWhereBtn = document.getElementById("gmReqWhereBtn");
+var gmReqWhereDropdown = document.getElementById("gmReqWhereDropdown");
+var gmReqFileLabel = document.getElementById("gmReqFileLabel");
+var gmReqFilePreview = document.getElementById("gmReqFilePreview");
+var gmReqFilePreviewName = document.getElementById("gmReqFilePreviewName");
+var gmReqFileRemove = document.getElementById("gmReqFileRemove");
+var gmReqUrgentToggle = document.getElementById("gmReqUrgentToggle");
+var gmReqUrgent = false;
+gmReqUrgentToggle.addEventListener("click", function(){
+  gmReqUrgent = !gmReqUrgent;
+  gmReqUrgentToggle.classList.toggle("active", gmReqUrgent);
+});
 STATE.signoffs = STATE.signoffs || [];
+
+var REQUEST_TYPE_LABELS = { repair:"Repair", spend_approval:"Spend approval", guest_issue:"Guest issue", staffing:"Staffing", other:"Other" };
+var REQUEST_TYPE_PLACEHOLDERS = {
+  repair: { title:"e.g. Ice machine has stopped cooling", desc:"What do you need from the GM?" },
+  spend_approval: { title:"e.g. Replace the lobby carpet", desc:"What do you need from the GM?" },
+  guest_issue: { title:"e.g. Room 214 guest unhappy with noise", desc:"What do you need from the GM?" },
+  staffing: { title:"e.g. Need extra cover this weekend", desc:"What do you need from the GM?" },
+  other: { title:"e.g. Need your sign-off on something", desc:"What do you need from the GM?" }
+};
+var NEEDED_BY_LABELS = { today:"Today", this_week:"This week", no_rush:"No rush" };
+var gmReqSelectedType = "repair";
+var gmReqSelectedNeeded = "no_rush";
+var gmReqSelectedFile = null;
+var cachedGmReqFloors = null;
+
+function updateGmReqToCard(){
+  var id = newRequestTo.value;
+  var d = DEPTS[id];
+  gmReqToAvatar.textContent = d ? d.initials : (id || "").slice(0,2).toUpperCase();
+  gmReqToAvatar.style.background = d ? d.color : "#777";
+  gmReqToName.textContent = d ? d.name : id;
+  gmReqToSub.textContent = "Your request will be sent to " + (d ? d.name : id);
+}
 
 function populateRequestToOptions(){
   var prev = newRequestTo.value;
@@ -9862,7 +9956,94 @@ function populateRequestToOptions(){
   });
   if(prev && DEPT_ORDER.indexOf(prev) !== -1 && prev !== STATE.self) newRequestTo.value = prev;
   else if(STATE.self !== "gm" && DEPT_ORDER.indexOf("gm") !== -1) newRequestTo.value = "gm";
+  updateGmReqToCard();
 }
+newRequestTo.addEventListener("change", updateGmReqToCard);
+
+gmReqTypeChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    gmReqSelectedType = chip.getAttribute("data-type");
+    gmReqTypeChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
+    var ph = REQUEST_TYPE_PLACEHOLDERS[gmReqSelectedType];
+    if(ph){
+      newRequestTitle.placeholder = ph.title;
+    }
+  });
+});
+
+gmReqNeededChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    gmReqSelectedNeeded = chip.getAttribute("data-needed");
+    gmReqNeededChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
+  });
+});
+
+newRequestDesc.addEventListener("input", function(){
+  gmReqCharCount.textContent = newRequestDesc.value.length + "/500";
+});
+
+newRequestFile.addEventListener("change", function(){
+  var f = newRequestFile.files[0];
+  gmReqSelectedFile = f || null;
+  if(f){
+    gmReqFilePreviewName.textContent = f.name;
+    gmReqFilePreview.hidden = false;
+    gmReqFileLabel.textContent = "File attached";
+  } else {
+    gmReqFilePreview.hidden = true;
+    gmReqFileLabel.textContent = "Tap to add a file";
+  }
+});
+gmReqFileRemove.addEventListener("click", function(e){
+  e.preventDefault();
+  gmReqSelectedFile = null;
+  newRequestFile.value = "";
+  gmReqFilePreview.hidden = true;
+  gmReqFileLabel.textContent = "Tap to add a file";
+});
+
+function closeGmReqWhereDropdown(){
+  gmReqWhereDropdown.hidden = true;
+  gmReqWhereDropdown.innerHTML = "";
+}
+function renderGmReqWhereDropdown(floors){
+  gmReqWhereDropdown.innerHTML = "";
+  var any = false;
+  floors.forEach(function(f){
+    if(!f.zones || !f.zones.length) return;
+    any = true;
+    f.zones.forEach(function(z){
+      var opt = document.createElement("button");
+      opt.type = "button";
+      opt.className = "gmreq-where-opt";
+      opt.textContent = f.name + " · " + z.name;
+      opt.addEventListener("click", function(){
+        newRequestTarget.value = f.name + " · " + z.name;
+        closeGmReqWhereDropdown();
+      });
+      gmReqWhereDropdown.appendChild(opt);
+    });
+  });
+  if(!any){
+    gmReqWhereDropdown.innerHTML = '<div class="gmreq-where-empty">No hotel areas set up yet - just type it in</div>';
+  }
+  gmReqWhereDropdown.hidden = false;
+}
+gmReqWhereBtn.addEventListener("click", function(){
+  if(!gmReqWhereDropdown.hidden){ closeGmReqWhereDropdown(); return; }
+  if(cachedGmReqFloors){ renderGmReqWhereDropdown(cachedGmReqFloors); return; }
+  gmReqWhereDropdown.innerHTML = '<div class="gmreq-where-empty">Loading&hellip;</div>';
+  gmReqWhereDropdown.hidden = false;
+  apiGet('/api/floors').then(function(res){
+    cachedGmReqFloors = res.floors || [];
+    renderGmReqWhereDropdown(cachedGmReqFloors);
+  }).catch(function(){
+    gmReqWhereDropdown.innerHTML = '<div class="gmreq-where-empty">Couldn\'t load hotel areas - just type it in</div>';
+  });
+});
+document.addEventListener("click", function(e){
+  if(!gmReqWhereDropdown.hidden && !e.target.closest(".gmreq-where-wrap")) closeGmReqWhereDropdown();
+});
 
 function refreshRequestsBadge(){
   apiGet('/api/signoffs').then(function(res){
@@ -10111,7 +10292,8 @@ function buildRequestCard(m){
   var otherDept = mine ? m.to : m.from;
   var otherName = DEPTS[otherDept] ? DEPTS[otherDept].name : otherDept;
   var card = document.createElement("div");
-  card.className = "missed-msg-card request-card" + (m.pinned ? " pinned" : "");
+  var ragClass = s.status !== "pending" ? "rag-green" : (m.urgent ? "rag-red" : "rag-amber");
+  card.className = "missed-msg-card request-card " + ragClass + (m.pinned ? " pinned" : "");
   var statusHtml;
   if(s.status === "pending" && !mine){
     statusHtml = '<div class="missed-approval-actions">' +
@@ -10125,9 +10307,10 @@ function buildRequestCard(m){
     statusHtml = '<div class="missed-msg-time">' + (s.status === "approved" ? "Approved" : "Declined") + (byName ? " by " + esc(byName) : "") + (s.decidedAt ? " · " + fmtNoteTime(s.decidedAt) : "") + '</div>';
   }
   var metaBits = [];
-  if(s.category) metaBits.push(esc(s.category));
+  if(s.category) metaBits.push(esc(REQUEST_TYPE_LABELS[s.category] || s.category));
   if(s.target) metaBits.push(esc(s.target));
   if(s.guestInfo) metaBits.push(esc(s.guestInfo));
+  if(s.neededBy) metaBits.push(esc("Needed: " + (NEEDED_BY_LABELS[s.neededBy] || s.neededBy)));
   card.innerHTML =
     '<span class="missed-msg-avatar" style="' + avatarStyleAttr(otherDept) + '">' + avatarInnerHtml(otherDept) + '</span>' +
     '<div class="missed-msg-body">' +
@@ -10168,25 +10351,45 @@ newRequestForm.addEventListener("submit", function(e){
   var to = newRequestTo.value;
   if(!to){ requestError.textContent = "Choose who to send this to."; return; }
   var amountRaw = newRequestAmount.value.trim();
-  if(!amountRaw){ requestError.textContent = "Enter the amount this will cost."; return; }
   var payload = {
     from: STATE.self, to: to, type: "text",
-    text: "Requesting approval: " + title,
+    text: "GM request: " + title,
+    urgent: gmReqUrgent,
     signoff: {
       title: title,
-      amount: Number(amountRaw),
-      category: newRequestCategory.value || undefined,
+      amount: amountRaw ? Number(amountRaw) : undefined,
+      category: gmReqSelectedType,
       target: newRequestTarget.value.trim() || undefined,
-      guestInfo: newRequestGuest.value.trim() || undefined,
+      description: newRequestDesc.value.trim() || undefined,
+      neededBy: gmReqSelectedNeeded,
     }
   };
-  var submitBtn = newRequestForm.querySelector(".admin-add-btn");
+  var submitBtn = newRequestForm.querySelector(".gmreq-submit");
   submitBtn.disabled = true;
-  apiSend('/api/messages', 'POST', payload).then(function(res){
+  (gmReqSelectedFile
+    ? blobToBase64(gmReqSelectedFile).then(function(b64){
+        payload.type = gmReqSelectedFile.type && gmReqSelectedFile.type.indexOf("image/") === 0 ? "image" : "file";
+        payload.fileBase64 = b64;
+        payload.fileMime = gmReqSelectedFile.type;
+        payload.fileName = gmReqSelectedFile.name;
+      })
+    : Promise.resolve())
+  .then(function(){ return apiSend('/api/messages', 'POST', payload); })
+  .then(function(res){
     STATE.signoffs.unshift(res.message);
     renderRequestsBoard();
     newRequestForm.reset();
     populateRequestToOptions();
+    gmReqSelectedType = "repair";
+    gmReqTypeChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-type") === "repair"); });
+    gmReqSelectedNeeded = "no_rush";
+    gmReqNeededChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-needed") === "no_rush"); });
+    gmReqSelectedFile = null;
+    gmReqFilePreview.hidden = true;
+    gmReqFileLabel.textContent = "Tap to add a file";
+    gmReqCharCount.textContent = "0/500";
+    gmReqUrgent = false;
+    gmReqUrgentToggle.classList.remove("active");
     var code = res.message.signoff && res.message.signoff.code;
     showToast((code ? code + " sent to " : "Sent to ") + (DEPTS[to] ? DEPTS[to].name : to));
   }).catch(function(err){

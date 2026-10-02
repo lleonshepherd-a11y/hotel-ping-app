@@ -256,6 +256,8 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       status: row.signoff_status,
       decidedBy: row.signoff_decided_by || undefined,
       decidedAt: row.signoff_decided_at || undefined,
+      neededBy: row.signoff_needed_by || undefined,
+      description: row.signoff_description || undefined,
     } : undefined,
     poll: row.poll_question ? {
       question: row.poll_question,
@@ -442,8 +444,8 @@ function insertMessage(opts) {
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
   try {
     db.prepare(`
-      INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id, maint_ticket_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO messages (id, from_dept, to_dept, type, body, file_name, file_path, file_size, duration, transcript, urgent, status, created_at, reply_to_id, broadcast_id, room_number, task_status, group_id, mentions, signoff_title, signoff_amount, signoff_target, signoff_category, signoff_guest_info, signoff_status, signoff_code, signoff_needed_by, signoff_description, poll_question, poll_options, poll_votes, affects_guest, dashboard_conversation_id, room_clean, from_staff_name, client_message_id, maint_ticket_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, opts.from, opts.to || null, opts.type,
       opts.body || null, opts.fileName || null, opts.filePath || null, opts.fileSize || null,
@@ -455,6 +457,8 @@ function insertMessage(opts) {
       opts.signoff && opts.signoff.guestInfo ? opts.signoff.guestInfo : null,
       opts.signoff ? 'pending' : null,
       signoffCode,
+      opts.signoff && opts.signoff.neededBy ? opts.signoff.neededBy : null,
+      opts.signoff && opts.signoff.description ? opts.signoff.description : null,
       opts.poll ? opts.poll.question : null,
       pollOptionsJson,
       opts.poll ? '{}' : null,
@@ -2032,7 +2036,9 @@ const server = http.createServer(async (req, res) => {
         const target = signoff.target ? String(signoff.target).trim().slice(0, 120) : null;
         const category = signoff.category ? String(signoff.category).trim().slice(0, 60) : null;
         const guestInfo = signoff.guestInfo ? String(signoff.guestInfo).trim().slice(0, 120) : null;
-        signoffData = { title, amount, target, category, guestInfo };
+        const neededBy = signoff.neededBy && ['today', 'this_week', 'no_rush'].includes(signoff.neededBy) ? signoff.neededBy : null;
+        const description = signoff.description ? String(signoff.description).trim().slice(0, 500) : null;
+        signoffData = { title, amount, target, category, guestInfo, neededBy, description };
       }
       let pollData = null;
       if (poll) {
