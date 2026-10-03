@@ -711,8 +711,23 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   padding:14px 20px 20px;background:none;
   position:relative;
   pointer-events:none;
+  display:flex;flex-direction:column;
+  max-height:100%;min-height:0;
+  box-sizing:border-box;
 }
 .composer-wrap>*{pointer-events:auto}
+/* Everything that can grow tall (an active Report/Task/Repair form, the
+   quick-action row, attachment previews) lives in here, which is the one
+   thing allowed to shrink and scroll. composerLocked and .composer below
+   it are flex:none - they keep their natural size no matter what, so the
+   actual message box and its send button can never be pushed below the
+   visible screen the way a tall form once could. */
+.composer-tags-scroll{
+  display:flex;flex-direction:column;
+  flex:1 1 auto;min-height:0;
+  overflow-y:auto;
+}
+.composer-locked,.composer-wrap>.composer{flex:none}
 
 /* Push-to-talk: floats bottom-left so it never sits over the send button in
    the composer pill, and is draggable (see setupPtt in app.js) so it can sit
