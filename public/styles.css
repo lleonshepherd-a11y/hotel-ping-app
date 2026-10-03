@@ -1204,44 +1204,48 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* ---- Repair tag bar: dropped into the chat above the composer, same
    slot as Report issue/Task - a small structured form (location, issue
    type, priority) instead of the plain-text report. The description
-   itself is still typed in the real message box and sent together. ---- */
+   itself is still typed in the real message box and sent together.
+   Capped with its own max-height + scroll so a tall form can never push
+   the actual message box out of reach - on a phone with the on-screen
+   keyboard open there isn't much room left, and the composer has to
+   stay reachable no matter what. ---- */
 .repair-tag-bar{
-  display:flex;flex-direction:column;gap:12px;max-width:640px;margin:0 auto 8px;
-  background:#fff;border-radius:20px;padding:14px 16px 16px;
+  display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto 6px;
+  background:#fff;border-radius:18px;padding:10px 14px 12px;
   box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  max-height:38vh;overflow-y:auto;
 }
 .repair-tag-head{display:flex;align-items:center;gap:8px}
-.repair-tag-head-ic{width:26px;height:26px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:#8a6d3b;flex:none}
-.repair-tag-head-ic svg{width:14px;height:14px}
-.repair-tag-head-title{flex:1;font-size:15px;font-weight:700;color:var(--text)}
+.repair-tag-head-ic{width:24px;height:24px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:#8a6d3b;flex:none}
+.repair-tag-head-ic svg{width:13px;height:13px}
+.repair-tag-head-title{flex:1;font-size:14px;font-weight:700;color:var(--text)}
 .repair-tag-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:2px;display:flex;align-items:center}
-.repair-tag-close svg{width:18px;height:18px}
-.repair-tag-bar .maint-input-icon-wrap input[type=text]{font-size:14.5px}
-.repair-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.repair-tag-close svg{width:17px;height:17px}
+.repair-tag-bar .maint-input-icon-wrap input[type=text]{font-size:14px;padding-top:9px;padding-bottom:9px}
+.repair-tag-bar .maint-input-icon{top:10px}
+.repair-type-grid{display:flex;flex-wrap:wrap;gap:6px}
 .repair-type-grid .repair-type-chip{
-  display:flex;align-items:center;gap:8px;border:none;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
-  color:var(--text);border-radius:13px;padding:11px 12px;font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:5px;border:none;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
+  color:var(--text);border-radius:999px;padding:7px 11px;font-size:12.5px;font-weight:700;cursor:pointer;
   transition:background .12s ease,box-shadow .12s ease,color .12s ease;
 }
-.repair-type-grid .repair-type-chip svg{width:16px;height:16px;color:var(--text-faint);flex:none}
-.repair-type-grid .repair-type-chip.wide{grid-column:span 2}
-.repair-type-grid .repair-type-chip:active{transform:scale(.97)}
+.repair-type-grid .repair-type-chip svg{width:13px;height:13px;color:var(--text-faint);flex:none}
+.repair-type-grid .repair-type-chip:active{transform:scale(.96)}
 .repair-type-grid .repair-type-chip.active{background:rgba(47,95,224,.1);box-shadow:inset 0 0 0 1.5px #2f5fe0;color:#2f5fe0}
 .repair-type-grid .repair-type-chip.active svg{color:#2f5fe0}
-.repair-priority-row{display:flex;gap:8px}
+.repair-priority-row{display:flex;gap:6px}
 .repair-priority-chip{
-  flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:6px;
+  flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;
   border:none;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
-  color:var(--text-dim);border-radius:12px;padding:10px 8px;font-size:12.5px;font-weight:700;cursor:pointer;
+  color:var(--text-dim);border-radius:11px;padding:8px 6px;font-size:12px;font-weight:700;cursor:pointer;
   transition:transform .12s cubic-bezier(.3,1.4,.4,1),background .12s ease,box-shadow .12s ease,color .12s ease;
   text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis
 }
-.repair-priority-chip svg{width:14px;height:14px;flex:none}
+.repair-priority-chip svg{width:13px;height:13px;flex:none}
 .repair-priority-chip:active{transform:scale(.94)}
 .repair-priority-chip.active{background:rgba(47,95,224,.1);box-shadow:inset 0 0 0 1.5px #2f5fe0;color:#2f5fe0}
 .repair-priority-chip.urgent-opt{color:#c0392b}
 .repair-priority-chip.urgent-opt.active{background:rgba(198,57,41,.1);box-shadow:inset 0 0 0 1.5px #c0392b;color:#c0392b}
-.repair-tag-hint{font-size:12.5px;color:var(--text-faint);line-height:1.4}
 .admin-add-btn{border:none;border-radius:10px;background:linear-gradient(150deg,rgba(44,44,48,.85),rgba(16,16,18,.9));backdrop-filter:blur(14px) saturate(1.6);-webkit-backdrop-filter:blur(14px) saturate(1.6);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.25);color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px;transition:background .2s ease}
 .admin-add-btn.success{background:#2f9a5c}
 .admin-add-form .admin-add-btn{width:100%;padding:10px 14px}
