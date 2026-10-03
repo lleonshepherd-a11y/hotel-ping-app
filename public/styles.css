@@ -724,7 +724,7 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    visible screen the way a tall form once could. */
 .composer-tags-scroll{
   display:flex;flex-direction:column;
-  flex:1 1 auto;min-height:0;
+  flex:0 1 auto;min-height:0;
   overflow-y:auto;
 }
 .composer-locked,.composer-wrap>.composer{flex:none}
