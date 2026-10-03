@@ -3838,6 +3838,29 @@ function doSendReal(){
       : (err && err.message ? err.message : "Server error"));
   });
 }
+// Filing a ticket via /api/maintenance only ever lands a message in the
+// reporter's own conversation with Maintenance - not in whatever thread
+// was actually open when they pressed the button, so from the sender's
+// side it looked like nothing happened. Post a normal confirmation
+// message into the thread they were actually looking at too.
+function postThreadConfirmation(text){
+  var deptId = STATE.active, groupId = STATE.activeGroupId;
+  if(!deptId && !groupId) return;
+  var payload = { from: STATE.self, type: "text", text: text, urgent: false, affectsGuest: false };
+  if(groupId) payload.groupId = groupId; else payload.to = deptId;
+  apiSend('/api/messages', 'POST', payload).then(function(res){
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
+  }).catch(function(){});
+}
 function sendQuickReport(text, attachment){
   msgInput.value = "";
   autoGrow();
@@ -3864,6 +3887,7 @@ function sendQuickReport(text, attachment){
         }
         renderMaintenanceBoard();
       }
+      postThreadConfirmation("⚠️ Reported: " + text);
       showToast("Reported");
     }).catch(function(err){
       showToast(err.message || "Couldn't send that report.");
@@ -3903,6 +3927,7 @@ function sendRepairReport(text, attachment){
         }
         renderMaintenanceBoard();
       }
+      postThreadConfirmation("🔧 Repair requested: " + text + (roomNumber ? " (" + roomNumber + ")" : ""));
       showToast("Reported");
     }).catch(function(err){
       showToast(err.message || "Couldn't send that report.");
