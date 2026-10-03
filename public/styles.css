@@ -2258,10 +2258,18 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 
 @media (max-width:720px){
   body{padding:0}
-  .app{grid-template-columns:1fr;max-width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0;box-shadow:none}
-  .sidebar{position:fixed;inset:0;height:100vh;height:100dvh;z-index:5;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top)}
+  /* --vvh is kept live by JS from window.visualViewport.height, which
+     (unlike 100vh/100dvh) actually shrinks when the on-screen keyboard
+     opens on a real phone - position:fixed elements sized off plain
+     dvh are a known source of "the keyboard covers the input" bugs on
+     mobile Safari in particular, because dvh doesn't reliably account
+     for the keyboard the way the visualViewport does. Falls back to
+     100dvh for the one frame before the JS listener has run, and for
+     any browser without visualViewport support. */
+  .app{grid-template-columns:1fr;max-width:100%;height:100vh;height:100dvh;height:var(--vvh,100dvh);max-height:none;border-radius:0;box-shadow:none}
+  .sidebar{position:fixed;inset:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);z-index:5;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top)}
   .sidebar.hide-mobile{transform:translateX(-100%)}
-  .main{position:fixed;inset:0;height:100vh;height:100dvh;z-index:4;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top);transform:translateX(100%)}
+  .main{position:fixed;inset:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);z-index:4;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top);transform:translateX(100%)}
   .main.show-mobile{transform:translateX(0)}
   /* Absolutely positioned, so it floats over the header rather than
      taking a grid column - the old flex layout compensated with

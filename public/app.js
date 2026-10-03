@@ -11,6 +11,22 @@ function perfLogAfterPaint(label, since){
   });
 }
 
+// Keeps --vvh in sync with the real visible viewport. Plain 100vh/100dvh
+// don't reliably shrink when the on-screen keyboard opens on a real
+// phone (a well-known mobile Safari issue for position:fixed layouts),
+// which is what let the keyboard cover the composer - window.visualViewport
+// is the one thing that actually tracks the keyboard, so the mobile
+// media query sizes off this instead.
+(function setupVisualViewportFix(){
+  if(!window.visualViewport) return;
+  function update(){
+    document.documentElement.style.setProperty("--vvh", window.visualViewport.height + "px");
+  }
+  window.visualViewport.addEventListener("resize", update);
+  window.visualViewport.addEventListener("scroll", update);
+  update();
+})();
+
 var ICONS = {
   gm: '<path d="M12 3l7 7-7 11-7-11z"/>',
   foh: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
