@@ -94,7 +94,6 @@ const MAINT_AREA_TYPES = ["guest_room", "shared_space", "back_of_house"];
 const MAINT_ISSUE_TYPES = ["plumbing", "electrical", "heating", "furniture", "other"];
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ["new", "in_progress", "completed"];
-const ASSET_STATUSES = ["requested", "borrowed", "returned"];
 const DEFAULT_QUICK_REPLIES = ["On it", "Done", "5 mins", "On my way", "Noted", "Course away", "Hold 10 mins", "Ready for dessert"];
 
 // Scoped to the app's own origin rather than "*" - nothing here needs to
@@ -933,7 +932,6 @@ async function insertMessage(env, ctx, opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
-  const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? await nextSignoffCode(env) : null;
   try {
     await env.DB.prepare(
@@ -952,9 +950,9 @@ async function insertMessage(env, ctx, opts) {
       signoffCode,
       opts.signoff && opts.signoff.neededBy ? opts.signoff.neededBy : null,
       opts.signoff && opts.signoff.description ? opts.signoff.description : null,
-      opts.poll ? opts.poll.question : null,
-      pollOptionsJson,
-      opts.poll ? "{}" : null,
+      null,
+      null,
+      null,
       opts.affectsGuest ? 1 : 0,
       opts.dashboardConversationId || null,
       opts.roomClean || null,
@@ -996,7 +994,7 @@ async function insertMessage(env, ctx, opts) {
     signoff_decided_by: null, signoff_decided_at: null, signoff_code: signoffCode,
     signoff_needed_by: opts.signoff && opts.signoff.neededBy ? opts.signoff.neededBy : null,
     signoff_description: opts.signoff && opts.signoff.description ? opts.signoff.description : null,
-    poll_question: opts.poll ? opts.poll.question : null, poll_options: pollOptionsJson, poll_votes: opts.poll ? "{}" : null,
+    poll_question: null, poll_options: null, poll_votes: null,
     escalation_level: 0, affects_guest: opts.affectsGuest ? 1 : 0,
     dashboard_conversation_id: opts.dashboardConversationId || null, from_staff_name: opts.fromStaffName || null,
     client_message_id: opts.clientMessageId || null, maint_ticket_id: opts.maintTicketId || null,
@@ -1179,46 +1177,6 @@ function rowToGuestRequest(row) {
     completedAt: row.completed_at || undefined,
   };
 }
-function rowToAssetRequest(row) {
-  return {
-    id: row.id,
-    itemName: row.item_name,
-    notes: row.notes || undefined,
-    status: row.status,
-    requestedBy: row.requested_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    returnedAt: row.returned_at || undefined,
-  };
-}
-// asset_requests has no department column on the dashboard side, only a
-// staff FK - department-level ownership is resolved via a join (see the
-// /api/assets handlers), and this maps that joined row back to the local
-// shape rowToAssetRequest expects.
-function noirAssetRow(r) {
-  return {
-    id: r.id,
-    item_name: r.item_name,
-    notes: r.notes,
-    status: r.status,
-    requested_by: fromNoirDept(r.requester_dept),
-    created_at: r.created_at,
-    updated_at: r.updated_at,
-    returned_at: r.returned_at,
-  };
-}
-function rowToStory(row, viewed) {
-  return {
-    id: row.id,
-    departmentId: row.department_id,
-    staffName: row.staff_name || undefined,
-    photoUrl: "/uploads/" + row.photo_path,
-    caption: row.caption || undefined,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    viewed: !!viewed,
-  };
-}
 function rowToGroup(row, members) {
   return {
     id: row.id, name: row.name, createdBy: row.created_by, createdAt: row.created_at, members: members || [],
@@ -1290,31 +1248,6 @@ function rowToRunsheetItem(row) {
     createdByName: row.created_by_name || undefined,
   };
 }
-async function reactionsMap(env, messageIds) {
-  const ids = [...new Set(messageIds)];
-  if (!ids.length) return {};
-  // Chunked rather than one IN (...) with a placeholder per id - a full
-  // page of messages (see MESSAGE_PAGE_SIZE) pushed this over D1's bound
-  // parameter limit and threw "too many SQL variables" for the whole
-  // request, not just the reactions.
-  const CHUNK = 90;
-  const byMessage = {};
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const chunk = ids.slice(i, i + CHUNK);
-    const rows = await env.DB.prepare(
-      `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${chunk.map(() => "?").join(",")})`
-    ).bind(...chunk).all();
-    rows.results.forEach((r) => {
-      byMessage[r.message_id] = byMessage[r.message_id] || [];
-      byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
-    });
-  }
-  return byMessage;
-}
-function attachReactions(messages, map) {
-  messages.forEach((m) => { m.reactions = map[m.id] || []; });
-  return messages;
-}
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
   if (deleted && !isAdmin && viewerDeptId !== row.from_dept) {
@@ -1369,11 +1302,6 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       decidedAt: row.signoff_decided_at || undefined,
       neededBy: row.signoff_needed_by || undefined,
       description: row.signoff_description || undefined,
-    } : undefined,
-    poll: row.poll_question ? {
-      question: row.poll_question,
-      options: JSON.parse(row.poll_options || "[]"),
-      votes: JSON.parse(row.poll_votes || "{}"),
     } : undefined,
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
@@ -2499,8 +2427,7 @@ export default {
         const hasMore = rows.results.length > MESSAGE_PAGE_SIZE;
         const page = (hasMore ? rows.results.slice(0, MESSAGE_PAGE_SIZE) : rows.results).reverse();
         const messages = page.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
-        const rMap = await reactionsMap(env, messages.map((m) => m.id));
-        return json({ messages: attachReactions(messages, rMap), hasMore });
+        return json({ messages, hasMore });
       }
 
       // ---- Groups ----
@@ -2893,8 +2820,7 @@ export default {
         }
         const rows = await env.DB.prepare("SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC").bind(id).all();
         const messages = rows.results.map((r) => rowToMessage(r, self, request._staff.is_admin)).filter(Boolean);
-        const rMap = await reactionsMap(env, messages.map((m) => m.id));
-        return json({ messages: attachReactions(messages, rMap) });
+        return json({ messages });
       }
 
       if (method === "POST" && p.startsWith("/api/groups/") && p.endsWith("/read")) {
@@ -3286,7 +3212,7 @@ export default {
 
       if (method === "POST" && p === "/api/messages") {
         const body = await readJsonBody(request);
-        const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll, clientMessageId } = body;
+        const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, clientMessageId } = body;
         if (!ALL_DEPT_IDS.has(from)) return json({ error: "Unknown department" }, 400);
         const sendingAsOwnHead = HEAD_DEPT_IDS.has(from) && request._staff.head_depts && request._staff.head_depts.includes(from);
         if (from !== request._staff.department_id && !sendingAsOwnHead) {
@@ -3305,7 +3231,7 @@ export default {
           return json({ error: "Only the GM can message Head Office directly" }, 403);
         }
         if (!["text", "image", "file", "audio"].includes(type)) return json({ error: "Invalid message type" }, 400);
-        if (type === "text" && !(text && text.trim()) && !poll) return json({ error: "Message text is required" }, 400);
+        if (type === "text" && !(text && text.trim())) return json({ error: "Message text is required" }, 400);
         if (roomNumber && String(roomNumber).length > 20) return json({ error: "Room number is too long" }, 400);
         if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return json({ error: "Invalid task status" }, 400);
         let signoffData = null;
@@ -3325,18 +3251,6 @@ export default {
           const neededBy = signoff.neededBy && ["today", "this_week", "no_rush"].includes(signoff.neededBy) ? signoff.neededBy : null;
           const description = signoff.description ? String(signoff.description).trim().slice(0, 500) : null;
           signoffData = { title, amount, target, category, guestInfo, neededBy, description };
-        }
-        let pollData = null;
-        if (poll) {
-          const question = String(poll.question || "").trim();
-          if (!question) return json({ error: "Poll question is required" }, 400);
-          if (question.length > 140) return json({ error: "Poll question is too long" }, 400);
-          const options = Array.isArray(poll.options)
-            ? poll.options.map((o) => String(o || "").trim()).filter(Boolean)
-            : [];
-          if (options.length < 2 || options.length > 4) return json({ error: "A poll needs 2-4 options" }, 400);
-          if (options.some((o) => o.length > 60)) return json({ error: "Poll option is too long" }, 400);
-          pollData = { question, options };
         }
         const validMentions = Array.isArray(mentions) && validMembers
           ? mentions.filter((d) => validMembers.has(d) && d !== from)
@@ -3368,7 +3282,6 @@ export default {
           taskStatus: taskStatus || null,
           mentions: validMentions,
           signoff: signoffData,
-          poll: pollData,
           fromStaffName: request._staff.name || null,
           clientMessageId: clientMessageId && String(clientMessageId).trim() ? String(clientMessageId).trim().slice(0, 100) : null,
           hotelId: resolvedNoirHotelId, actorStaffId: request._staff.id,
@@ -3434,33 +3347,6 @@ export default {
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 
-      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/reactions")) {
-        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/reactions".length));
-        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-        if (!existing) return json({ error: "Message not found" }, 404);
-        const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
-        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
-        const body = await readJsonBody(request);
-        const emoji = String(body.emoji || "").trim().slice(0, 8);
-        if (!emoji) return json({ error: "An emoji is required" }, 400);
-        const current = await env.DB.prepare(
-          "SELECT emoji FROM message_reactions WHERE message_id = ? AND department_id = ?"
-        ).bind(id, requester.department_id).first();
-        // Tapping the same reaction again removes it - a real toggle, not a
-        // one-way stamp, same as tapping a like a second time anywhere else.
-        if (current && current.emoji === emoji) {
-          await env.DB.prepare("DELETE FROM message_reactions WHERE message_id = ? AND department_id = ?").bind(id, requester.department_id).run();
-        } else {
-          await env.DB.prepare(
-            `INSERT INTO message_reactions (id, message_id, department_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)
-             ON CONFLICT(message_id, department_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at`
-          ).bind(crypto.randomUUID(), id, requester.department_id, emoji, new Date().toISOString()).run();
-        }
-        const rMap = await reactionsMap(env, [id]);
-        return json({ reactions: rMap[id] || [] });
-      }
 
       if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/affects-guest")) {
         const id = decodeURIComponent(p.slice("/api/messages/".length, -"/affects-guest".length));
@@ -3579,31 +3465,6 @@ export default {
           tag: "hotel-ping-signoff-" + id,
         }, existing.to_dept).catch((e) => console.error("notifyDepartment (signoff) top-level error:", e && e.stack || e));
         if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
-        return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
-      }
-
-      if (method === "POST" && p.startsWith("/api/messages/") && p.endsWith("/vote")) {
-        const id = decodeURIComponent(p.slice("/api/messages/".length, -"/vote".length));
-        const existing = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
-        if (!existing) return json({ error: "Message not found" }, 404);
-        if (!existing.poll_question) return json({ error: "This message isn't a poll" }, 400);
-        const requester = request._staff;
-        const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-          || (existing.group_id && await env.NOIR_DB.prepare("SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?").bind(existing.group_id, toNoirDept(requester.department_id)).first());
-        if (!inConversation && !requester.is_admin) return json({ error: "Not part of this conversation" }, 403);
-        const bodyIn = await readJsonBody(request);
-        const options = JSON.parse(existing.poll_options || "[]");
-        const optionIndex = Number(bodyIn.optionIndex);
-        if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
-          return json({ error: "Invalid poll option" }, 400);
-        }
-        // Merge this one vote in with an atomic SQL json_set, rather than reading the whole
-        // votes blob into JS and writing it back - two people voting at once would otherwise
-        // race and one vote could silently overwrite the other.
-        await env.DB.prepare(
-          "UPDATE messages SET poll_votes = json_set(COALESCE(poll_votes, '{}'), '$.' || ?, ?) WHERE id = ?"
-        ).bind(requester.department_id, optionIndex, id).run();
-        const row = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(id).first();
         return json({ message: rowToMessage(row, requester.department_id, requester.is_admin) });
       }
 
@@ -4023,125 +3884,6 @@ export default {
         const dept = toNoirDept(request._staff.department_id);
         await env.NOIR_DB.prepare("DELETE FROM quick_replies WHERE id = ? AND department_id = ?").bind(id, dept).run();
         return json({ ok: true });
-      }
-
-      if (method === "GET" && p === "/api/stories") {
-        const now = new Date().toISOString();
-        // story_views.story_id references stories(id) with no cascade, so the
-        // views of an expiring story have to go first or this delete 500s
-        // with a foreign key violation - which silently broke every story
-        // fetch (this whole handler) the moment any expired story had a view.
-        await env.NOIR_DB.prepare("DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < ?)").bind(now).run();
-        await env.NOIR_DB.prepare("DELETE FROM stories WHERE expires_at < ?").bind(now).run();
-        const rows = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC").bind(now).all();
-        const viewerDept = request._staff.department_id;
-        const viewedRows = await env.NOIR_DB.prepare("SELECT story_id FROM story_views WHERE department_id = ?").bind(toNoirDept(viewerDept)).all();
-        const viewedIds = new Set(viewedRows.results.map((r) => r.story_id));
-        return json({ stories: rows.results.map((r) => rowToStory(noirDeptRow(r), fromNoirDept(r.department_id) === viewerDept || viewedIds.has(r.id))) });
-      }
-
-      if (method === "POST" && p === "/api/stories") {
-        const requester = request._staff;
-        const body = await readJsonBody(request);
-        if (!body.fileBase64) return json({ error: "Photo is required" }, 400);
-        if (base64ExceedsBytes(body.fileBase64, 10 * 1024 * 1024)) return json({ error: "Photo is too large (10MB max)" }, 400);
-        const binary = atob(body.fileBase64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const ext = body.fileMime && body.fileMime.split("/")[1] ? "." + body.fileMime.split("/")[1].split(";")[0] : "";
-        const safeName = hotelKeyPrefix + "story-" + crypto.randomUUID() + ext;
-        await env.UPLOADS.put(safeName, bytes, { httpMetadata: { contentType: body.fileMime || "application/octet-stream" } });
-        const id = crypto.randomUUID();
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-        const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
-        await env.NOIR_DB.prepare(
-          "INSERT INTO stories (id, hotel_id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).bind(id, resolvedNoirHotelId, toNoirDept(requester.department_id), requester.name, safeName, caption, now.toISOString(), expiresAt).run();
-        const row = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
-        return json({ story: rowToStory(noirDeptRow(row), true) }, 201);
-      }
-
-      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/view")) {
-        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/view".length));
-        const story = await env.NOIR_DB.prepare("SELECT 1 FROM stories WHERE id = ?").bind(id).first();
-        if (!story) return json({ error: "Story not found" }, 404);
-        const viewerDept = request._staff.department_id;
-        await env.NOIR_DB.prepare(
-          "INSERT INTO story_views (story_id, department_id, viewed_at) VALUES (?, ?, ?) ON CONFLICT(story_id, department_id) DO NOTHING"
-        ).bind(id, toNoirDept(viewerDept), new Date().toISOString()).run();
-        return json({ ok: true });
-      }
-
-      if (method === "DELETE" && p.startsWith("/api/stories/")) {
-        const id = decodeURIComponent(p.slice("/api/stories/".length));
-        const existing = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
-        if (!existing) return json({ error: "Story not found" }, 404);
-        const requester = request._staff;
-        if (fromNoirDept(existing.department_id) !== requester.department_id && !requester.is_admin) {
-          return json({ error: "You can only delete your own department's stories" }, 403);
-        }
-        await env.NOIR_DB.prepare("DELETE FROM story_views WHERE story_id = ?").bind(id).run();
-        await env.NOIR_DB.prepare("DELETE FROM stories WHERE id = ?").bind(id).run();
-        return json({ ok: true });
-      }
-
-      // Sends a story's own photo onward as a real message - e.g. housekeeping
-      // posts a photo of a finished wedding set-up to Stories, then also
-      // "pings" that same photo straight to the GM as proof the job's done,
-      // instead of the GM having to happen to catch the story before it
-      // expires. Rides the same insertMessage/notifyDepartment path as any
-      // other ping, per the "everything is a ping" rule elsewhere in here.
-      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/ping")) {
-        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/ping".length));
-        const story = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
-        if (!story) return json({ error: "Story not found" }, 404);
-        const requester = request._staff;
-        const to = String((await readJsonBody(request)).to || "").trim();
-        if (!DEPT_IDS.has(to)) return json({ error: "Unknown department" }, 400);
-        if (to === requester.department_id) return json({ error: "Pick a different department" }, 400);
-        const row = await insertMessage(env, ctx, {
-          from: requester.department_id, to, type: "image",
-          body: "📌 " + requester.name + " pinged an update" + (story.caption ? ": " + story.caption : ""),
-          fileName: "Update photo", filePath: story.photo_path,
-          fromStaffName: requester.name || null,
-        });
-        const notifyPromise = notifyDepartment(env, to, {
-          title: "📌 " + requester.name + " pinged you",
-          body: story.caption || "Sent an update photo",
-          url: "/",
-          tag: "hotel-ping-story-ping-" + id,
-        }, requester.department_id).catch((e) => console.error("notifyDepartment (story ping) error:", e && e.stack || e));
-        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
-        return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
-      }
-
-      // A quick one-tap acknowledgement on someone else's story - lets a
-      // department head say "seen, nice work" without opening the thread.
-      if (method === "POST" && p.startsWith("/api/stories/") && p.endsWith("/like")) {
-        const id = decodeURIComponent(p.slice("/api/stories/".length, -"/like".length));
-        const story = await env.NOIR_DB.prepare("SELECT * FROM stories WHERE id = ?").bind(id).first();
-        if (!story) return json({ error: "Story not found" }, 404);
-        const requester = request._staff;
-        const to = fromNoirDept(story.department_id);
-        // Liking your own story would otherwise insert a message from your
-        // department to itself - there's no such conversation, so it can
-        // never be opened or replied to once it shows up as a missed
-        // message. Just acknowledge the tap; nothing to notify yourself of.
-        if (to === requester.department_id) return json({ message: null }, 201);
-        const row = await insertMessage(env, ctx, {
-          from: requester.department_id, to, type: "text",
-          body: "👍 " + requester.name + " liked your update" + (story.caption ? ": " + story.caption : ""),
-          fromStaffName: requester.name || null,
-        });
-        const notifyPromise = notifyDepartment(env, to, {
-          title: "👍 " + requester.name + " liked your update",
-          body: story.caption || "Nice work",
-          url: "/",
-          tag: "hotel-ping-story-like-" + id,
-        }, requester.department_id).catch((e) => console.error("notifyDepartment (story like) error:", e && e.stack || e));
-        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
-        return json({ message: rowToMessage(row, requester.department_id, false) }, 201);
       }
 
       if (method === "GET" && p === "/api/handover") {
@@ -4753,81 +4495,6 @@ export default {
         await env.DB.prepare("UPDATE guest_requests SET pinned_at = ? WHERE id = ?").bind(newPinned, id).run();
         const row = await env.DB.prepare("SELECT * FROM guest_requests WHERE id = ?").bind(id).first();
         return json({ request: rowToGuestRequest(row) });
-      }
-
-      // Dashboard's asset_requests has no department column, only a staff FK
-      // (requested_by_staff_id) - so department-level ownership is resolved
-      // by joining staff to look up which department the requester belongs to,
-      // matching this table's original "your department's requests" behavior.
-      if (method === "GET" && p === "/api/assets") {
-        const rows = await env.NOIR_DB.prepare(
-          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
-           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id ORDER BY ar.created_at DESC`
-        ).all();
-        return json({ requests: rows.results.map((r) => rowToAssetRequest(noirAssetRow(r))) });
-      }
-
-      if (method === "POST" && p === "/api/assets") {
-        const requester = request._staff;
-        const body = await readJsonBody(request);
-        const itemName = String(body.itemName || "").trim();
-        if (!itemName) return json({ error: "An item name is required" }, 400);
-        if (itemName.length > 80) return json({ error: "Item name is too long" }, 400);
-        const notes = body.notes ? String(body.notes).trim().slice(0, 200) : null;
-        const id = crypto.randomUUID();
-        const now = new Date().toISOString();
-        await env.NOIR_DB.prepare(
-          "INSERT INTO asset_requests (id, hotel_id, item_name, notes, status, requested_by_staff_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'requested', ?, ?, ?)"
-        ).bind(id, resolvedNoirHotelId, itemName, notes, requester.id, now, now).run();
-        const row = { id, item_name: itemName, notes, status: "requested", requester_dept: toNoirDept(requester.department_id), created_at: now, updated_at: now, returned_at: null };
-
-        const notifyPromise = Promise.all([...DEPT_IDS].filter((d) => d !== requester.department_id).map((deptId) =>
-          notifyDepartment(env, deptId, {
-            title: "📦 Asset request",
-            body: (DEPT_NAMES[requester.department_id] || requester.department_id) + " needs: " + itemName,
-            url: "/",
-            tag: "hotel-ping-asset-" + id,
-          }, requester.department_id).catch(function(e){ console.error("notifyDepartment (asset) error:", e && e.stack || e); })
-        ));
-        if (ctx && ctx.waitUntil) ctx.waitUntil(notifyPromise); else await notifyPromise;
-
-        return json({ request: rowToAssetRequest(noirAssetRow(row)) }, 201);
-      }
-
-      if (method === "POST" && p.startsWith("/api/assets/") && p.endsWith("/status")) {
-        const id = decodeURIComponent(p.slice("/api/assets/".length, -"/status".length));
-        const body = await readJsonBody(request);
-        const status = body.status;
-        if (!ASSET_STATUSES.includes(status)) return json({ error: "Invalid status" }, 400);
-        const existing = await env.NOIR_DB.prepare(
-          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
-           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id WHERE ar.id = ?`
-        ).bind(id).first();
-        if (!existing) return json({ error: "Request not found" }, 404);
-        if (fromNoirDept(existing.requester_dept) !== request._staff.department_id && !request._staff.is_admin) {
-          return json({ error: "You can only update your own department's requests" }, 403);
-        }
-        const now = new Date().toISOString();
-        await env.NOIR_DB.prepare(
-          "UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?"
-        ).bind(status, now, status === "returned" ? now : null, id).run();
-        existing.status = status; existing.updated_at = now; existing.returned_at = status === "returned" ? now : null;
-        return json({ request: rowToAssetRequest(noirAssetRow(existing)) });
-      }
-
-      if (method === "DELETE" && p.startsWith("/api/assets/")) {
-        const id = decodeURIComponent(p.slice("/api/assets/".length));
-        const existing = await env.NOIR_DB.prepare(
-          `SELECT ar.*, s.department_id AS requester_dept FROM asset_requests ar
-           LEFT JOIN staff s ON s.id = ar.requested_by_staff_id WHERE ar.id = ?`
-        ).bind(id).first();
-        if (!existing) return json({ error: "Request not found" }, 404);
-        const requester = request._staff;
-        if (fromNoirDept(existing.requester_dept) !== requester.department_id && !requester.is_admin) {
-          return json({ error: "You can only remove your own department's requests" }, 403);
-        }
-        await env.NOIR_DB.prepare("DELETE FROM asset_requests WHERE id = ?").bind(id).run();
-        return json({ ok: true });
       }
 
       if (method === "POST" && p === "/api/escalations/check") {

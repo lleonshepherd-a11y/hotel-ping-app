@@ -35,16 +35,6 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_messages_pair ON messages(from_dept, to_dept, created_at);
 
-  CREATE TABLE IF NOT EXISTS message_reactions (
-    id TEXT PRIMARY KEY,
-    message_id TEXT NOT NULL,
-    department_id TEXT NOT NULL,
-    emoji TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    UNIQUE(message_id, department_id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_message_reactions_message ON message_reactions(message_id);
-
   CREATE TABLE IF NOT EXISTS staff (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -400,37 +390,6 @@ db.exec(`
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_quick_replies_dept ON quick_replies(department_id, position);
-
-  CREATE TABLE IF NOT EXISTS stories (
-    id TEXT PRIMARY KEY,
-    department_id TEXT NOT NULL,
-    staff_name TEXT,
-    photo_path TEXT NOT NULL,
-    caption TEXT,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_stories_dept ON stories(department_id, created_at);
-  CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
-
-  CREATE TABLE IF NOT EXISTS story_views (
-    story_id TEXT NOT NULL,
-    department_id TEXT NOT NULL,
-    viewed_at TEXT NOT NULL,
-    PRIMARY KEY (story_id, department_id)
-  );
-
-  CREATE TABLE IF NOT EXISTS asset_requests (
-    id TEXT PRIMARY KEY,
-    item_name TEXT NOT NULL,
-    notes TEXT,
-    status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','borrowed','returned')),
-    requested_by TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    returned_at TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_asset_requests_status ON asset_requests(status, created_at);
 
   CREATE TABLE IF NOT EXISTS floors (
     id TEXT PRIMARY KEY,

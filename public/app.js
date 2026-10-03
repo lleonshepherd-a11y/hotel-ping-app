@@ -220,12 +220,10 @@ function mapServerMessage(row, self){
     edited: !!row.editedAt,
     mentions: row.mentions || undefined,
     signoff: row.signoff || undefined,
-    poll: row.poll || undefined,
     escalationLevel: row.escalationLevel || 0,
     affectsGuest: !!row.affectsGuest,
     staffName: row.staffName || undefined,
     maintTicketId: row.maintTicketId || undefined,
-    reactions: (row.reactions || []).map(function(r){ return { emoji: r.emoji, from: r.from === self ? "self" : r.from }; })
   };
 }
 
@@ -715,7 +713,6 @@ function fmtClockDuration(seconds){
   return m + ":" + (s < 10 ? "0" : "") + s;
 }
 function previewText(m){
-  if(m.poll) return (m.from === "self" ? "You: " : "") + "📊 Poll: " + m.poll.question;
   if(m.signoff) return (m.from === "self" ? "You: " : "") + "🖋 Sign-off request: " + m.signoff.title;
   if(m.type === "text") return (m.from === "self" ? "You: " : "") + m.text;
   if(m.type === "image") return (m.from === "self" ? "You: " : "") + "📷 Photo";
@@ -1769,16 +1766,14 @@ function hideMessageActionMenu(){
   setTimeout(function(){ msgActionMenu.hidden = true; }, 140);
 }
 
-var THUMB_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22V11l5-9a2.5 2.5 0 0 1 2.5 3l-1 5h5.5a2 2 0 0 1 2 2.4l-1.7 7A2 2 0 0 1 17.4 22H7z"/><path d="M7 22H4a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1h3"/></svg>';
-var THUMB_REACTION = "thumbsup";
 function showMessageActionMenu(m, x, y){
   // The menu opens the instant the long-press timer fires, which is often
   // still *during* the same touch/click that triggered it (finger/mouse
   // button not yet released). If a row ends up positioned right under that
   // still-down pointer, its release fires a synthetic click straight onto
   // the row - "selecting" whatever action happens to be there before the
-  // user ever consciously tapped it. Every row (and the reaction button)
-  // ignores clicks for a brief window after opening so only a deliberate,
+  // user ever consciously tapped it. Every row ignores clicks for a brief
+  // window after opening so only a deliberate,
   // later tap can trigger anything.
   var openedAt = Date.now();
   var MENU_CLICK_GUARD_MS = 400;
@@ -1791,11 +1786,6 @@ function showMessageActionMenu(m, x, y){
   if(!m.deleted) rows.push({ key:"complete", label: m.completed ? "Mark as not done" : "Mark as done", icon:ACTION_ICONS.check });
   if(!m.deleted && m.type === "text" && m.text && window.speechSynthesis) rows.push({ key:"speak", label:"Read aloud", icon:ACTION_ICONS.speak });
 
-  var myReaction = (m.reactions || []).filter(function(r){ return r.from === "self"; })[0];
-  var reactHtml = !m.deleted ? '<div class="msg-action-react-row">' +
-    '<button type="button" class="msg-action-react-btn'+(myReaction ? ' active' : '')+'" data-emoji="'+THUMB_REACTION+'" aria-label="'+(myReaction ? 'Remove reaction' : 'React with thumbs up')+'">'+THUMB_ICON+'</button>' +
-    '</div>' : '';
-
   var html = rows.map(function(r){
     return '<button type="button" class="msg-action-row" data-action="'+r.key+'">'+r.icon+'<span>'+r.label+'</span></button>';
   }).join("");
@@ -1803,16 +1793,7 @@ function showMessageActionMenu(m, x, y){
   // the system it stays. See confirmDeleteMessage's removal for the full
   // reasoning; this is the deliberate absence of that button, not an
   // oversight.
-  msgActionMenu.innerHTML = reactHtml + html;
-  if(!m.deleted){
-    msgActionMenu.querySelectorAll(".msg-action-react-btn").forEach(function(btn){
-      btn.addEventListener("click", function(){
-        if(Date.now() - openedAt < MENU_CLICK_GUARD_MS) return;
-        hideMessageActionMenu();
-        toggleReaction(m, btn.getAttribute("data-emoji"));
-      });
-    });
-  }
+  msgActionMenu.innerHTML = html;
 
   msgActionMenu.hidden = false;
   msgActionBackdrop.hidden = false;
@@ -1863,18 +1844,6 @@ function currentMessagesArray(){
   }
   STATE.data[STATE.active] = STATE.data[STATE.active] || [];
   return STATE.data[STATE.active];
-}
-
-function toggleReaction(m, emoji){
-  if(navigator.vibrate) navigator.vibrate(10);
-  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/reactions', 'POST', { emoji: emoji }).then(function(res){
-    var msgs = currentMessagesArray();
-    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
-    if(idx !== -1){
-      msgs[idx].reactions = (res.reactions || []).map(function(r){ return { emoji: r.emoji, from: r.from === STATE.self ? "self" : r.from }; });
-    }
-    renderThread();
-  }).catch(function(){ showToast("Couldn't react to that"); });
 }
 
 function togglePinMessage(m){
@@ -1975,42 +1944,14 @@ function openForwardPicker(m){
         renderList();
         if(STATE.active === to) renderThread();
         forwardOverlay.hidden = true;
-        resumeStoryProgress();
         showToast("Forwarded to " + DEPTS[to].name);
       }).catch(function(e){ forwardError.textContent = e.message || "Couldn't forward that message."; });
     });
   });
   forwardOverlay.hidden = false;
 }
-// forwardOverlay is reused for both message-forward and story-ping - either
-// can be opened while a story is mid-playback (openStoryPingPicker pauses it),
-// so every way this overlay closes has to resume it too, or the story behind
-// it freezes on that frame forever. resumeStoryProgress() is a no-op when
-// there's no story open/paused, so this is always safe to call.
-forwardClose.addEventListener("click", function(){ forwardOverlay.hidden = true; resumeStoryProgress(); });
-forwardOverlay.addEventListener("click", function(e){ if(e.target === forwardOverlay){ forwardOverlay.hidden = true; resumeStoryProgress(); } });
-
-function openStoryPingPicker(story){
-  forwardError.textContent = "";
-  forwardTitle.textContent = "Ping to…";
-  var targets = DEPT_ORDER.filter(function(id){ return id !== STATE.self; });
-  forwardDeptList.innerHTML = targets.map(function(id){
-    return '<button type="button" class="forward-dept-opt" data-dept="'+id+'">'+
-      '<span class="fwd-avatar" style="'+avatarStyleAttr(id)+'">'+avatarInnerHtml(id)+'</span>'+
-      DEPTS[id].name+'</button>';
-  }).join("");
-  forwardDeptList.querySelectorAll(".forward-dept-opt").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      var to = btn.getAttribute("data-dept");
-      apiSend('/api/stories/' + encodeURIComponent(story.id) + '/ping', 'POST', { to: to }).then(function(){
-        forwardOverlay.hidden = true;
-        resumeStoryProgress();
-        showToast("Pinged " + DEPTS[to].name);
-      }).catch(function(e){ forwardError.textContent = e.message || "Couldn't send that ping."; });
-    });
-  });
-  forwardOverlay.hidden = false;
-}
+forwardClose.addEventListener("click", function(){ forwardOverlay.hidden = true; });
+forwardOverlay.addEventListener("click", function(e){ if(e.target === forwardOverlay){ forwardOverlay.hidden = true; } });
 
 function attachLongPress(el, onLongPress){
   var LONG_PRESS_MS = 300, MOVE_TOLERANCE = 30;
@@ -2416,14 +2357,6 @@ function refreshMaintTicketCardInChat(ticket){
   });
 }
 
-function voteOnPoll(m, index){
-  apiSend('/api/messages/' + encodeURIComponent(m.id) + '/vote', 'POST', { optionIndex: index }).then(function(res){
-    var msgs = currentMessagesArray();
-    var idx = msgs.findIndex(function(x){ return x.id === m.id; });
-    if(idx !== -1) msgs[idx] = mapServerMessage(res.message, STATE.self);
-    renderThread();
-  }).catch(function(){ showToast("Couldn't record your vote"); });
-}
 function acceptRoomClean(m){
   apiSend('/api/messages/' + encodeURIComponent(m.id) + '/complete', 'POST', {}).then(function(res){
     var msgs = currentMessagesArray();
@@ -2448,57 +2381,6 @@ function buildRoomCleanCard(m){
   if(canAccept){
     card.querySelector(".room-clean-pill-btn").addEventListener("click", function(){ acceptRoomClean(m); });
   }
-  return card;
-}
-
-function buildPollCard(m){
-  var p = m.poll;
-  var votes = p.votes || {};
-  var counts = p.options.map(function(_, i){
-    return Object.keys(votes).filter(function(dept){ return votes[dept] === i; }).length;
-  });
-  var total = counts.reduce(function(a, b){ return a + b; }, 0);
-  var myVote = votes[STATE.self];
-
-  var card = document.createElement("div");
-  card.className = "poll-card";
-  var head = document.createElement("div");
-  head.className = "poll-head";
-  head.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><rect x="6" y="12" width="3" height="6" rx="0.5"/><rect x="11" y="8" width="3" height="10" rx="0.5"/><rect x="16" y="4" width="3" height="14" rx="0.5"/></svg> POLL';
-  card.appendChild(head);
-
-  var question = document.createElement("div");
-  question.className = "poll-question";
-  question.textContent = p.question;
-  card.appendChild(question);
-
-  var optionsWrap = document.createElement("div");
-  optionsWrap.className = "poll-options";
-  p.options.forEach(function(opt, i){
-    var pct = total ? Math.round((counts[i] / total) * 100) : 0;
-    var voters = Object.keys(votes).filter(function(dept){ return votes[dept] === i; });
-    var optBtn = document.createElement("button");
-    optBtn.type = "button";
-    optBtn.className = "poll-option" + (myVote === i ? " voted" : "");
-    optBtn.innerHTML =
-      '<div class="poll-option-fill" style="width:' + pct + '%"></div>' +
-      '<div class="poll-option-top">' +
-        '<span class="poll-option-label">' + (myVote === i ? '<svg class="poll-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' : '') + esc(opt) + '</span>' +
-        '<span class="poll-option-pct">' + pct + '%</span>' +
-      '</div>' +
-      (voters.length ? '<div class="poll-voter-avatars">' + voters.map(function(dept){
-        return '<span class="poll-voter-avatar" style="'+avatarStyleAttr(dept)+'" title="'+esc(DEPTS[dept] ? DEPTS[dept].name : dept)+'">'+avatarInnerHtml(dept)+'</span>';
-      }).join("") + '</div>' : '');
-    optBtn.addEventListener("click", function(){ voteOnPoll(m, i); });
-    optionsWrap.appendChild(optBtn);
-  });
-  card.appendChild(optionsWrap);
-
-  var meta = document.createElement("div");
-  meta.className = "poll-meta";
-  meta.textContent = total + (total === 1 ? " vote" : " votes");
-  card.appendChild(meta);
-
   return card;
 }
 
@@ -2675,8 +2557,7 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
   } else if(m.type === "audio"){
     bubble = buildAudioNode(m);
   }
-  var isEmptyPollBubble = m.poll && m.type === "text" && !m.text;
-  var hideTextBubble = isEmptyPollBubble || (m.signoff && m.type === "text") || (m.roomClean && m.type === "text") || (m.taskStatus && m.type === "text");
+  var hideTextBubble = (m.signoff && m.type === "text") || (m.roomClean && m.type === "text") || (m.taskStatus && m.type === "text");
   if(!hideTextBubble){
     if(!m.deleted && !m.pending && !m.failed) attachLongPress(bubble, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(bubble);
@@ -2713,20 +2594,9 @@ function buildMessageRow(m, groupEnd, msgsById, groupStart){
     if(!m.deleted && !m.pending && !m.failed) attachLongPress(signoffCard, function(x, y){ showMessageActionMenu(m, x, y); });
     wrap.appendChild(signoffCard);
   }
-  if(m.poll) wrap.appendChild(buildPollCard(m));
   if(m.roomClean) wrap.appendChild(buildRoomCleanCard(m));
   if(m.taskStatus) wrap.appendChild(buildTaskCard(m));
   if(m.maintTicketId) wrap.appendChild(buildMaintTicketCard(m));
-
-  if(m.reactions && m.reactions.length){
-    var mine = m.reactions.filter(function(r){ return r.from === "self"; })[0];
-    var pills = document.createElement("div");
-    pills.className = "msg-reactions-row" + (out ? " out" : "");
-    pills.innerHTML =
-      '<button type="button" class="msg-reaction-pill'+(mine ? ' mine' : '')+'" aria-label="'+m.reactions.length+' thumbs up reaction'+(m.reactions.length===1?'':'s')+(mine ? ', tap to remove yours' : ', tap to add yours')+'">'+THUMB_ICON+(m.reactions.length>1 ? ' <span>'+m.reactions.length+'</span>' : '')+'</button>';
-    pills.querySelector(".msg-reaction-pill").addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(m, THUMB_REACTION); });
-    wrap.appendChild(pills);
-  }
 
   var canInlineMeta = m.type === "text" && !hideTextBubble;
   var meta = document.createElement("div");
@@ -3210,12 +3080,6 @@ optSignoff.addEventListener("click", function(){
   closeHeaderMenu();
   openSignoffOverlay();
 });
-var optAssetRequest = document.getElementById("optAssetRequest");
-optAssetRequest.addEventListener("click", function(){
-  closeHeaderMenu();
-  openAssetsOverlay(true);
-});
-
 /* ---------------- Team feed (still a client-side demo - posts and
    attachments here aren't saved or shared with anyone else yet, this
    is for trying out the concept before we wire it to a real backend) ---------------- */
@@ -3546,73 +3410,6 @@ var feedVoiceBtn = document.getElementById("feedVoiceBtn");
     });
   });
 })();
-
-var optPoll = document.getElementById("optPoll");
-var pollComposeOverlay = document.getElementById("pollComposeOverlay");
-var pollComposeClose = document.getElementById("pollComposeClose");
-var pollComposeForm = document.getElementById("pollComposeForm");
-var pollQuestionInput = document.getElementById("pollQuestionInput");
-var pollOptionsList = document.getElementById("pollOptionsList");
-var pollAddOptionBtn = document.getElementById("pollAddOptionBtn");
-var pollComposeError = document.getElementById("pollComposeError");
-var pollComposeSubmit = document.getElementById("pollComposeSubmit");
-function addPollOptionInput(){
-  var count = pollOptionsList.querySelectorAll(".poll-option-input").length;
-  if(count >= 4) return;
-  var input = document.createElement("input");
-  input.type = "text";
-  input.className = "poll-option-input";
-  input.maxLength = 60;
-  input.placeholder = "Option " + (count + 1);
-  pollOptionsList.appendChild(input);
-  pollAddOptionBtn.hidden = pollOptionsList.querySelectorAll(".poll-option-input").length >= 4;
-}
-function openPollComposeOverlay(){
-  pollQuestionInput.value = "";
-  pollOptionsList.innerHTML = "";
-  addPollOptionInput();
-  addPollOptionInput();
-  pollComposeError.textContent = "";
-  pollComposeSubmit.disabled = false;
-  pollComposeOverlay.hidden = false;
-}
-optPoll.addEventListener("click", function(){
-  closeHeaderMenu();
-  openPollComposeOverlay();
-});
-pollAddOptionBtn.addEventListener("click", addPollOptionInput);
-pollComposeClose.addEventListener("click", function(){ pollComposeOverlay.hidden = true; });
-pollComposeOverlay.addEventListener("click", function(e){ if(e.target === pollComposeOverlay) pollComposeOverlay.hidden = true; });
-pollComposeForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  var question = pollQuestionInput.value.trim();
-  var options = Array.prototype.map.call(pollOptionsList.querySelectorAll(".poll-option-input"), function(inp){ return inp.value.trim(); }).filter(Boolean);
-  if(!question){ pollComposeError.textContent = "A question is required."; return; }
-  if(options.length < 2){ pollComposeError.textContent = "Add at least 2 options."; return; }
-  pollComposeSubmit.disabled = true;
-  pollComposeError.textContent = "";
-  var groupId = STATE.activeGroupId;
-  var deptId = STATE.active;
-  var payload = { from: STATE.self, type: "text", poll: { question: question, options: options } };
-  if(groupId) payload.groupId = groupId; else payload.to = deptId;
-  apiSend('/api/messages', 'POST', payload).then(function(res){
-    if(groupId){
-      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
-      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
-      if(STATE.activeGroupId === groupId) renderThread();
-    } else {
-      STATE.data[deptId] = STATE.data[deptId] || [];
-      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
-      renderList();
-      if(STATE.active === deptId) renderThread();
-    }
-    pollComposeOverlay.hidden = true;
-  }).catch(function(err){
-    pollComposeError.textContent = err.message || "Couldn't create that poll.";
-  }).then(function(){
-    pollComposeSubmit.disabled = false;
-  });
-});
 
 function handleAttachedFile(file){
   if(!file) return;
@@ -4314,7 +4111,7 @@ function boot(){
 var pollTimer = null;
 function messagesChangeSignature(msgs){
   return msgs.map(function(m){
-    return m.id+":"+m.status+":"+(m.edited?1:0)+":"+(m.deleted?1:0)+":"+(m.taskStatus||"")+":"+(m.completed?1:0)+":"+(m.pinned?1:0)+":"+(m.signoff?JSON.stringify(m.signoff):"")+":"+(m.poll?JSON.stringify(m.poll):"");
+    return m.id+":"+m.status+":"+(m.edited?1:0)+":"+(m.deleted?1:0)+":"+(m.taskStatus||"")+":"+(m.completed?1:0)+":"+(m.pinned?1:0)+":"+(m.signoff?JSON.stringify(m.signoff):"");
   }).join("|");
 }
 var refreshNowInFlight = null;
@@ -4325,11 +4122,6 @@ function refreshNow(){
   return refreshNowInFlight;
 }
 function refreshNowImpl(){
-  // Fire this alongside the message fetch below, not after it finishes -
-  // otherwise stories only start loading once messages have already been
-  // fetched AND rendered (two sequential round trips), and visibly pop in
-  // a beat later every time the app comes back from the background.
-  loadStories();
   var prevIds = {};
   Object.keys(STATE.data).forEach(function(id){
     prevIds[id] = {};
@@ -4489,7 +4281,6 @@ function enterApp(staff){
   tabRoomsBtn.hidden = staff.departmentId !== "housekeeping";
   msgInput.placeholder = "Message";
   boot();
-  loadStories();
   startPolling();
   setTimeout(function(){
     if(canManageMaintenanceView()) refreshMaintenanceBadge();
@@ -5693,492 +5484,6 @@ deptPhotoRemoveBtn.addEventListener("click", function(){
   }).finally(function(){ deptPhotoRemoveBtn.disabled = false; });
 });
 
-/* ---- Stories ---- */
-var storiesRow = document.getElementById("storiesRow");
-STATE.stories = [];
-function fmtStoryAge(iso){
-  var diff = Math.max(0, Math.round((Date.now() - new Date(iso).getTime())/60000));
-  if(diff < 1) return "Just now";
-  if(diff < 60) return diff + (diff === 1 ? " min ago" : " mins ago");
-  var h = Math.round(diff/60);
-  return h + (h === 1 ? " hour ago" : " hours ago");
-}
-function storiesByDept(){
-  var grouped = {};
-  STATE.stories.forEach(function(s){
-    grouped[s.departmentId] = grouped[s.departmentId] || [];
-    grouped[s.departmentId].push(s);
-  });
-  Object.keys(grouped).forEach(function(id){ grouped[id].sort(function(a,b){ return new Date(a.createdAt) - new Date(b.createdAt); }); });
-  return grouped;
-}
-function loadStories(){
-  return apiGet('/api/stories').then(function(res){
-    STATE.stories = res.stories || [];
-    renderStoriesRow();
-  }).catch(function(err){
-    // A failed load used to leave storiesRow with whatever it last had -
-    // nothing, on first load - so the whole feature silently looked gone.
-    // Render anyway so "Your story" (always in the row regardless of data)
-    // still shows up even when the fetch itself failed.
-    console.error("loadStories failed:", err);
-    renderStoriesRow();
-  });
-}
-function renderStoriesRow(){
-  var grouped = storiesByDept();
-  var mine = grouped[STATE.self] || [];
-  var others = DEPT_ORDER.filter(function(id){ return id !== STATE.self && grouped[id] && grouped[id].length; });
-  others.sort(function(a,b){
-    var aUnseen = grouped[a].some(function(s){ return !s.viewed; });
-    var bUnseen = grouped[b].some(function(s){ return !s.viewed; });
-    if(aUnseen !== bUnseen) return aUnseen ? -1 : 1;
-    var aLast = grouped[a][grouped[a].length-1].createdAt;
-    var bLast = grouped[b][grouped[b].length-1].createdAt;
-    return new Date(bLast) - new Date(aLast);
-  });
-  var order = [STATE.self].concat(others);
-  storiesRow.innerHTML = "";
-  order.forEach(function(id){
-    var reel = grouped[id] || [];
-    var isMine = id === STATE.self;
-    var hasUnseen = reel.some(function(s){ return !s.viewed; });
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "story-item" + (isMine ? " mine" : "") + (hasUnseen ? " unseen" : "");
-    var d = DEPTS[id];
-    // The ring should preview the actual story photo (like WhatsApp/IG
-    // status), not the flat department icon - reel is oldest-first, so the
-    // last entry is the most recent story to show as the thumbnail.
-    var latestStory = reel.length ? reel[reel.length - 1] : null;
-    var avatarInner = latestStory && latestStory.photoUrl
-      ? iconSvg(id) + '<img src="'+esc(mediaUrl(latestStory.photoUrl))+'" alt="" class="avatar-photo-img" onerror="this.remove()">'
-      : avatarInnerHtml(id);
-    btn.innerHTML =
-      '<span class="story-ring"><span class="story-avatar-inner" style="'+avatarStyleAttr(id)+'">'+avatarInner+'</span>'+
-        (isMine ? '<span class="story-add-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>' : '') +
-      '</span>' +
-      '<span class="story-item-label">'+(isMine ? "Your story" : esc(d ? d.name : id))+'</span>';
-    btn.addEventListener("click", function(e){
-      if(isMine && e.target.closest(".story-add-badge")){ openPostStoryOverlay(); return; }
-      if(reel.length) openStoryViewer(id);
-      else if(isMine) openPostStoryOverlay();
-    });
-    storiesRow.appendChild(btn);
-  });
-}
-
-var storyEditor = document.getElementById("storyEditor");
-var storyEditorImg = document.getElementById("storyEditorImg");
-var postStoryClose = document.getElementById("postStoryClose");
-var storyRetakeBtn = document.getElementById("storyRetakeBtn");
-var storyPhotoInput = document.getElementById("storyPhotoInput");
-var storyCaptionInput = document.getElementById("storyCaptionInput");
-var storyPostBtn = document.getElementById("storyPostBtn");
-var storyPostError = document.getElementById("storyPostError");
-var storyPendingFile = null;
-function openPostStoryOverlay(){
-  storyPhotoInput.click();
-}
-function autoGrowStoryCaption(){
-  storyCaptionInput.style.height = "auto";
-  storyCaptionInput.style.height = Math.min(storyCaptionInput.scrollHeight, 160) + "px";
-}
-storyPhotoInput.addEventListener("change", function(){
-  var file = storyPhotoInput.files[0];
-  storyPhotoInput.value = "";
-  if(!file) return;
-  var isFreshOpen = storyEditor.hidden;
-  storyPendingFile = file;
-  var reader = new FileReader();
-  reader.onload = function(){
-    storyEditorImg.src = reader.result;
-    if(isFreshOpen) storyCaptionInput.value = "";
-    storyPostError.textContent = "";
-    storyEditor.hidden = false;
-    autoGrowStoryCaption();
-  };
-  reader.readAsDataURL(file);
-});
-postStoryClose.addEventListener("click", function(){ storyEditor.hidden = true; storyPendingFile = null; storyMentionPopover.hidden = true; });
-storyRetakeBtn.addEventListener("click", function(){ storyPhotoInput.click(); });
-storyCaptionInput.addEventListener("input", function(){ autoGrowStoryCaption(); updateStoryMentionPopover(); });
-storyCaptionInput.addEventListener("click", updateStoryMentionPopover);
-storyCaptionInput.addEventListener("blur", function(){ setTimeout(function(){ storyMentionPopover.hidden = true; }, 150); });
-
-// Story captions can @mention management (the GM and any assigned
-// head-of-department contacts) - a plain department queue isn't a
-// specific person to call out by name, so it's excluded from candidates.
-var storyMentionPopover = document.getElementById("storyMentionPopover");
-function storyMentionCandidates(){
-  var ids = ["gm"].concat(HEAD_DEPT_IDS.filter(function(id){
-    var realId = headRealDeptId(id);
-    return DEPT_HEADS[realId];
-  }));
-  return ids.filter(function(id){ return id !== STATE.self; }).map(function(id){
-    return { id: id, name: DEPTS[id] ? DEPTS[id].name : id };
-  });
-}
-function updateStoryMentionPopover(){
-  var val = storyCaptionInput.value;
-  var caret = storyCaptionInput.selectionStart;
-  var uptoCaret = val.slice(0, caret);
-  var match = uptoCaret.match(/@([a-zA-Z ]*)$/);
-  if(!match){ storyMentionPopover.hidden = true; return; }
-  var term = match[1].toLowerCase();
-  var candidates = storyMentionCandidates().filter(function(c){ return c.name.toLowerCase().indexOf(term) !== -1; });
-  if(!candidates.length){ storyMentionPopover.hidden = true; return; }
-  storyMentionPopover.innerHTML = candidates.map(function(c){
-    return '<button type="button" class="story-mention-opt" data-dept="'+c.id+'">'+
-      '<span class="fwd-avatar" style="'+avatarStyleAttr(c.id)+'">'+avatarInnerHtml(c.id)+'</span>'+esc(c.name)+'</button>';
-  }).join("");
-  storyMentionPopover.hidden = false;
-  storyMentionPopover.querySelectorAll(".story-mention-opt").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      var deptId = btn.getAttribute("data-dept");
-      var name = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
-      var before = val.slice(0, caret - match[0].length);
-      var after = val.slice(caret);
-      var inserted = "@" + name + " ";
-      storyCaptionInput.value = before + inserted + after;
-      var newCaret = before.length + inserted.length;
-      storyCaptionInput.focus();
-      storyCaptionInput.setSelectionRange(newCaret, newCaret);
-      autoGrowStoryCaption();
-      storyMentionPopover.hidden = true;
-    });
-  });
-}
-function postStoryNow(){
-  if(!storyPendingFile || storyPostBtn.disabled) return;
-  storyPostError.textContent = "";
-  storyPostBtn.disabled = true;
-  blobToBase64(storyPendingFile).then(function(b64){
-    return apiSend('/api/stories', 'POST', { fileBase64: b64, fileMime: storyPendingFile.type, caption: storyCaptionInput.value.trim() || undefined });
-  }).then(function(res){
-    STATE.stories.push(res.story);
-    renderStoriesRow();
-    storyEditor.hidden = true;
-    storyPendingFile = null;
-    showToast("Update posted");
-  }).catch(function(err){
-    storyPostError.textContent = err.message || "Couldn't post that update.";
-    storyPostBtn.disabled = false;
-  });
-}
-storyPostBtn.addEventListener("click", postStoryNow);
-storyEditorImg.addEventListener("click", postStoryNow);
-
-var storyViewer = document.getElementById("storyViewer");
-var storyProgressRow = document.getElementById("storyProgressRow");
-var storyViewerAvatar = document.getElementById("storyViewerAvatar");
-var storyViewerName = document.getElementById("storyViewerName");
-var storyViewerSub = document.getElementById("storyViewerSub");
-var storyViewerImg = document.getElementById("storyViewerImg");
-var storyViewerCaption = document.getElementById("storyViewerCaption");
-var storyViewerClose = document.getElementById("storyViewerClose");
-var storyViewerDelete = document.getElementById("storyViewerDelete");
-var storyPingBtn = document.getElementById("storyPingBtn");
-var storyLikeBtn = document.getElementById("storyLikeBtn");
-var storyTapLeft = document.getElementById("storyTapLeft");
-var storyTapRight = document.getElementById("storyTapRight");
-var storyViewerStage = document.getElementById("storyViewerStage");
-var STORY_DURATION_MS = 5000;
-var storyViewState = null;
-var storyHoldTimer = null;
-var storySuppressClick = false;
-
-function storyReelOrder(){
-  var grouped = storiesByDept();
-  var order = [STATE.self].concat(DEPT_ORDER.filter(function(id){ return id !== STATE.self; }));
-  return order.filter(function(id){ return grouped[id] && grouped[id].length; });
-}
-function openStoryViewer(deptId){
-  var grouped = storiesByDept();
-  var deptOrder = storyReelOrder();
-  var idx = deptOrder.indexOf(deptId);
-  if(idx === -1) return;
-  storyViewState = { deptOrder: deptOrder, deptIdx: idx, storyIdx: 0, timer: null };
-  storyViewer.hidden = false;
-  renderStoryFrame();
-}
-function currentReel(){
-  if(!storyViewState) return [];
-  var grouped = storiesByDept();
-  return grouped[storyViewState.deptOrder[storyViewState.deptIdx]] || [];
-}
-function renderStoryFrame(){
-  if(!storyViewState) return;
-  if(storyViewState.timer){ clearTimeout(storyViewState.timer); storyViewState.timer = null; }
-  var reel = currentReel();
-  if(!reel.length){ closeStoryViewer(); return; }
-  var deptId = storyViewState.deptOrder[storyViewState.deptIdx];
-  var story = reel[storyViewState.storyIdx];
-
-  storyProgressRow.innerHTML = "";
-  reel.forEach(function(s, i){
-    var seg = document.createElement("div");
-    seg.className = "story-progress-seg" + (i < storyViewState.storyIdx ? " done" : (i === storyViewState.storyIdx ? " active" : ""));
-    seg.innerHTML = '<div class="story-progress-fill"></div>';
-    if(i === storyViewState.storyIdx){
-      seg.querySelector(".story-progress-fill").style.animationDuration = STORY_DURATION_MS + "ms";
-    }
-    storyProgressRow.appendChild(seg);
-  });
-
-  storyViewerAvatar.setAttribute("style", avatarStyleAttr(deptId));
-  storyViewerAvatar.innerHTML = avatarInnerHtml(deptId);
-  storyViewerName.textContent = (story.staffName ? story.staffName : (DEPTS[deptId] ? DEPTS[deptId].name : deptId));
-  storyViewerSub.textContent = (DEPTS[deptId] ? DEPTS[deptId].name : "") + " · " + fmtStoryAge(story.createdAt);
-  storyViewerImg.src = mediaUrl(story.photoUrl);
-  storyViewerCaption.textContent = story.caption || "";
-  storyViewerCaption.hidden = !story.caption;
-  storyViewerDelete.hidden = !(deptId === STATE.self || (AUTH.staff && AUTH.staff.isAdmin));
-  storyLikeBtn.classList.remove("liked");
-  storyLikeBtn.disabled = false;
-
-  if(!story.viewed){
-    story.viewed = true;
-    apiSend('/api/stories/' + encodeURIComponent(story.id) + '/view', 'POST', {}).catch(function(){});
-  }
-
-  storyViewState.paused = false;
-  storyViewState.remainingMs = STORY_DURATION_MS;
-  storyViewState.segStartedAt = Date.now();
-  storyViewState.timer = setTimeout(function(){ storyAdvance(1); }, STORY_DURATION_MS);
-}
-function pauseStoryProgress(){
-  if(!storyViewState || storyViewState.paused) return;
-  storyViewState.paused = true;
-  if(storyViewState.timer){ clearTimeout(storyViewState.timer); storyViewState.timer = null; }
-  storyViewState.remainingMs = Math.max(storyViewState.remainingMs - (Date.now() - storyViewState.segStartedAt), 0);
-  var activeFill = storyProgressRow.querySelector(".story-progress-seg.active .story-progress-fill");
-  if(activeFill) activeFill.style.animationPlayState = "paused";
-}
-function resumeStoryProgress(){
-  if(!storyViewState || !storyViewState.paused) return;
-  storyViewState.paused = false;
-  storyViewState.segStartedAt = Date.now();
-  var activeFill = storyProgressRow.querySelector(".story-progress-seg.active .story-progress-fill");
-  if(activeFill) activeFill.style.animationPlayState = "running";
-  storyViewState.timer = setTimeout(function(){ storyAdvance(1); }, storyViewState.remainingMs);
-}
-function storyAdvance(dir){
-  if(!storyViewState) return;
-  var reel = currentReel();
-  var nextStoryIdx = storyViewState.storyIdx + dir;
-  if(nextStoryIdx >= 0 && nextStoryIdx < reel.length){
-    storyViewState.storyIdx = nextStoryIdx;
-    renderStoryFrame();
-    return;
-  }
-  var nextDeptIdx = storyViewState.deptIdx + dir;
-  if(nextDeptIdx >= 0 && nextDeptIdx < storyViewState.deptOrder.length){
-    storyViewState.deptIdx = nextDeptIdx;
-    storyViewState.storyIdx = dir > 0 ? 0 : (storiesByDept()[storyViewState.deptOrder[nextDeptIdx]] || []).length - 1;
-    renderStoryFrame();
-    return;
-  }
-  closeStoryViewer();
-}
-function closeStoryViewer(){
-  if(storyViewState && storyViewState.timer) clearTimeout(storyViewState.timer);
-  storyViewState = null;
-  storyViewer.hidden = true;
-  renderStoriesRow();
-}
-storyViewerClose.addEventListener("click", closeStoryViewer);
-storyTapLeft.addEventListener("click", function(){ if(storySuppressClick){ storySuppressClick = false; return; } storyAdvance(-1); });
-storyTapRight.addEventListener("click", function(){ if(storySuppressClick){ storySuppressClick = false; return; } storyAdvance(1); });
-storyViewerStage.addEventListener("pointerdown", function(){
-  clearTimeout(storyHoldTimer);
-  storyHoldTimer = setTimeout(function(){
-    pauseStoryProgress();
-    storySuppressClick = true;
-  }, 180);
-});
-function endStoryHold(){
-  clearTimeout(storyHoldTimer);
-  if(storyViewState && storyViewState.paused) resumeStoryProgress();
-}
-storyViewerStage.addEventListener("pointerup", endStoryHold);
-storyViewerStage.addEventListener("pointercancel", endStoryHold);
-storyViewerStage.addEventListener("pointerleave", endStoryHold);
-storyViewerDelete.addEventListener("click", function(){
-  if(!storyViewState) return;
-  var reel = currentReel();
-  var story = reel[storyViewState.storyIdx];
-  if(!story) return;
-  pauseStoryProgress();
-  showConfirm({ title: "Delete this update?" }).then(function(ok){
-    if(!ok){ resumeStoryProgress(); return; }
-    apiDelete('/api/stories/' + encodeURIComponent(story.id)).then(function(){
-      STATE.stories = STATE.stories.filter(function(s){ return s.id !== story.id; });
-      var newReel = currentReel();
-      if(!newReel.length){ storyAdvance(1); return; }
-      if(storyViewState.storyIdx >= newReel.length) storyViewState.storyIdx = newReel.length - 1;
-      renderStoryFrame();
-    }).catch(function(){ showToast("Couldn't delete that update"); resumeStoryProgress(); });
-  });
-});
-storyPingBtn.addEventListener("click", function(){
-  if(!storyViewState) return;
-  var reel = currentReel();
-  var story = reel[storyViewState.storyIdx];
-  if(!story) return;
-  pauseStoryProgress();
-  openStoryPingPicker(story);
-});
-storyLikeBtn.addEventListener("click", function(){
-  if(!storyViewState || storyLikeBtn.disabled) return;
-  var reel = currentReel();
-  var story = reel[storyViewState.storyIdx];
-  if(!story) return;
-  storyLikeBtn.disabled = true;
-  storyLikeBtn.classList.add("liked");
-  apiSend('/api/stories/' + encodeURIComponent(story.id) + '/like', 'POST', {}).then(function(){
-    showToast("Liked");
-  }).catch(function(e){
-    storyLikeBtn.classList.remove("liked");
-    showToast(e.message || "Couldn't like that");
-  }).finally(function(){ storyLikeBtn.disabled = false; });
-});
-
-var notifSettingsBtn = document.getElementById("notifSettingsBtn");
-var notifSettingsOverlay = document.getElementById("notifSettingsOverlay");
-var notifSettingsClose = document.getElementById("notifSettingsClose");
-var notifSettingsList = document.getElementById("notifSettingsList");
-function renderNotifSettings(mutedIds){
-  if(!mutedIds.length){
-    notifSettingsList.innerHTML = '<div class="handover-empty">You haven\'t muted any conversations.</div>';
-    return;
-  }
-  notifSettingsList.innerHTML = "";
-  mutedIds.forEach(function(deptId){
-    var row = document.createElement("div");
-    row.className = "mute-row";
-    var name = document.createElement("span");
-    name.className = "mute-row-name";
-    name.textContent = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
-    row.appendChild(name);
-    var unmuteBtn = document.createElement("button");
-    unmuteBtn.type = "button";
-    unmuteBtn.textContent = "Unmute";
-    unmuteBtn.addEventListener("click", function(){
-      apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
-        STATE.muted[deptId] = res.muted;
-        showToast("Unmuted");
-        loadNotifSettings();
-      }).catch(function(){ showToast("Couldn't unmute"); });
-    });
-    row.appendChild(unmuteBtn);
-    notifSettingsList.appendChild(row);
-  });
-}
-function loadNotifSettings(){
-  notifSettingsList.innerHTML = '<div class="handover-empty">Loading…</div>';
-  apiGet('/api/muted?self=' + encodeURIComponent(STATE.self)).then(function(res){
-    renderNotifSettings(res.muted || []);
-  }).catch(function(){
-    notifSettingsList.innerHTML = '<div class="handover-empty">Couldn\'t load notification settings.</div>';
-  });
-}
-notifSettingsBtn.addEventListener("click", function(){
-  notifSettingsOverlay.hidden = false;
-  loadNotifSettings();
-});
-notifSettingsClose.addEventListener("click", function(){ notifSettingsOverlay.hidden = true; });
-notifSettingsOverlay.addEventListener("click", function(e){ if(e.target === notifSettingsOverlay) notifSettingsOverlay.hidden = true; });
-
-// ---- GM's "only notify me for department heads" switch (GM-only) ----
-// Whether the message itself gets through is untouched by this - the GM
-// still sees every department's conversation and can reply normally. This
-// only silences the push notification for plain departments (foh, kitchen,
-// housekeeping, ...); a head-of-department contact (head_kitchen etc.)
-// still notifies him regardless of this switch's state.
-var gmMuteDeptsBtn = document.getElementById("gmMuteDeptsBtn");
-var gmMuteDeptsSwitch = document.getElementById("gmMuteDeptsSwitch");
-var gmMuteDeptsOn = false;
-function renderGmMuteDepartments(on){
-  gmMuteDeptsOn = !!on;
-  gmMuteDeptsSwitch.classList.toggle("on", gmMuteDeptsOn);
-  gmMuteDeptsSwitch.setAttribute("aria-checked", gmMuteDeptsOn ? "true" : "false");
-}
-function loadGmMuteDepartments(){
-  apiGet('/api/gm/mute-departments').then(function(res){
-    renderGmMuteDepartments(!!res.muteDepartments);
-  }).catch(function(){});
-}
-function toggleGmMuteDepartments(){
-  var next = !gmMuteDeptsOn;
-  gmMuteDeptsSwitch.disabled = true;
-  apiSend('/api/gm/mute-departments', 'POST', { on: next }).then(function(res){
-    renderGmMuteDepartments(!!res.muteDepartments);
-    showToast(res.muteDepartments ? "Only department heads will notify you now" : "All departments will notify you again");
-  }).catch(function(){
-    showToast("Couldn't update that setting");
-  }).finally(function(){ gmMuteDeptsSwitch.disabled = false; });
-}
-gmMuteDeptsBtn.addEventListener("click", toggleGmMuteDepartments);
-gmMuteDeptsSwitch.addEventListener("click", function(e){ e.stopPropagation(); toggleGmMuteDepartments(); });
-
-var pushEnableRowBtn = document.getElementById("pushEnableRowBtn");
-pushEnableRowBtn.addEventListener("click", function(){
-  if(!pushSupported()){ showToast("Push isn't supported on this device"); return; }
-  if(Notification.permission === "denied"){
-    showToast("Notifications are blocked. Enable them in your device Settings.");
-    return;
-  }
-  pushEnableRowBtn.disabled = true;
-  Notification.requestPermission().then(function(perm){
-    if(perm !== "granted"){ showToast("Notifications weren't enabled"); return; }
-    return subscribeToPush().then(function(){ showToast("Notifications enabled"); });
-  }).catch(function(){
-    showToast("Couldn't enable notifications");
-  }).finally(function(){ pushEnableRowBtn.disabled = false; });
-});
-
-var myActivityBtn = document.getElementById("myActivityBtn");
-var myActivityOverlay = document.getElementById("myActivityOverlay");
-var myActivityClose = document.getElementById("myActivityClose");
-var myActivityList = document.getElementById("myActivityList");
-myActivityBtn.addEventListener("click", function(){
-  myActivityList.innerHTML = '<div class="handover-empty">Loading…</div>';
-  myActivityOverlay.hidden = false;
-  apiGet('/api/response-times?mine=1').then(function(res){
-    renderResponseTimes(res.departments, myActivityList);
-  }).catch(function(){
-    myActivityList.innerHTML = '<div class="handover-empty">Couldn\'t load your activity.</div>';
-  });
-});
-myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
-myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
-
-var lastPlannerReminderIds = null;
-var lastGuestRequestIds = null;
-function pollMissed(){
-  apiGet('/api/missed').then(function(res){
-    var plannerIds = res.items.filter(function(i){ return i.kind === "planner"; }).map(function(i){ return i.id; });
-    if(lastPlannerReminderIds !== null){
-      var hasNewReminder = plannerIds.some(function(id){ return lastPlannerReminderIds.indexOf(id) === -1; });
-      if(hasNewReminder && isOnDuty(STATE.self)) playPlannerChime();
-    }
-    lastPlannerReminderIds = plannerIds;
-    // Guest requests don't land as a chat message (no department "sent"
-    // them - a guest scanned a QR code), so unlike a ticket or a sign-off,
-    // nothing about them flows through the normal new-message chime. Ping
-    // for a newly-appeared one here instead, or FOH gets a silent badge
-    // change for the one thing this system's entire premise is "you get a
-    // ping for it".
-    var guestIds = res.items.filter(function(i){ return i.kind === "guestRequest"; }).map(function(i){ return i.id; });
-    if(lastGuestRequestIds !== null){
-      var hasNewGuestRequest = guestIds.some(function(id){ return lastGuestRequestIds.indexOf(id) === -1; });
-      if(hasNewGuestRequest && isOnDuty(STATE.self)) playChime(false);
-    }
-    lastGuestRequestIds = guestIds;
-  }).catch(function(e){ console.error("pollMissed failed:", e && e.stack || e); });
-}
-
 /* ---- Hold-for-help safety alert ---- */
 var helpHoldBtn = document.getElementById("helpHoldBtn");
 var helpHoldRing = document.getElementById("helpHoldRing");
@@ -6923,22 +6228,19 @@ function opsClickRow(name, sub, riskClass, onClick){
   return row;
 }
 
-function renderOperational(missedItems, assetRequests){
+function renderOperational(missedItems){
   var homeDept = AUTH.staff.departmentId;
   var tasks = missedItems.filter(function(i){ return i.kind === "task"; }).map(function(i){ return mapServerMessage(i.message, homeDept); });
   var signoffs = missedItems.filter(function(i){ return i.kind === "approval"; }).map(function(i){ return mapServerMessage(i.message, homeDept); });
-  var openRequests = (assetRequests || []).filter(function(r){ return r.status === "requested"; });
 
-  operationalCount.hidden = !(tasks.length + signoffs.length + openRequests.length);
-  operationalCount.textContent = tasks.length + signoffs.length + openRequests.length;
+  operationalCount.hidden = !(tasks.length + signoffs.length);
+  operationalCount.textContent = tasks.length + signoffs.length;
 
   operationalBody.innerHTML =
     '<div class="ops-section-label">Tasks</div>' +
     '<div class="ops-list" id="opTasksList"></div>' +
     '<div class="ops-section-label">Sign-offs</div>' +
-    '<div class="ops-list" id="opSignoffsList"></div>' +
-    '<div class="ops-section-label">Item requests</div>' +
-    '<div class="ops-list" id="opRequestsList"></div>';
+    '<div class="ops-list" id="opSignoffsList"></div>';
 
   var tasksList = document.getElementById("opTasksList");
   if(!tasks.length){ tasksList.outerHTML = '<div class="ops-empty-line">Nothing outstanding.</div>'; }
@@ -6954,21 +6256,11 @@ function renderOperational(missedItems, assetRequests){
     var sub = (DEPTS[m.from] ? DEPTS[m.from].name : m.from) + ' · Awaiting your decision';
     signoffsList.appendChild(opsClickRow(m.signoff ? m.signoff.title : "Sign-off request", sub, "risk", function(){ openOperationalItem(m); }));
   });
-
-  var requestsList = document.getElementById("opRequestsList");
-  if(!openRequests.length){ requestsList.outerHTML = '<div class="ops-empty-line">No open item requests.</div>'; }
-  else openRequests.forEach(function(r){
-    var sub = (DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy) + ' needs this';
-    requestsList.appendChild(opsClickRow(r.itemName, sub, "risk", function(){
-      operationalOverlay.hidden = true;
-      assetsBtn.click();
-    }));
-  });
 }
 
 function loadOperational(){
-  Promise.all([apiGet('/api/missed'), apiGet('/api/assets')]).then(function(results){
-    renderOperational(results[0].items, results[1].requests);
+  apiGet('/api/missed').then(function(res){
+    renderOperational(res.items);
   }).catch(function(){
     operationalBody.innerHTML = '<div class="handover-empty">Couldn\'t load this.</div>';
   });
@@ -9737,169 +9029,6 @@ newMaintForm.addEventListener("submit", function(e){
   }).catch(function(err){
     submitBtn.textContent = originalBtnLabel;
     maintError.textContent = err.message || "Couldn't report that issue.";
-  }).finally(function(){ submitBtn.disabled = false; });
-});
-
-/* ---- Hotel asset exchange (reached via the composer's "Item request"
-   option and Profile > More options > Asset exchange - not a main tab) ---- */
-var assetFeed = document.getElementById("assetFeed");
-var newAssetForm = document.getElementById("newAssetForm");
-var newAssetItem = document.getElementById("newAssetItem");
-var newAssetNotes = document.getElementById("newAssetNotes");
-var assetError = document.getElementById("assetError");
-STATE.assetRequests = STATE.assetRequests || [];
-var ASSET_STATUS_LABEL = { requested: "Requested", borrowed: "Borrowed", returned: "Returned" };
-var ASSET_STATUS_ORDER = { requested: 0, borrowed: 1, returned: 2 };
-var ASSET_NEXT_STATUS = { requested: "borrowed", borrowed: "returned" };
-var ASSET_NEXT_LABEL = { requested: "Mark borrowed", borrowed: "Mark returned" };
-
-var assetsOverlay = document.getElementById("assetsOverlay");
-var assetsClose = document.getElementById("assetsClose");
-var assetsBtn = document.getElementById("assetsBtn");
-function refreshAssetsList(){
-  apiGet('/api/assets').then(function(res){
-    STATE.assetRequests = res.requests;
-    if(!assetsOverlay.hidden) renderAssetsBoard();
-  }).catch(function(){});
-}
-function openAssetsOverlay(focusForm){
-  assetsOverlay.hidden = false;
-  assetFeed.innerHTML = '<div class="maint-col-empty">Loading&hellip;</div>';
-  refreshAssetsList();
-  if(focusForm) setTimeout(function(){ newAssetItem.focus(); }, 30);
-}
-assetsClose.addEventListener("click", function(){ assetsOverlay.hidden = true; });
-assetsOverlay.addEventListener("click", function(e){ if(e.target === assetsOverlay) assetsOverlay.hidden = true; });
-assetsBtn.addEventListener("click", function(){ openAssetsOverlay(false); });
-
-var assetSearchInput = document.getElementById("assetSearchInput");
-var assetSearchClear = document.getElementById("assetSearchClear");
-STATE.assetSearchTerm = "";
-assetSearchInput.addEventListener("input", function(){
-  STATE.assetSearchTerm = assetSearchInput.value;
-  assetSearchClear.hidden = STATE.assetSearchTerm.length === 0;
-  renderAssetsBoard();
-});
-assetSearchClear.addEventListener("click", function(){
-  assetSearchInput.value = "";
-  STATE.assetSearchTerm = "";
-  assetSearchClear.hidden = true;
-  renderAssetsBoard();
-  assetSearchInput.focus();
-});
-
-function sortedAssetRequests(){
-  return (STATE.assetRequests || []).slice().sort(function(a, b){
-    if(ASSET_STATUS_ORDER[a.status] !== ASSET_STATUS_ORDER[b.status]) return ASSET_STATUS_ORDER[a.status] - ASSET_STATUS_ORDER[b.status];
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
-}
-
-function renderAssetsBoard(){
-  var term = STATE.assetSearchTerm || "";
-  var requests = sortedAssetRequests().filter(function(r){
-    return matchesSearch(term, [r.itemName, r.notes, DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy]);
-  });
-  assetFeed.innerHTML = "";
-  if(!requests.length){
-    assetFeed.innerHTML = '<div class="maint-col-empty">'+(term ? "No requests match \""+esc(term)+"\"" : "No asset requests yet")+'</div>';
-    return;
-  }
-  requests.forEach(function(r){ assetFeed.appendChild(buildAssetCard(r)); });
-}
-
-function updateAssetStatus(id, status){
-  var r = STATE.assetRequests.find(function(x){ return x.id === id; });
-  var prevStatus = r ? r.status : null;
-  if(r) r.status = status;
-  renderAssetsBoard();
-  apiSend('/api/assets/' + encodeURIComponent(id) + '/status', 'POST', { status: status }).then(function(res){
-    var idx = STATE.assetRequests.findIndex(function(x){ return x.id === id; });
-    if(idx !== -1) STATE.assetRequests[idx] = res.request;
-    renderAssetsBoard();
-    showToast(ASSET_STATUS_LABEL[status]);
-  }).catch(function(){
-    if(r && prevStatus) r.status = prevStatus;
-    renderAssetsBoard();
-    showToast("Couldn't update that");
-  });
-}
-
-function deleteAssetRequest(id){
-  showConfirm({ title: "Remove this request?", confirmLabel: "Remove" }).then(function(ok){
-    if(!ok) return;
-    apiDelete('/api/assets/' + encodeURIComponent(id)).then(function(){
-      STATE.assetRequests = STATE.assetRequests.filter(function(x){ return x.id !== id; });
-      renderAssetsBoard();
-    }).catch(function(err){
-      showToast(err.message || "Couldn't remove that");
-    });
-  });
-}
-
-function buildAssetCard(r){
-  var card = document.createElement("div");
-  card.className = "asset-card status-" + r.status;
-
-  var top = document.createElement("div");
-  top.className = "asset-card-top";
-  top.innerHTML = '<span class="asset-card-item">' + esc(r.itemName) + '</span>' +
-    '<span class="asset-status-pill ' + r.status + '">' + ASSET_STATUS_LABEL[r.status] + '</span>';
-  card.appendChild(top);
-
-  if(r.notes){
-    var notes = document.createElement("div");
-    notes.className = "asset-card-notes";
-    notes.textContent = r.notes;
-    card.appendChild(notes);
-  }
-
-  var meta = document.createElement("div");
-  meta.className = "asset-card-meta";
-  var deptName = DEPTS[r.requestedBy] ? DEPTS[r.requestedBy].name : r.requestedBy;
-  meta.textContent = deptName + " · " + (r.status === "returned" ? "Returned " + fmtNoteTime(r.returnedAt) : "Requested " + fmtNoteTime(r.createdAt));
-  card.appendChild(meta);
-
-  var actions = document.createElement("div");
-  actions.className = "asset-card-actions";
-  var isMine = AUTH.staff && (r.requestedBy === STATE.self || AUTH.staff.isAdmin);
-  if(ASSET_NEXT_STATUS[r.status] && isMine){
-    var nextBtn = document.createElement("button");
-    nextBtn.type = "button";
-    nextBtn.className = "asset-card-btn primary";
-    nextBtn.textContent = ASSET_NEXT_LABEL[r.status];
-    nextBtn.addEventListener("click", function(){ updateAssetStatus(r.id, ASSET_NEXT_STATUS[r.status]); });
-    actions.appendChild(nextBtn);
-  }
-  if(isMine){
-    var delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "asset-card-btn danger";
-    delBtn.textContent = "Remove";
-    delBtn.addEventListener("click", function(){ deleteAssetRequest(r.id); });
-    actions.appendChild(delBtn);
-  }
-  if(actions.childNodes.length) card.appendChild(actions);
-
-  return card;
-}
-
-newAssetForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  assetError.textContent = "";
-  var itemName = newAssetItem.value.trim();
-  if(!itemName) return;
-  var payload = { itemName: itemName, notes: newAssetNotes.value.trim() || undefined };
-  var submitBtn = newAssetForm.querySelector(".admin-add-btn");
-  submitBtn.disabled = true;
-  apiSend('/api/assets', 'POST', payload).then(function(res){
-    STATE.assetRequests.unshift(res.request);
-    renderAssetsBoard();
-    newAssetItem.value = "";
-    newAssetNotes.value = "";
-    showToast("Requested");
-  }).catch(function(err){
-    assetError.textContent = err.message || "Couldn't send that request.";
   }).finally(function(){ submitBtn.disabled = false; });
 });
 

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Hotel Ping">
-<link rel="stylesheet" href="/styles.css?v=20261002t221337">
+<link rel="stylesheet" href="/styles.css?v=20261002t222926">
 </head>
 <body>
 
@@ -111,11 +111,6 @@
       <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
     </button>
 
-    <div class="profile-stories-label">Stories</div>
-    <div class="profile-stories-card">
-      <div class="stories-row" id="storiesRow"></div>
-    </div>
-
     <div class="sb-switcher" id="switcherWrap">
       <div class="sb-switcher-label" id="switcherLabel">Viewing as</div>
       <div class="switcher-row" id="switcherRow"></div>
@@ -207,11 +202,6 @@
         <span class="sb-menu-chevron" id="opsOverviewChevronBadge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
       </button>
       </div>
-      <button class="sb-menu-row" id="assetsBtn" type="button">
-        <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
-        <span class="sb-menu-label">Asset exchange</span>
-        <span class="sb-menu-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span>
-      </button>
       <button class="sb-menu-row" id="changePinBtn" type="button">
         <span class="sb-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg></span>
         <span class="sb-menu-label">Change your PIN</span>
@@ -710,14 +700,6 @@
             <button class="plus-opt" id="optSignoff" type="button">
               <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" stroke-width="2.2"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" stroke-width="2.2"/></svg></span>
               <span class="plus-opt-label">Sign-off</span>
-            </button>
-            <button class="plus-opt" id="optPoll" type="button">
-              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16" stroke-width="2.2"/><rect x="6" y="12" width="3" height="6" rx="0.5" stroke-width="2.2"/><rect x="11" y="8" width="3" height="10" rx="0.5" stroke-width="2.2"/><rect x="16" y="4" width="3" height="14" rx="0.5" stroke-width="2.2"/></svg></span>
-              <span class="plus-opt-label">Poll</span>
-            </button>
-            <button class="plus-opt" id="optAssetRequest" type="button">
-              <span class="plus-opt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke-width="2.2"/><path d="M3 8v8l9 5 9-5V8" stroke-width="2.2"/><path d="M12 13v8" stroke-width="2.2"/></svg></span>
-              <span class="plus-opt-label">Item request</span>
             </button>
           </div>
         </div>
@@ -1231,32 +1213,6 @@
   </div>
 </div>
 
-<div class="admin-overlay" id="assetsOverlay" hidden>
-  <div class="admin-modal">
-    <div class="admin-modal-head">
-      <h2>Asset exchange</h2>
-      <button class="admin-close" id="assetsClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <p class="broadcast-hint">Swap stock and items between departments.</p>
-    <form class="maint-new-form" id="newAssetForm">
-      <input type="text" id="newAssetItem" placeholder="Item, e.g. Wine for the kitchen, champagne chillers" required maxlength="80">
-      <textarea id="newAssetNotes" placeholder="Notes (optional)" maxlength="200" rows="2"></textarea>
-      <button type="submit" class="admin-add-btn">Request item</button>
-    </form>
-    <div class="admin-add-error" id="assetError"></div>
-    <div class="sb-search">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input type="text" id="assetSearchInput" placeholder="Search asset requests">
-      <button id="assetSearchClear" hidden aria-label="Clear search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <div class="maint-feed" id="assetFeed"></div>
-  </div>
-</div>
-
 <div class="admin-overlay" id="calendarOverlay" hidden>
   <div class="admin-modal admin-modal-wide calendar-modal">
     <div class="admin-modal-head">
@@ -1496,62 +1452,6 @@
   </div>
 </div>
 
-<input type="file" accept="image/*" id="storyPhotoInput" hidden>
-<div class="story-editor" id="storyEditor" hidden>
-  <div class="story-editor-stage">
-    <img class="story-editor-img" id="storyEditorImg" alt="">
-    <div class="story-editor-scrim"></div>
-    <button type="button" class="story-editor-icon-btn story-editor-close" id="postStoryClose" aria-label="Cancel">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-    </button>
-    <div class="story-editor-rail">
-      <button type="button" class="story-editor-icon-btn" id="storyRetakeBtn" aria-label="Choose a different photo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-      </button>
-      <button type="button" class="story-editor-icon-btn story-editor-send-btn" id="storyPostBtn" aria-label="Post update">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.5L20.5 4 13 21.5l-2.4-7.1L3 11.5z"/></svg>
-      </button>
-    </div>
-    <textarea class="story-editor-caption" id="storyCaptionInput" placeholder="Write something…" rows="1" maxlength="200"></textarea>
-    <div class="story-mention-popover" id="storyMentionPopover" hidden></div>
-  </div>
-  <div class="story-editor-error" id="storyPostError"></div>
-</div>
-
-<div class="story-viewer" id="storyViewer" hidden>
-  <div class="story-progress-row" id="storyProgressRow"></div>
-  <div class="story-viewer-head">
-    <span class="story-viewer-avatar" id="storyViewerAvatar"></span>
-    <div class="story-viewer-meta">
-      <div class="story-viewer-name" id="storyViewerName"></div>
-      <div class="story-viewer-sub" id="storyViewerSub"></div>
-    </div>
-    <button type="button" class="story-viewer-delete" id="storyViewerDelete" hidden aria-label="Delete this update">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>
-    </button>
-    <button type="button" class="story-viewer-close" id="storyViewerClose" aria-label="Close">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-    </button>
-  </div>
-  <div class="story-viewer-stage" id="storyViewerStage">
-    <div class="story-viewer-tap story-viewer-tap-left" id="storyTapLeft"></div>
-    <div class="story-viewer-tap story-viewer-tap-right" id="storyTapRight"></div>
-    <img class="story-viewer-img" id="storyViewerImg" alt="">
-  </div>
-  <div class="story-viewer-footer">
-    <div class="story-viewer-caption" id="storyViewerCaption"></div>
-    <div class="story-viewer-actions">
-      <button type="button" class="story-ping-btn" id="storyPingBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l6-6m0 0l-6-6M21 9H9a6 6 0 0 0-6 6v3"/></svg>
-        <span>Ping</span>
-      </button>
-      <button type="button" class="story-like-btn" id="storyLikeBtn" aria-label="Like this update">
-        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
-      </button>
-    </div>
-  </div>
-</div>
-
 <div class="admin-overlay" id="forwardOverlay" hidden>
   <div class="admin-modal">
     <div class="admin-modal-head">
@@ -1574,27 +1474,6 @@
       </button>
     </div>
     <div class="forward-dept-list" id="callPickerList"></div>
-  </div>
-</div>
-
-<div class="admin-overlay" id="pollComposeOverlay" hidden>
-  <div class="admin-modal">
-    <div class="admin-modal-head">
-      <h2>New poll</h2>
-      <button class="admin-close" id="pollComposeClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <form class="admin-add-form" id="pollComposeForm">
-      <input type="text" id="pollQuestionInput" placeholder="Ask a question…" maxlength="140" required>
-      <div id="pollOptionsList">
-        <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="60" required>
-        <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="60" required>
-      </div>
-      <button type="button" class="qr-add-chip" id="pollAddOptionBtn" style="text-align:left">+ Add option</button>
-      <div class="admin-add-error" id="pollComposeError"></div>
-      <button type="submit" class="admin-add-btn" id="pollComposeSubmit">Create poll</button>
-    </form>
   </div>
 </div>
 
@@ -1723,6 +1602,6 @@
 <input type="file" id="fileInput" hidden>
 <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
-<script src="/app.js?v=20261002t221337"></script>
+<script src="/app.js?v=20261002t222926"></script>
 </body>
 </html>

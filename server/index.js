@@ -97,7 +97,6 @@ const MAINT_AREA_TYPES = ['guest_room', 'shared_space', 'back_of_house'];
 const MAINT_ISSUE_TYPES = ['plumbing', 'electrical', 'heating', 'furniture', 'other'];
 const DEADLINE_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const GUEST_REQUEST_STATUSES = ['new', 'in_progress', 'completed'];
-const ASSET_STATUSES = ['requested', 'borrowed', 'returned'];
 const loginAttempts = new Map();
 
 function send(res, status, body, headers) {
@@ -192,19 +191,6 @@ function rowToGuestRequest(row) {
     completedAt: row.completed_at || undefined,
   };
 }
-function rowToAssetRequest(row) {
-  return {
-    id: row.id,
-    itemName: row.item_name,
-    notes: row.notes || undefined,
-    status: row.status,
-    requestedBy: row.requested_by,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    returnedAt: row.returned_at || undefined,
-  };
-}
-
 function rowToMessage(row, viewerDeptId, isAdmin) {
   const deleted = !!row.deleted_at;
   if (deleted && !isAdmin && viewerDeptId !== row.from_dept) {
@@ -259,34 +245,11 @@ function rowToMessage(row, viewerDeptId, isAdmin) {
       neededBy: row.signoff_needed_by || undefined,
       description: row.signoff_description || undefined,
     } : undefined,
-    poll: row.poll_question ? {
-      question: row.poll_question,
-      options: JSON.parse(row.poll_options || '[]'),
-      votes: JSON.parse(row.poll_votes || '{}'),
-    } : undefined,
     escalationLevel: row.escalation_level || 0,
     affectsGuest: !!row.affects_guest,
     staffName: hide ? null : (row.from_staff_name || undefined),
     maintTicketId: row.maint_ticket_id || undefined,
   };
-}
-function reactionsMap(messageIds) {
-  const ids = [...new Set(messageIds)];
-  if (!ids.length) return {};
-  const rows = db.prepare(
-    `SELECT message_id, department_id, emoji FROM message_reactions WHERE message_id IN (${ids.map(() => '?').join(',')})`
-  ).all(...ids);
-  const byMessage = {};
-  rows.forEach((r) => {
-    byMessage[r.message_id] = byMessage[r.message_id] || [];
-    byMessage[r.message_id].push({ emoji: r.emoji, from: r.department_id });
-  });
-  return byMessage;
-}
-function attachReactions(messages) {
-  const map = reactionsMap(messages.map((m) => m.id));
-  messages.forEach((m) => { m.reactions = map[m.id] || []; });
-  return messages;
 }
 function rowToGroup(row, members) {
   return {
@@ -311,19 +274,6 @@ function rowToRunsheetItem(row) {
     description: row.description || undefined, teamLabel: row.team_label || undefined, position: row.position,
   };
 }
-function rowToStory(row, viewed) {
-  return {
-    id: row.id,
-    departmentId: row.department_id,
-    staffName: row.staff_name || undefined,
-    photoUrl: '/uploads/' + row.photo_path,
-    caption: row.caption || undefined,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    viewed: !!viewed,
-  };
-}
-
 const URGENT_ESCALATION_MINUTES = 10;
 const NORMAL_ESCALATION_MINUTES = 25;
 const URGENT_ESCALATION_L2_MINUTES = 20;
@@ -490,7 +440,6 @@ function insertMessage(opts) {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const mentionsJson = opts.mentions && opts.mentions.length ? JSON.stringify(opts.mentions) : null;
-  const pollOptionsJson = opts.poll ? JSON.stringify(opts.poll.options) : null;
   const signoffCode = opts.signoff ? nextSignoffCode() : null;
   try {
     db.prepare(`
@@ -509,9 +458,9 @@ function insertMessage(opts) {
       signoffCode,
       opts.signoff && opts.signoff.neededBy ? opts.signoff.neededBy : null,
       opts.signoff && opts.signoff.description ? opts.signoff.description : null,
-      opts.poll ? opts.poll.question : null,
-      pollOptionsJson,
-      opts.poll ? '{}' : null,
+      null,
+      null,
+      null,
       opts.affectsGuest ? 1 : 0,
       opts.dashboardConversationId || null,
       opts.roomClean || null,
@@ -1153,7 +1102,7 @@ const server = http.createServer(async (req, res) => {
       const hasMore = rows.length > MESSAGE_PAGE_SIZE;
       const page = (hasMore ? rows.slice(0, MESSAGE_PAGE_SIZE) : rows).reverse();
       const pageMessages = page.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean);
-      return send(res, 200, { messages: attachReactions(pageMessages), hasMore });
+      return send(res, 200, { messages: pageMessages, hasMore });
     }
 
     if (req.method === 'GET' && p === '/api/groups') {
@@ -1487,7 +1436,7 @@ const server = http.createServer(async (req, res) => {
       }
       const rows = db.prepare('SELECT * FROM messages WHERE group_id = ? ORDER BY created_at ASC').all(id);
       const groupMessages = rows.map((r) => rowToMessage(r, self, requester.is_admin)).filter(Boolean);
-      return send(res, 200, { messages: attachReactions(groupMessages) });
+      return send(res, 200, { messages: groupMessages });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/groups/') && p.endsWith('/read')) {
@@ -2049,7 +1998,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && p === '/api/messages') {
       const body = await readJsonBody(req);
-      const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, poll, clientMessageId } = body;
+      const { from, to, groupId, type, text, urgent, affectsGuest, fileName, fileBase64, fileMime, duration, transcript, replyToId, roomNumber, taskStatus, mentions, signoff, clientMessageId } = body;
       if (!ALL_DEPT_IDS.has(from)) return send(res, 400, { error: 'Unknown department' });
       const sendRequester = staffFromToken(req);
       const sendingAsOwnHead = HEAD_DEPT_IDS.has(from) && sendRequester.head_depts && sendRequester.head_depts.includes(from);
@@ -2069,7 +2018,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 403, { error: 'Only the GM can message Head Office directly' });
       }
       if (!['text', 'image', 'file', 'audio'].includes(type)) return send(res, 400, { error: 'Invalid message type' });
-      if (type === 'text' && !text?.trim() && !poll) return send(res, 400, { error: 'Message text is required' });
+      if (type === 'text' && !text?.trim()) return send(res, 400, { error: 'Message text is required' });
       if (roomNumber && String(roomNumber).length > 20) return send(res, 400, { error: 'Room number is too long' });
       if (taskStatus && !TASK_STATUSES.includes(taskStatus)) return send(res, 400, { error: 'Invalid task status' });
       let signoffData = null;
@@ -2089,18 +2038,6 @@ const server = http.createServer(async (req, res) => {
         const neededBy = signoff.neededBy && ['today', 'this_week', 'no_rush'].includes(signoff.neededBy) ? signoff.neededBy : null;
         const description = signoff.description ? String(signoff.description).trim().slice(0, 500) : null;
         signoffData = { title, amount, target, category, guestInfo, neededBy, description };
-      }
-      let pollData = null;
-      if (poll) {
-        const question = String(poll.question || '').trim();
-        if (!question) return send(res, 400, { error: 'Poll question is required' });
-        if (question.length > 140) return send(res, 400, { error: 'Poll question is too long' });
-        const options = Array.isArray(poll.options)
-          ? poll.options.map((o) => String(o || '').trim()).filter(Boolean)
-          : [];
-        if (options.length < 2 || options.length > 4) return send(res, 400, { error: 'A poll needs 2-4 options' });
-        if (options.some((o) => o.length > 60)) return send(res, 400, { error: 'Poll option is too long' });
-        pollData = { question, options };
       }
       const validMentions = Array.isArray(mentions) && validMembers
         ? mentions.filter((d) => validMembers.has(d) && d !== from)
@@ -2130,7 +2067,6 @@ const server = http.createServer(async (req, res) => {
         taskStatus: taskStatus || null,
         mentions: validMentions,
         signoff: signoffData,
-        poll: pollData,
         fromStaffName: sendRequester.name || null,
         clientMessageId: clientMessageId && String(clientMessageId).trim() ? String(clientMessageId).trim().slice(0, 100) : null,
       });
@@ -2172,31 +2108,6 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE messages SET pinned_at = ? WHERE id = ?').run(nextPinned ? new Date().toISOString() : null, id);
       const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/reactions')) {
-      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/reactions'.length));
-      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Message not found' });
-      const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
-      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
-      const body = await readJsonBody(req);
-      const emoji = String(body.emoji || '').trim().slice(0, 8);
-      if (!emoji) return send(res, 400, { error: 'An emoji is required' });
-      const current = db.prepare('SELECT emoji FROM message_reactions WHERE message_id = ? AND department_id = ?').get(id, requester.department_id);
-      // Tapping the same reaction again removes it - a real toggle, same as tapping a like a second time anywhere else.
-      if (current && current.emoji === emoji) {
-        db.prepare('DELETE FROM message_reactions WHERE message_id = ? AND department_id = ?').run(id, requester.department_id);
-      } else {
-        db.prepare(`
-          INSERT INTO message_reactions (id, message_id, department_id, emoji, created_at) VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(message_id, department_id) DO UPDATE SET emoji = excluded.emoji, created_at = excluded.created_at
-        `).run(crypto.randomUUID(), id, requester.department_id, emoji, new Date().toISOString());
-      }
-      const rMap = reactionsMap([id]);
-      return send(res, 200, { reactions: rMap[id] || [] });
     }
 
     if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/affects-guest')) {
@@ -2292,28 +2203,6 @@ const server = http.createServer(async (req, res) => {
       // one message is the whole record. Notify by push only (no local dev simulation for
       // 1:1 push exists yet), not by sending a second chat message that would fragment it.
       console.log('[signoff notify]', existing.from_dept, verb.toLowerCase(), 'sign-off:', existing.signoff_title);
-      return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/messages/') && p.endsWith('/vote')) {
-      const id = decodeURIComponent(p.slice('/api/messages/'.length, -'/vote'.length));
-      const existing = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Message not found' });
-      if (!existing.poll_question) return send(res, 400, { error: "This message isn't a poll" });
-      const requester = staffFromToken(req);
-      const inConversation = existing.from_dept === requester.department_id || existing.to_dept === requester.department_id
-        || (existing.group_id && db.prepare('SELECT 1 FROM group_members WHERE group_id = ? AND department_id = ?').get(existing.group_id, requester.department_id));
-      if (!inConversation && !requester.is_admin) return send(res, 403, { error: 'Not part of this conversation' });
-      const bodyIn = await readJsonBody(req);
-      const options = JSON.parse(existing.poll_options || '[]');
-      const optionIndex = Number(bodyIn.optionIndex);
-      if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= options.length) {
-        return send(res, 400, { error: 'Invalid poll option' });
-      }
-      db.prepare(
-        "UPDATE messages SET poll_votes = json_set(COALESCE(poll_votes, '{}'), '$.' || ?, ?) WHERE id = ?"
-      ).run(requester.department_id, optionIndex, id);
-      const row = db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
       return send(res, 200, { message: rowToMessage(row, requester.department_id, requester.is_admin) });
     }
 
@@ -2676,95 +2565,6 @@ const server = http.createServer(async (req, res) => {
       const dept = requester.department_id;
       db.prepare('DELETE FROM quick_replies WHERE id = ? AND department_id = ?').run(id, dept);
       return send(res, 200, { ok: true });
-    }
-
-    if (req.method === 'GET' && p === '/api/stories') {
-      const now = new Date().toISOString();
-      db.prepare('DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE expires_at < ?)').run(now);
-      db.prepare('DELETE FROM stories WHERE expires_at < ?').run(now);
-      const rows = db.prepare('SELECT * FROM stories WHERE expires_at >= ? ORDER BY created_at ASC').all(now);
-      const requester = staffFromToken(req);
-      const viewerDept = requester.department_id;
-      const viewedRows = db.prepare('SELECT story_id FROM story_views WHERE department_id = ?').all(viewerDept);
-      const viewedIds = new Set(viewedRows.map((r) => r.story_id));
-      return send(res, 200, { stories: rows.map((r) => rowToStory(r, r.department_id === viewerDept || viewedIds.has(r.id))) });
-    }
-
-    if (req.method === 'POST' && p === '/api/stories') {
-      const requester = staffFromToken(req);
-      const body = await readJsonBody(req);
-      if (!body.fileBase64) return send(res, 400, { error: 'Photo is required' });
-      const buf = Buffer.from(body.fileBase64, 'base64');
-      if (buf.length > 10 * 1024 * 1024) return send(res, 400, { error: 'Photo is too large (10MB max)' });
-      const ext = (body.fileMime && body.fileMime.split('/')[1]) ? '.' + body.fileMime.split('/')[1].split(';')[0] : '';
-      const safeName = 'story-' + crypto.randomUUID() + ext;
-      fs.writeFileSync(path.join(UPLOADS_DIR, safeName), buf);
-      const id = crypto.randomUUID();
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-      const caption = body.caption ? String(body.caption).trim().slice(0, 200) : null;
-      db.prepare(
-        'INSERT INTO stories (id, department_id, staff_name, photo_path, caption, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(id, requester.department_id, requester.name, safeName, caption, now.toISOString(), expiresAt);
-      const row = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
-      return send(res, 201, { story: rowToStory(row, true) });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/view')) {
-      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/view'.length));
-      const story = db.prepare('SELECT 1 FROM stories WHERE id = ?').get(id);
-      if (!story) return send(res, 404, { error: 'Story not found' });
-      const requester = staffFromToken(req);
-      db.prepare(
-        'INSERT INTO story_views (story_id, department_id, viewed_at) VALUES (?, ?, ?) ON CONFLICT(story_id, department_id) DO NOTHING'
-      ).run(id, requester.department_id, new Date().toISOString());
-      return send(res, 200, { ok: true });
-    }
-
-    if (req.method === 'DELETE' && p.startsWith('/api/stories/')) {
-      const id = decodeURIComponent(p.slice('/api/stories/'.length));
-      const existing = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Story not found' });
-      const requester = staffFromToken(req);
-      if (existing.department_id !== requester.department_id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only delete your own department's stories" });
-      }
-      db.prepare('DELETE FROM story_views WHERE story_id = ?').run(id);
-      db.prepare('DELETE FROM stories WHERE id = ?').run(id);
-      return send(res, 200, { ok: true });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/ping')) {
-      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/ping'.length));
-      const story = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
-      if (!story) return send(res, 404, { error: 'Story not found' });
-      const requester = staffFromToken(req);
-      const body = await readJsonBody(req);
-      const to = String(body.to || '').trim();
-      if (!DEPT_IDS.has(to)) return send(res, 400, { error: 'Unknown department' });
-      if (to === requester.department_id) return send(res, 400, { error: "Pick a different department" });
-      const row = insertMessage({
-        from: requester.department_id, to, type: 'image',
-        body: '📌 ' + requester.name + ' pinged an update' + (story.caption ? ': ' + story.caption : ''),
-        fileName: 'Update photo', filePath: story.photo_path,
-        fromStaffName: requester.name || null,
-      });
-      return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/stories/') && p.endsWith('/like')) {
-      const id = decodeURIComponent(p.slice('/api/stories/'.length, -'/like'.length));
-      const story = db.prepare('SELECT * FROM stories WHERE id = ?').get(id);
-      if (!story) return send(res, 404, { error: 'Story not found' });
-      const requester = staffFromToken(req);
-      const to = story.department_id;
-      if (to === requester.department_id) return send(res, 201, { message: null });
-      const row = insertMessage({
-        from: requester.department_id, to, type: 'text',
-        body: '👍 ' + requester.name + ' liked your update' + (story.caption ? ': ' + story.caption : ''),
-        fromStaffName: requester.name || null,
-      });
-      return send(res, 201, { message: rowToMessage(row, requester.department_id, false) });
     }
 
     if (req.method === 'GET' && p === '/api/handover') {
@@ -3165,58 +2965,6 @@ const server = http.createServer(async (req, res) => {
       db.prepare('UPDATE guest_requests SET pinned_at = ? WHERE id = ?').run(newPinned, id);
       const row = db.prepare('SELECT * FROM guest_requests WHERE id = ?').get(id);
       return send(res, 200, { request: rowToGuestRequest(row) });
-    }
-
-    if (req.method === 'GET' && p === '/api/assets') {
-      const rows = db.prepare('SELECT * FROM asset_requests ORDER BY created_at DESC').all();
-      return send(res, 200, { requests: rows.map(rowToAssetRequest) });
-    }
-
-    if (req.method === 'POST' && p === '/api/assets') {
-      const requester = staffFromToken(req);
-      const body = await readJsonBody(req);
-      const itemName = String(body.itemName || '').trim();
-      if (!itemName) return send(res, 400, { error: 'An item name is required' });
-      if (itemName.length > 80) return send(res, 400, { error: 'Item name is too long' });
-      const notes = body.notes ? String(body.notes).trim().slice(0, 200) : null;
-      const id = crypto.randomUUID();
-      const now = new Date().toISOString();
-      db.prepare(
-        "INSERT INTO asset_requests (id, item_name, notes, status, requested_by, created_at, updated_at) VALUES (?, ?, ?, 'requested', ?, ?, ?)"
-      ).run(id, itemName, notes, requester.department_id, now, now);
-      const row = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
-      console.log('[asset notify] all departments:', (DEPT_NAMES[requester.department_id] || requester.department_id), 'needs:', itemName);
-      return send(res, 201, { request: rowToAssetRequest(row) });
-    }
-
-    if (req.method === 'POST' && p.startsWith('/api/assets/') && p.endsWith('/status')) {
-      const id = decodeURIComponent(p.slice('/api/assets/'.length, -'/status'.length));
-      const body = await readJsonBody(req);
-      const status = body.status;
-      if (!ASSET_STATUSES.includes(status)) return send(res, 400, { error: 'Invalid status' });
-      const existing = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Request not found' });
-      const assetRequester = staffFromToken(req);
-      if (existing.requested_by !== assetRequester.department_id && !assetRequester.is_admin) {
-        return send(res, 403, { error: "You can only update your own department's requests" });
-      }
-      const now = new Date().toISOString();
-      db.prepare('UPDATE asset_requests SET status = ?, updated_at = ?, returned_at = ? WHERE id = ?')
-        .run(status, now, status === 'returned' ? now : null, id);
-      const row = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
-      return send(res, 200, { request: rowToAssetRequest(row) });
-    }
-
-    if (req.method === 'DELETE' && p.startsWith('/api/assets/')) {
-      const id = decodeURIComponent(p.slice('/api/assets/'.length));
-      const existing = db.prepare('SELECT * FROM asset_requests WHERE id = ?').get(id);
-      if (!existing) return send(res, 404, { error: 'Request not found' });
-      const requester = staffFromToken(req);
-      if (existing.requested_by !== requester.department_id && !requester.is_admin) {
-        return send(res, 403, { error: "You can only remove your own department's requests" });
-      }
-      db.prepare('DELETE FROM asset_requests WHERE id = ?').run(id);
-      return send(res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && p === '/api/escalations/check') {
