@@ -809,12 +809,6 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .reply-preview-bar-text{font-size:13px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply-preview-bar-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:4px;display:flex;align-items:center}
 .reply-preview-bar-close svg{width:16px;height:16px}
-/* Tinted red like the not-started stage it's about to create, so the
-   banner previews the color the resulting task card will start life in. */
-#taskTagBar{background:rgba(214,73,60,.1);padding:8px 8px 8px 10px}
-#taskTagBar .reply-preview-bar-name{color:#c0392b}
-.task-tag-bar-icon{flex:none;width:30px;height:30px;border-radius:50%;background:#d6493c;color:#fff;display:flex;align-items:center;justify-content:center}
-.task-tag-bar-icon svg{width:15px;height:15px}
 #taskTagClose{color:#c0392b}
 .room-tag-input{border:none;background:none;color:var(--text);font-size:16px;font-family:inherit;width:100%;padding:0;outline:none}
 .room-tag-input::placeholder{color:var(--text-faint)}
@@ -1261,6 +1255,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .repair-priority-chip.active{background:rgba(47,95,224,.1);box-shadow:inset 0 0 0 1.5px #2f5fe0;color:#2f5fe0}
 .repair-priority-chip.urgent-opt{color:#c0392b}
 .repair-priority-chip.urgent-opt.active{background:rgba(198,57,41,.1);box-shadow:inset 0 0 0 1.5px #c0392b;color:#c0392b}
+.repair-tag-desc{
+  width:100%;box-sizing:border-box;border:none;border-radius:12px;padding:10px 12px;
+  background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
+  font-size:14px;font-family:inherit;color:var(--text);resize:none;
+}
+.repair-tag-desc:focus{outline:none;box-shadow:0 0 0 3px rgba(47,95,224,.16),inset 0 0 0 1.5px #2f5fe0}
 .repair-tag-send{
   display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;
   margin-top:2px;padding:11px 14px;border-radius:12px;cursor:pointer;

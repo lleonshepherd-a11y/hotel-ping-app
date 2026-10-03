@@ -748,25 +748,33 @@
         </button>
       </div>
 
-      <div class="reply-preview-bar" id="taskTagBar" hidden>
-        <span class="task-tag-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M8.5 13l1.5 1.5L13 11"/></svg></span>
-        <div class="reply-preview-bar-body">
-          <div class="reply-preview-bar-name">New task</div>
-          <div class="reply-preview-bar-text">Type your message below and send to create it</div>
+      <div class="repair-tag-bar" id="taskTagBar" hidden>
+        <div class="repair-tag-head">
+          <span class="repair-tag-head-ic" style="color:#d6493c"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M8.5 13l1.5 1.5L13 11"/></svg></span>
+          <span class="repair-tag-head-title">New task</span>
+          <button type="button" class="repair-tag-close" id="taskTagClose" aria-label="Remove task tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
-        <button type="button" class="reply-preview-bar-close" id="taskTagClose" aria-label="Remove task tag">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <textarea id="taskTagDesc" class="repair-tag-desc" placeholder="What's the task?" rows="2"></textarea>
+        <button type="button" class="repair-tag-send" id="taskTagSend">
+          <span>Send task</span>
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3.4 11.6L20.3 3.2a.8.8 0 0 1 1.08 1.06l-6.9 17.4a.8.8 0 0 1-1.5-.02l-2.8-7.4-7.4-2.8a.8.8 0 0 1 .02-1.5l.6-.3z"/></svg>
         </button>
       </div>
 
-      <div class="reply-preview-bar" id="reportTagBar" hidden>
-        <span class="task-tag-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></span>
-        <div class="reply-preview-bar-body">
-          <div class="reply-preview-bar-name">Reporting an issue</div>
-          <div class="reply-preview-bar-text">Type what's wrong below and send to report it</div>
+      <div class="repair-tag-bar" id="reportTagBar" hidden>
+        <div class="repair-tag-head">
+          <span class="repair-tag-head-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></span>
+          <span class="repair-tag-head-title">Reporting an issue</span>
+          <button type="button" class="repair-tag-close" id="reportTagClose" aria-label="Remove report tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
         </div>
-        <button type="button" class="reply-preview-bar-close" id="reportTagClose" aria-label="Remove report tag">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        <textarea id="reportTagDesc" class="repair-tag-desc" placeholder="What's the problem?" rows="2"></textarea>
+        <button type="button" class="repair-tag-send" id="reportTagSend">
+          <span>Send report</span>
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3.4 11.6L20.3 3.2a.8.8 0 0 1 1.08 1.06l-6.9 17.4a.8.8 0 0 1-1.5-.02l-2.8-7.4-7.4-2.8a.8.8 0 0 1 .02-1.5l.6-.3z"/></svg>
         </button>
       </div>
 

@@ -1615,23 +1615,53 @@ roomTagInput.addEventListener("keydown", function(e){
 
 var taskTagBar = document.getElementById("taskTagBar");
 var taskTagClose = document.getElementById("taskTagClose");
+var taskTagDesc = document.getElementById("taskTagDesc");
+var taskTagSend = document.getElementById("taskTagSend");
 function setTaskActive(on){
   taskActive = on;
   if(on && reportActive) setReportActive(false);
   if(on && repairActive) setRepairActive(false);
   optTask.classList.toggle("active", on);
   taskTagBar.hidden = !on;
+  if(!on) taskTagDesc.value = "";
+  else setTimeout(function(){ taskTagDesc.focus(); }, 30);
 }
 taskTagClose.addEventListener("click", function(){ setTaskActive(false); });
+taskTagSend.addEventListener("click", function(){
+  var text = taskTagDesc.value.trim();
+  if(!text){ showToast("Type the task first"); taskTagDesc.focus(); return; }
+  sendTaskTag(text);
+});
+function sendTaskTag(text){
+  var deptId = STATE.active;
+  setTaskActive(false);
+  var payload = { from: STATE.self, to: deptId, type: "text", text: text, urgent: false, affectsGuest: false, taskStatus: "not_started" };
+  apiSend('/api/messages', 'POST', payload).then(function(res){
+    STATE.data[deptId] = STATE.data[deptId] || [];
+    STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+    renderList();
+    if(STATE.active === deptId) renderThread();
+  }).catch(function(err){
+    showToast(err.message || "Couldn't send that task");
+  });
+}
 
 var reportActive = false;
+var reportTagDesc = document.getElementById("reportTagDesc");
+var reportTagSend = document.getElementById("reportTagSend");
 function setReportActive(on){
   reportActive = on;
   if(on && taskActive) setTaskActive(false);
   if(on && repairActive) setRepairActive(false);
   reportTagBar.hidden = !on;
-  if(on) focusInput();
+  if(!on) reportTagDesc.value = "";
+  else setTimeout(function(){ reportTagDesc.focus(); }, 30);
 }
+reportTagSend.addEventListener("click", function(){
+  var text = reportTagDesc.value.trim();
+  if(!text){ showToast("Describe the problem first"); reportTagDesc.focus(); return; }
+  sendQuickReport(text, null);
+});
 
 var repairTagBar = document.getElementById("repairTagBar");
 var repairTagClose = document.getElementById("repairTagClose");
