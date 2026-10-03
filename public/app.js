@@ -1101,6 +1101,9 @@ var eventNotice = document.getElementById("eventNotice");
 var hDot = document.getElementById("hDot");
 var callBtn = document.getElementById("callBtn");
 
+var spacesPillRow = document.getElementById("spacesPillRow");
+var spacesPillBtn = document.getElementById("spacesPillBtn");
+
 var composeToBar = document.getElementById("composeToBar");
 var composeToBarChips = document.getElementById("composeToBarChips");
 // Tap the whole stack to spread the overstacked icons apart a little and
@@ -1126,6 +1129,7 @@ function renderComposeToBarChips(){
 }
 function renderHeader(){
   if(composeMode){
+    spacesPillRow.hidden = true;
     composeToBar.hidden = false;
     hCenter.classList.add("plain");
     hAvatar.hidden = true;
@@ -1142,6 +1146,7 @@ function renderHeader(){
     renderComposeToBarChips();
     return;
   }
+  spacesPillRow.hidden = false;
   composeToBar.hidden = true;
   hCenter.classList.remove("plain");
   hAvatar.hidden = false;
@@ -2826,6 +2831,9 @@ var quickReportClose = document.getElementById("quickReportClose");
 var quickReportForm = document.getElementById("quickReportForm");
 var quickReportText = document.getElementById("quickReportText");
 var quickReportError = document.getElementById("quickReportError");
+var quickReportPhoto = document.getElementById("quickReportPhoto");
+var quickReportPhotoLabel = document.getElementById("quickReportPhotoLabel");
+var quickReportPhotoFile = null;
 var fileInput = document.getElementById("fileInput");
 var pdfInput = document.getElementById("pdfInput");
 var cameraInput = document.getElementById("cameraInput");
@@ -3089,11 +3097,20 @@ qaMaintenanceBtn.addEventListener("click", function(){ showTab("maintenance"); }
 qaReportBtn.addEventListener("click", function(){
   quickReportError.textContent = "";
   quickReportText.value = "";
+  quickReportPhotoFile = null;
+  quickReportPhoto.value = "";
+  quickReportPhotoLabel.textContent = "Add photo or video";
   quickReportOverlay.hidden = false;
   setTimeout(function(){ quickReportText.focus(); }, 30);
 });
 quickReportClose.addEventListener("click", function(){ quickReportOverlay.hidden = true; });
 quickReportOverlay.addEventListener("click", function(e){ if(e.target === quickReportOverlay) quickReportOverlay.hidden = true; });
+quickReportPhoto.addEventListener("change", function(){
+  var file = quickReportPhoto.files && quickReportPhoto.files[0];
+  if(!file) return;
+  quickReportPhotoFile = file;
+  quickReportPhotoLabel.textContent = file.name;
+});
 quickReportForm.addEventListener("submit", function(e){
   e.preventDefault();
   var description = quickReportText.value.trim();
@@ -3101,12 +3118,21 @@ quickReportForm.addEventListener("submit", function(e){
   var submitBtn = quickReportForm.querySelector(".admin-add-btn");
   submitBtn.disabled = true;
   quickReportError.textContent = "";
-  apiSend('/api/maintenance', 'POST', { description: description }).then(function(){
-    quickReportOverlay.hidden = true;
-    showToast("Reported");
-  }).catch(function(err){
-    quickReportError.textContent = err.message || "Couldn't send that report.";
-  }).finally(function(){ submitBtn.disabled = false; });
+  var payload = { description: description };
+  var photoFile = quickReportPhotoFile;
+  (photoFile
+    ? blobToBase64(photoFile).then(function(b64){
+        payload.photoBase64 = b64;
+        payload.photoMime = photoFile.type;
+      })
+    : Promise.resolve())
+    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); })
+    .then(function(){
+      quickReportOverlay.hidden = true;
+      showToast("Reported");
+    }).catch(function(err){
+      quickReportError.textContent = err.message || "Couldn't send that report.";
+    }).finally(function(){ submitBtn.disabled = false; });
 });
 
 optSignoff.addEventListener("click", function(){
@@ -6524,6 +6550,13 @@ function renderDirectory(){
   else if(directoryMode === "existingEvent"){
     var g = STATE.groups.find(function(x){ return x.id === directoryExistingEventGroupId; });
     excluded = g ? g.members : [];
+  } else if(directoryMode === "addToThread"){
+    if(STATE.activeGroupId){
+      var ag = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
+      excluded = ag ? ag.members : [];
+    } else {
+      excluded = [STATE.self, STATE.active];
+    }
   } else excluded = composeRecipients;
   var ids = DEPT_ORDER.concat(assignedHeads).filter(function(id){
     if(directoryMode === "compose" && id === STATE.self) return false;
@@ -6554,6 +6587,9 @@ function renderDirectory(){
       } else if(directoryMode === "existingEvent"){
         closeDirectoryOverlay();
         joinGroup(directoryExistingEventGroupId, id);
+      } else if(directoryMode === "addToThread"){
+        closeDirectoryOverlay();
+        addDeptToCurrentThread(id);
       } else {
         composeRecipients.push(id);
         closeDirectoryOverlay();
@@ -6568,6 +6604,36 @@ function renderDirectory(){
 directoryBtn.addEventListener("click", openComposeScreen);
 composeAddBtn.addEventListener("click", function(){
   openDirectoryPicker("compose", { title: "Add to message" });
+});
+
+// "Spaces": pull another department into the conversation that's open
+// right now, turning a 1:1 thread into a group the first time, or just
+// adding one more member if it's already a group.
+function addDeptToCurrentThread(deptId){
+  var deptName = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+  if(STATE.activeGroupId){
+    var groupId = STATE.activeGroupId;
+    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/join', 'POST', { self: deptId }).then(function(){
+      return loadGroups();
+    }).then(function(){
+      if(STATE.activeGroupId === groupId){ renderHeader(); }
+      showToast(deptName + " added");
+    }).catch(function(){ showToast("Couldn't add them"); });
+    return;
+  }
+  if(!STATE.active) return;
+  var otherId = STATE.active;
+  var names = [DEPTS[otherId] ? DEPTS[otherId].name : otherId, deptName];
+  var memberDepartmentIds = [STATE.self, otherId, deptId].map(function(id){ return headRealDeptId(id) || id; })
+    .filter(function(id, i, arr){ return arr.indexOf(id) === i; });
+  apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: memberDepartmentIds })
+    .then(function(res){
+      return loadGroups().then(function(){ openGroupThread(res.group.id); });
+    })
+    .catch(function(){ showToast("Couldn't create that space"); });
+}
+spacesPillBtn.addEventListener("click", function(){
+  openDirectoryPicker("addToThread", { title: "Add to this conversation" });
 });
 directoryClose.addEventListener("click", closeDirectoryOverlay);
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) closeDirectoryOverlay(); });

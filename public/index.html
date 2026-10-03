@@ -706,6 +706,13 @@
       </div>
     </header>
 
+    <div class="spaces-pill-row" id="spacesPillRow" hidden>
+      <button type="button" class="spaces-pill" id="spacesPillBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span>Spaces</span>
+      </button>
+    </div>
+
     <div class="compose-to-bar" id="composeToBar" hidden>
       <span class="compose-to-bar-label">To:</span>
       <div class="compose-to-bar-chips" id="composeToBarChips"></div>
@@ -738,7 +745,7 @@
         </button>
         <button type="button" class="thread-quick-btn" id="qaMaintenanceBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.1 5.1L4 17v3h3l5.6-5.6a4 4 0 0 1 5.1-5.1l-2.3 2.3-2-2 2.3-2.3z"/></svg>
-          <span>Maintenance</span>
+          <span>Repair</span>
         </button>
       </div>
       <div id="attachPreview"></div>
@@ -1489,6 +1496,11 @@
     </div>
     <form class="admin-add-form" id="quickReportForm">
       <textarea id="quickReportText" placeholder="What's the problem?" maxlength="500" rows="3" required></textarea>
+      <label class="maint-photo-btn" for="quickReportPhoto">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/></svg>
+        <span id="quickReportPhotoLabel">Add photo or video</span>
+      </label>
+      <input type="file" id="quickReportPhoto" accept="image/*,video/*" hidden>
       <button type="submit" class="admin-add-btn">Send</button>
     </form>
     <div class="admin-add-error" id="quickReportError"></div>

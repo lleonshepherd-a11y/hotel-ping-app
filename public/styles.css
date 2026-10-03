@@ -1191,7 +1191,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .admin-add-form input,.admin-add-form select,.admin-add-form textarea{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface-2);font-size:16px;font-family:inherit;resize:none;transition:border-color .15s ease}
 .admin-add-form input:focus,.admin-add-form select:focus,.admin-add-form textarea:focus{outline:none}
 
-.thread-quick-row{flex:none;display:flex;justify-content:center;gap:22px;padding:4px 16px 2px;flex-wrap:wrap}
+.spaces-pill-row{flex:none;display:flex;justify-content:center;padding:14px 18px 0}
+.spaces-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;border:none;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);color:var(--text);font-size:15px;font-weight:700;cursor:pointer}
+.spaces-pill svg{width:15px;height:15px;flex:none}
+.spaces-pill:active{opacity:.6}
+
+.thread-quick-row{flex:none;display:flex;justify-content:center;gap:22px;padding:4px 16px 16px;flex-wrap:wrap}
 .thread-quick-btn{display:flex;align-items:center;gap:6px;border:none;background:none;padding:0;color:var(--text);font-size:14px;font-weight:600;cursor:pointer}
 .thread-quick-btn svg{width:16px;height:16px;flex:none}
 .thread-quick-btn:active{opacity:.6}
