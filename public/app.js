@@ -1670,6 +1670,15 @@ repairPriorityChips.forEach(function(chip){
     repairPriorityChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
   });
 });
+var repairTagSend = document.getElementById("repairTagSend");
+repairTagSend.addEventListener("click", function(){
+  if(!msgInput.value.trim() && !STATE.attachment){
+    showToast("Describe the problem below first");
+    focusInput();
+    return;
+  }
+  doSend();
+});
 
 var signoffTagBar = document.getElementById("signoffTagBar");
 var signoffTagText = document.getElementById("signoffTagText");
