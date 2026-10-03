@@ -1186,7 +1186,7 @@ function renderHeader(){
   var d = DEPTS[STATE.active];
   hAvatar.setAttribute("style", avatarStyleAttr(STATE.active));
   hAvatar.innerHTML = avatarInnerHtml(STATE.active);
-  hName.textContent = contactNameFor(STATE.active) || d.name;
+  hName.textContent = d.name;
   var targetOn = isOnDuty(STATE.active);
   hSub.classList.remove("meta");
   if(STATE.typingFrom[STATE.active]){
@@ -1252,17 +1252,7 @@ function renderOffDutyBanner(){
 }
 
 function renderContactName(){
-  var deptId = STATE.active;
-  var d = DEPTS[deptId];
-  var contact = contactNameFor(deptId);
   hContactWrap.innerHTML = "";
-  var roleLabel = (contact && contact !== d.name) ? d.name : null;
-  if(roleLabel){
-    var span = document.createElement("span");
-    span.className = "h-contact-name";
-    span.textContent = roleLabel;
-    hContactWrap.appendChild(span);
-  }
 }
 
 function sameDay(a,b){
@@ -1612,6 +1602,7 @@ var taskTagClose = document.getElementById("taskTagClose");
 function setTaskActive(on){
   taskActive = on;
   if(on && reportActive) setReportActive(false);
+  if(on && repairActive) setRepairActive(false);
   optTask.classList.toggle("active", on);
   taskTagBar.hidden = !on;
 }
@@ -1621,9 +1612,48 @@ var reportActive = false;
 function setReportActive(on){
   reportActive = on;
   if(on && taskActive) setTaskActive(false);
+  if(on && repairActive) setRepairActive(false);
   reportTagBar.hidden = !on;
   if(on) focusInput();
 }
+
+var repairTagBar = document.getElementById("repairTagBar");
+var repairTagClose = document.getElementById("repairTagClose");
+var repairLocationInput = document.getElementById("repairLocationInput");
+var repairActive = false;
+var repairSelectedIssue = null;
+var repairSelectedPriority = "routine";
+function setRepairActive(on){
+  repairActive = on;
+  if(on && taskActive) setTaskActive(false);
+  if(on && reportActive) setReportActive(false);
+  repairTagBar.hidden = !on;
+  if(!on){
+    repairLocationInput.value = "";
+    repairSelectedIssue = null;
+    repairTypeChips.forEach(function(c){ c.classList.remove("active"); });
+    repairSelectedPriority = "routine";
+    repairPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "routine"); });
+  } else {
+    focusInput();
+  }
+}
+repairTagClose.addEventListener("click", function(){ setRepairActive(false); });
+var repairTypeChips = document.querySelectorAll("#repairTypeRow .repair-type-chip");
+repairTypeChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    var val = chip.getAttribute("data-issue");
+    repairSelectedIssue = repairSelectedIssue === val ? null : val;
+    repairTypeChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-issue") === repairSelectedIssue); });
+  });
+});
+var repairPriorityChips = document.querySelectorAll("#repairPriorityRow .repair-priority-chip");
+repairPriorityChips.forEach(function(chip){
+  chip.addEventListener("click", function(){
+    repairSelectedPriority = chip.getAttribute("data-priority");
+    repairPriorityChips.forEach(function(c){ c.classList.toggle("active", c === chip); });
+  });
+});
 
 var signoffTagBar = document.getElementById("signoffTagBar");
 var signoffTagText = document.getElementById("signoffTagText");
@@ -3095,7 +3125,7 @@ optTask.addEventListener("click", function(){
   closeHeaderMenu();
 });
 qaTaskBtn.addEventListener("click", function(){ optTask.click(); });
-qaMaintenanceBtn.addEventListener("click", function(){ showTab("maintenance"); });
+qaMaintenanceBtn.addEventListener("click", function(){ setRepairActive(!repairActive); });
 qaReportBtn.addEventListener("click", function(){ setReportActive(!reportActive); });
 reportTagClose.addEventListener("click", function(){ setReportActive(false); });
 
@@ -3679,6 +3709,7 @@ function doSendReal(){
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
   mentionPopover.hidden = true;
   if(reportActive) return sendQuickReport(text, STATE.attachment);
+  if(repairActive) return sendRepairReport(text, STATE.attachment);
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
@@ -3760,6 +3791,45 @@ function sendQuickReport(text, attachment){
   refreshSendState();
   setReportActive(false);
   var payload = { description: text };
+  (attachment && attachment.type === "image"
+    ? blobToBase64(attachment.file).then(function(b64){
+        payload.photoBase64 = b64;
+        payload.photoMime = attachment.mime;
+      })
+    : Promise.resolve())
+    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); })
+    .then(function(res){
+      if(canManageMaintenanceView()){
+        STATE.tickets = STATE.tickets || [];
+        if(res.merged){
+          var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
+          if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
+        } else {
+          STATE.tickets.unshift(res.ticket);
+        }
+        renderMaintenanceBoard();
+      }
+      showToast("Reported");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't send that report.");
+    });
+}
+function sendRepairReport(text, attachment){
+  var roomNumber = repairLocationInput.value.trim();
+  var issueType = repairSelectedIssue;
+  var priority = repairSelectedPriority;
+  msgInput.value = "";
+  autoGrow();
+  STATE.attachment = null;
+  renderAttachPreview();
+  refreshSendState();
+  setRepairActive(false);
+  var payload = {
+    description: text,
+    roomNumber: roomNumber || undefined,
+    issueType: issueType || undefined,
+    priority: priority,
+  };
   (attachment && attachment.type === "image"
     ? blobToBase64(attachment.file).then(function(b64){
         payload.photoBase64 = b64;
