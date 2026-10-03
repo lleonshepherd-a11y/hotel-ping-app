@@ -1219,9 +1219,9 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    keyboard open there isn't much room left, and the composer has to
    stay reachable no matter what. ---- */
 .repair-tag-bar{
-  display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto 6px;
+  display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto 16px;
   background:#fff;border-radius:18px;padding:10px 14px 12px;
-  box-shadow:var(--shadow-soft), inset 0 0 0 1px var(--border);
+  box-shadow:0 10px 26px -10px rgba(20,20,15,.22), inset 0 0 0 1px var(--border);
   max-height:38vh;overflow-y:auto;
 }
 .repair-tag-head{display:flex;align-items:center;gap:8px}
