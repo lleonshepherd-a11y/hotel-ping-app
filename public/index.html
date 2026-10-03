@@ -727,6 +727,20 @@
     <div class="thread-scroll" id="threadScroll"></div>
 
     <div class="composer-wrap">
+      <div class="thread-quick-row" id="threadQuickRow">
+        <button type="button" class="thread-quick-btn" id="qaReportBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg>
+          <span>Report issue</span>
+        </button>
+        <button type="button" class="thread-quick-btn" id="qaTaskBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 13l2 2 4-4"/></svg>
+          <span>Task</span>
+        </button>
+        <button type="button" class="thread-quick-btn" id="qaMaintenanceBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.1 5.1L4 17v3h3l5.6-5.6a4 4 0 0 1 5.1-5.1l-2.3 2.3-2-2 2.3-2.3z"/></svg>
+          <span>Maintenance</span>
+        </button>
+      </div>
       <div id="attachPreview"></div>
 
       <div class="reply-preview-bar" id="replyPreviewBar" hidden>
@@ -1462,6 +1476,22 @@
     </div>
     <div class="forward-dept-list" id="forwardDeptList"></div>
     <div class="admin-add-error" id="forwardError"></div>
+  </div>
+</div>
+
+<div class="admin-overlay" id="quickReportOverlay" hidden>
+  <div class="admin-modal">
+    <div class="admin-modal-head">
+      <h2>Report an issue</h2>
+      <button class="admin-close" id="quickReportClose" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <form class="admin-add-form" id="quickReportForm">
+      <textarea id="quickReportText" placeholder="What's the problem?" maxlength="500" rows="3" required></textarea>
+      <button type="submit" class="admin-add-btn">Send</button>
+    </form>
+    <div class="admin-add-error" id="quickReportError"></div>
   </div>
 </div>
 

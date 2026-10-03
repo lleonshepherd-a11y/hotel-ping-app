@@ -2818,6 +2818,14 @@ var urgentToggleBtn = document.getElementById("urgentToggleBtn");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
 var optSignoff = document.getElementById("optSignoff");
+var qaReportBtn = document.getElementById("qaReportBtn");
+var qaTaskBtn = document.getElementById("qaTaskBtn");
+var qaMaintenanceBtn = document.getElementById("qaMaintenanceBtn");
+var quickReportOverlay = document.getElementById("quickReportOverlay");
+var quickReportClose = document.getElementById("quickReportClose");
+var quickReportForm = document.getElementById("quickReportForm");
+var quickReportText = document.getElementById("quickReportText");
+var quickReportError = document.getElementById("quickReportError");
 var fileInput = document.getElementById("fileInput");
 var pdfInput = document.getElementById("pdfInput");
 var cameraInput = document.getElementById("cameraInput");
@@ -3076,6 +3084,31 @@ optTask.addEventListener("click", function(){
   setTaskActive(!taskActive);
   closeHeaderMenu();
 });
+qaTaskBtn.addEventListener("click", function(){ optTask.click(); });
+qaMaintenanceBtn.addEventListener("click", function(){ showTab("maintenance"); });
+qaReportBtn.addEventListener("click", function(){
+  quickReportError.textContent = "";
+  quickReportText.value = "";
+  quickReportOverlay.hidden = false;
+  setTimeout(function(){ quickReportText.focus(); }, 30);
+});
+quickReportClose.addEventListener("click", function(){ quickReportOverlay.hidden = true; });
+quickReportOverlay.addEventListener("click", function(e){ if(e.target === quickReportOverlay) quickReportOverlay.hidden = true; });
+quickReportForm.addEventListener("submit", function(e){
+  e.preventDefault();
+  var description = quickReportText.value.trim();
+  if(!description) return;
+  var submitBtn = quickReportForm.querySelector(".admin-add-btn");
+  submitBtn.disabled = true;
+  quickReportError.textContent = "";
+  apiSend('/api/maintenance', 'POST', { description: description }).then(function(){
+    quickReportOverlay.hidden = true;
+    showToast("Reported");
+  }).catch(function(err){
+    quickReportError.textContent = err.message || "Couldn't send that report.";
+  }).finally(function(){ submitBtn.disabled = false; });
+});
+
 optSignoff.addEventListener("click", function(){
   closeHeaderMenu();
   openSignoffOverlay();
@@ -5483,6 +5516,141 @@ deptPhotoRemoveBtn.addEventListener("click", function(){
     deptPhotoError.textContent = err.message || "Couldn't remove that photo.";
   }).finally(function(){ deptPhotoRemoveBtn.disabled = false; });
 });
+
+var notifSettingsBtn = document.getElementById("notifSettingsBtn");
+var notifSettingsOverlay = document.getElementById("notifSettingsOverlay");
+var notifSettingsClose = document.getElementById("notifSettingsClose");
+var notifSettingsList = document.getElementById("notifSettingsList");
+function renderNotifSettings(mutedIds){
+  if(!mutedIds.length){
+    notifSettingsList.innerHTML = '<div class="handover-empty">You haven\'t muted any conversations.</div>';
+    return;
+  }
+  notifSettingsList.innerHTML = "";
+  mutedIds.forEach(function(deptId){
+    var row = document.createElement("div");
+    row.className = "mute-row";
+    var name = document.createElement("span");
+    name.className = "mute-row-name";
+    name.textContent = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
+    row.appendChild(name);
+    var unmuteBtn = document.createElement("button");
+    unmuteBtn.type = "button";
+    unmuteBtn.textContent = "Unmute";
+    unmuteBtn.addEventListener("click", function(){
+      apiSend('/api/muted', 'POST', { with: deptId }).then(function(res){
+        STATE.muted[deptId] = res.muted;
+        showToast("Unmuted");
+        loadNotifSettings();
+      }).catch(function(){ showToast("Couldn't unmute"); });
+    });
+    row.appendChild(unmuteBtn);
+    notifSettingsList.appendChild(row);
+  });
+}
+function loadNotifSettings(){
+  notifSettingsList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  apiGet('/api/muted?self=' + encodeURIComponent(STATE.self)).then(function(res){
+    renderNotifSettings(res.muted || []);
+  }).catch(function(){
+    notifSettingsList.innerHTML = '<div class="handover-empty">Couldn\'t load notification settings.</div>';
+  });
+}
+notifSettingsBtn.addEventListener("click", function(){
+  notifSettingsOverlay.hidden = false;
+  loadNotifSettings();
+});
+notifSettingsClose.addEventListener("click", function(){ notifSettingsOverlay.hidden = true; });
+notifSettingsOverlay.addEventListener("click", function(e){ if(e.target === notifSettingsOverlay) notifSettingsOverlay.hidden = true; });
+
+// ---- GM's "only notify me for department heads" switch (GM-only) ----
+// Whether the message itself gets through is untouched by this - the GM
+// still sees every department's conversation and can reply normally. This
+// only silences the push notification for plain departments (foh, kitchen,
+// housekeeping, ...); a head-of-department contact (head_kitchen etc.)
+// still notifies him regardless of this switch's state.
+var gmMuteDeptsBtn = document.getElementById("gmMuteDeptsBtn");
+var gmMuteDeptsSwitch = document.getElementById("gmMuteDeptsSwitch");
+var gmMuteDeptsOn = false;
+function renderGmMuteDepartments(on){
+  gmMuteDeptsOn = !!on;
+  gmMuteDeptsSwitch.classList.toggle("on", gmMuteDeptsOn);
+  gmMuteDeptsSwitch.setAttribute("aria-checked", gmMuteDeptsOn ? "true" : "false");
+}
+function loadGmMuteDepartments(){
+  apiGet('/api/gm/mute-departments').then(function(res){
+    renderGmMuteDepartments(!!res.muteDepartments);
+  }).catch(function(){});
+}
+function toggleGmMuteDepartments(){
+  var next = !gmMuteDeptsOn;
+  gmMuteDeptsSwitch.disabled = true;
+  apiSend('/api/gm/mute-departments', 'POST', { on: next }).then(function(res){
+    renderGmMuteDepartments(!!res.muteDepartments);
+    showToast(res.muteDepartments ? "Only department heads will notify you now" : "All departments will notify you again");
+  }).catch(function(){
+    showToast("Couldn't update that setting");
+  }).finally(function(){ gmMuteDeptsSwitch.disabled = false; });
+}
+gmMuteDeptsBtn.addEventListener("click", toggleGmMuteDepartments);
+gmMuteDeptsSwitch.addEventListener("click", function(e){ e.stopPropagation(); toggleGmMuteDepartments(); });
+
+var pushEnableRowBtn = document.getElementById("pushEnableRowBtn");
+pushEnableRowBtn.addEventListener("click", function(){
+  if(!pushSupported()){ showToast("Push isn't supported on this device"); return; }
+  if(Notification.permission === "denied"){
+    showToast("Notifications are blocked. Enable them in your device Settings.");
+    return;
+  }
+  pushEnableRowBtn.disabled = true;
+  Notification.requestPermission().then(function(perm){
+    if(perm !== "granted"){ showToast("Notifications weren't enabled"); return; }
+    return subscribeToPush().then(function(){ showToast("Notifications enabled"); });
+  }).catch(function(){
+    showToast("Couldn't enable notifications");
+  }).finally(function(){ pushEnableRowBtn.disabled = false; });
+});
+
+var myActivityBtn = document.getElementById("myActivityBtn");
+var myActivityOverlay = document.getElementById("myActivityOverlay");
+var myActivityClose = document.getElementById("myActivityClose");
+var myActivityList = document.getElementById("myActivityList");
+myActivityBtn.addEventListener("click", function(){
+  myActivityList.innerHTML = '<div class="handover-empty">Loading…</div>';
+  myActivityOverlay.hidden = false;
+  apiGet('/api/response-times?mine=1').then(function(res){
+    renderResponseTimes(res.departments, myActivityList);
+  }).catch(function(){
+    myActivityList.innerHTML = '<div class="handover-empty">Couldn\'t load your activity.</div>';
+  });
+});
+myActivityClose.addEventListener("click", function(){ myActivityOverlay.hidden = true; });
+myActivityOverlay.addEventListener("click", function(e){ if(e.target === myActivityOverlay) myActivityOverlay.hidden = true; });
+
+var lastPlannerReminderIds = null;
+var lastGuestRequestIds = null;
+function pollMissed(){
+  apiGet('/api/missed').then(function(res){
+    var plannerIds = res.items.filter(function(i){ return i.kind === "planner"; }).map(function(i){ return i.id; });
+    if(lastPlannerReminderIds !== null){
+      var hasNewReminder = plannerIds.some(function(id){ return lastPlannerReminderIds.indexOf(id) === -1; });
+      if(hasNewReminder && isOnDuty(STATE.self)) playPlannerChime();
+    }
+    lastPlannerReminderIds = plannerIds;
+    // Guest requests don't land as a chat message (no department "sent"
+    // them - a guest scanned a QR code), so unlike a ticket or a sign-off,
+    // nothing about them flows through the normal new-message chime. Ping
+    // for a newly-appeared one here instead, or FOH gets a silent badge
+    // change for the one thing this system's entire premise is "you get a
+    // ping for it".
+    var guestIds = res.items.filter(function(i){ return i.kind === "guestRequest"; }).map(function(i){ return i.id; });
+    if(lastGuestRequestIds !== null){
+      var hasNewGuestRequest = guestIds.some(function(id){ return lastGuestRequestIds.indexOf(id) === -1; });
+      if(hasNewGuestRequest && isOnDuty(STATE.self)) playChime(false);
+    }
+    lastGuestRequestIds = guestIds;
+  }).catch(function(e){ console.error("pollMissed failed:", e && e.stack || e); });
+}
 
 /* ---- Hold-for-help safety alert ---- */
 var helpHoldBtn = document.getElementById("helpHoldBtn");
