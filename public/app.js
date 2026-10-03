@@ -1614,13 +1614,14 @@ roomTagInput.addEventListener("keydown", function(e){
 });
 
 var threadQuickRow = document.getElementById("threadQuickRow");
-// While any of these forms is open, the quick-action row and the real
-// message box hide completely - the form is the only thing you can type
-// into or send from, so there's nothing left for it to visually overlap.
+// Task and Repair each have their own fields and their own Send button,
+// so while either is open the quick-action row and the real message box
+// hide completely - the form is the only thing on screen to type into
+// or send from.
 function updateComposerAreaForForms(){
-  var anyFormActive = taskActive || reportActive || repairActive;
-  threadQuickRow.hidden = anyFormActive;
-  if(anyFormActive){
+  var formActive = taskActive || repairActive;
+  threadQuickRow.hidden = formActive;
+  if(formActive){
     composer.hidden = true;
     composerLocked.hidden = true;
   } else {
@@ -1631,70 +1632,46 @@ function updateComposerAreaForForms(){
 var taskTagBar = document.getElementById("taskTagBar");
 var taskTagClose = document.getElementById("taskTagClose");
 var taskTagDesc = document.getElementById("taskTagDesc");
-var taskTagSend = document.getElementById("taskTagSend");
 function setTaskActive(on){
   taskActive = on;
-  if(on && reportActive) setReportActive(false);
   if(on && repairActive) setRepairActive(false);
   optTask.classList.toggle("active", on);
   taskTagBar.hidden = !on;
-  if(!on) taskTagDesc.value = "";
-  else setTimeout(function(){ taskTagDesc.focus(); }, 30);
+  if(!on){
+    taskTagDesc.value = "";
+  } else {
+    setTimeout(function(){ taskTagDesc.focus(); }, 30);
+  }
   updateComposerAreaForForms();
 }
 taskTagClose.addEventListener("click", function(){ setTaskActive(false); });
+var taskTagSend = document.getElementById("taskTagSend");
 taskTagSend.addEventListener("click", function(){
   var text = taskTagDesc.value.trim();
-  if(!text){ showToast("Type the task first"); taskTagDesc.focus(); return; }
+  if(!text){
+    showToast("Write the task first");
+    taskTagDesc.focus();
+    return;
+  }
   sendTaskTag(text);
-});
-function sendTaskTag(text){
-  var deptId = STATE.active;
-  setTaskActive(false);
-  var payload = { from: STATE.self, to: deptId, type: "text", text: text, urgent: false, affectsGuest: false, taskStatus: "not_started" };
-  apiSend('/api/messages', 'POST', payload).then(function(res){
-    STATE.data[deptId] = STATE.data[deptId] || [];
-    STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
-    renderList();
-    if(STATE.active === deptId) renderThread();
-  }).catch(function(err){
-    showToast(err.message || "Couldn't send that task");
-  });
-}
-
-var reportActive = false;
-var reportTagDesc = document.getElementById("reportTagDesc");
-var reportTagSend = document.getElementById("reportTagSend");
-function setReportActive(on){
-  reportActive = on;
-  if(on && taskActive) setTaskActive(false);
-  if(on && repairActive) setRepairActive(false);
-  reportTagBar.hidden = !on;
-  if(!on) reportTagDesc.value = "";
-  else setTimeout(function(){ reportTagDesc.focus(); }, 30);
-  updateComposerAreaForForms();
-}
-reportTagSend.addEventListener("click", function(){
-  var text = reportTagDesc.value.trim();
-  if(!text){ showToast("Describe the problem first"); reportTagDesc.focus(); return; }
-  sendQuickReport(text, null);
 });
 
 var repairTagBar = document.getElementById("repairTagBar");
 var repairTagClose = document.getElementById("repairTagClose");
 var repairLocationInput = document.getElementById("repairLocationInput");
 var repairTagDesc = document.getElementById("repairTagDesc");
+var repairGuestPresent = document.getElementById("repairGuestPresent");
 var repairActive = false;
 var repairSelectedIssue = null;
 var repairSelectedPriority = "routine";
 function setRepairActive(on){
   repairActive = on;
   if(on && taskActive) setTaskActive(false);
-  if(on && reportActive) setReportActive(false);
   repairTagBar.hidden = !on;
   if(!on){
     repairLocationInput.value = "";
     repairTagDesc.value = "";
+    repairGuestPresent.checked = false;
     repairSelectedIssue = null;
     repairTypeChips.forEach(function(c){ c.classList.remove("active"); });
     repairSelectedPriority = "routine";
@@ -2936,11 +2913,8 @@ var urgentToggleBtn = document.getElementById("urgentToggleBtn");
 var optRoom = document.getElementById("optRoom");
 var optTask = document.getElementById("optTask");
 var optSignoff = document.getElementById("optSignoff");
-var qaReportBtn = document.getElementById("qaReportBtn");
 var qaTaskBtn = document.getElementById("qaTaskBtn");
 var qaMaintenanceBtn = document.getElementById("qaMaintenanceBtn");
-var reportTagBar = document.getElementById("reportTagBar");
-var reportTagClose = document.getElementById("reportTagClose");
 var fileInput = document.getElementById("fileInput");
 var pdfInput = document.getElementById("pdfInput");
 var cameraInput = document.getElementById("cameraInput");
@@ -3202,8 +3176,6 @@ optTask.addEventListener("click", function(){
 });
 qaTaskBtn.addEventListener("click", function(){ optTask.click(); });
 qaMaintenanceBtn.addEventListener("click", function(){ setRepairActive(!repairActive); });
-qaReportBtn.addEventListener("click", function(){ setReportActive(!reportActive); });
-reportTagClose.addEventListener("click", function(){ setReportActive(false); });
 
 optSignoff.addEventListener("click", function(){
   closeHeaderMenu();
@@ -3784,13 +3756,11 @@ function doSendReal(){
   if(!text && !STATE.attachment) return;
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
   mentionPopover.hidden = true;
-  if(reportActive) return sendQuickReport(text, STATE.attachment);
   if(repairActive) return sendRepairReport(text, STATE.attachment);
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
   var wasUrgent = urgentActive;
-  var wasTask = taskActive;
   var wasSignoff = signoffActive;
   var signoffPayload = signoffData;
 
@@ -3810,8 +3780,6 @@ function doSendReal(){
   var roomTag = roomTagInput.value.trim();
   if(roomTag) payload.roomNumber = roomTag;
   clearRoomTagBar();
-  if(wasTask && !groupId) payload.taskStatus = "not_started";
-  setTaskActive(false);
   if(wasSignoff && !groupId && signoffPayload) payload.signoff = signoffPayload;
   clearSignoffTag();
   var sendPromise;
@@ -3882,42 +3850,32 @@ function postThreadConfirmation(text){
     }
   }).catch(function(){});
 }
-function sendQuickReport(text, attachment){
-  msgInput.value = "";
-  autoGrow();
-  STATE.attachment = null;
-  renderAttachPreview();
-  refreshSendState();
-  setReportActive(false);
-  var payload = { description: text };
-  (attachment && attachment.type === "image"
-    ? blobToBase64(attachment.file).then(function(b64){
-        payload.photoBase64 = b64;
-        payload.photoMime = attachment.mime;
-      })
-    : Promise.resolve())
-    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); })
-    .then(function(res){
-      if(canManageMaintenanceView()){
-        STATE.tickets = STATE.tickets || [];
-        if(res.merged){
-          var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
-          if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
-        } else {
-          STATE.tickets.unshift(res.ticket);
-        }
-        renderMaintenanceBoard();
-      }
-      postThreadConfirmation("⚠️ Reported: " + text);
-      showToast("Reported");
-    }).catch(function(err){
-      showToast(err.message || "Couldn't send that report.");
-    });
+function sendTaskTag(text){
+  var deptId = STATE.active, groupId = STATE.activeGroupId;
+  if(!deptId && !groupId) return;
+  setTaskActive(false);
+  var payload = { from: STATE.self, type: "text", text: text, urgent: false, affectsGuest: false };
+  if(groupId){ payload.groupId = groupId; payload.mentions = extractMentions(text, groupId); } else { payload.to = deptId; payload.taskStatus = "not_started"; }
+  apiSend('/api/messages', 'POST', payload).then(function(res){
+    if(groupId){
+      STATE.groupMessages[groupId] = STATE.groupMessages[groupId] || [];
+      STATE.groupMessages[groupId].push(mapServerMessage(res.message, STATE.self));
+      if(STATE.activeGroupId === groupId) renderThread();
+    } else {
+      STATE.data[deptId] = STATE.data[deptId] || [];
+      STATE.data[deptId].push(mapServerMessage(res.message, STATE.self));
+      renderList();
+      if(STATE.active === deptId) renderThread();
+    }
+  }).catch(function(){
+    showToast("Couldn't send that task.");
+  });
 }
 function sendRepairReport(text, attachment){
   var roomNumber = repairLocationInput.value.trim();
   var issueType = repairSelectedIssue;
   var priority = repairSelectedPriority;
+  var guestPresent = repairGuestPresent.checked;
   msgInput.value = "";
   autoGrow();
   STATE.attachment = null;
@@ -3929,6 +3887,7 @@ function sendRepairReport(text, attachment){
     roomNumber: roomNumber || undefined,
     issueType: issueType || undefined,
     priority: priority,
+    guestPresent: guestPresent,
   };
   (attachment && attachment.type === "image"
     ? blobToBase64(attachment.file).then(function(b64){

@@ -640,9 +640,9 @@
         <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z"/></svg><span class="tab-badge" id="tabMaintBadge" hidden></span></span>
         <span class="bottom-tab-label">Repairs</span>
       </button>
-      <button class="bottom-tab" id="tabRequestsBtn" type="button" aria-label="Requests" title="Requests">
+      <button class="bottom-tab" id="tabRequestsBtn" type="button" aria-label="Tasks" title="Tasks">
         <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="tab-badge" id="tabRequestsBadge" hidden></span></span>
-        <span class="bottom-tab-label">Requests</span>
+        <span class="bottom-tab-label">Tasks</span>
       </button>
       <button class="bottom-tab" id="tabGuestsBtn" type="button" aria-label="Guests" title="Guests" hidden>
         <span class="bottom-tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c0-3 2-5 3-8 .6-1.8 2-3 5-3s4.4 1.2 5 3c1 3 3 5 3 8"/><path d="M2 18h20"/><path d="M6 18v1.5a2.5 2.5 0 0 0 2.5 2.5h7A2.5 2.5 0 0 0 18 19.5V18"/></svg><span class="tab-badge" id="tabGuestsBadge" hidden></span></span>
@@ -756,24 +756,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>
-        <textarea id="taskTagDesc" class="repair-tag-desc" placeholder="What's the task?" rows="2"></textarea>
+        <textarea id="taskTagDesc" class="repair-tag-desc" placeholder="What's the task?" rows="3"></textarea>
         <button type="button" class="repair-tag-send" id="taskTagSend">
           <span>Send task</span>
-          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3.4 11.6L20.3 3.2a.8.8 0 0 1 1.08 1.06l-6.9 17.4a.8.8 0 0 1-1.5-.02l-2.8-7.4-7.4-2.8a.8.8 0 0 1 .02-1.5l.6-.3z"/></svg>
-        </button>
-      </div>
-
-      <div class="repair-tag-bar" id="reportTagBar" hidden>
-        <div class="repair-tag-head">
-          <span class="repair-tag-head-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></span>
-          <span class="repair-tag-head-title">Reporting an issue</span>
-          <button type="button" class="repair-tag-close" id="reportTagClose" aria-label="Remove report tag">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>
-        <textarea id="reportTagDesc" class="repair-tag-desc" placeholder="What's the problem?" rows="2"></textarea>
-        <button type="button" class="repair-tag-send" id="reportTagSend">
-          <span>Send report</span>
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3.4 11.6L20.3 3.2a.8.8 0 0 1 1.08 1.06l-6.9 17.4a.8.8 0 0 1-1.5-.02l-2.8-7.4-7.4-2.8a.8.8 0 0 1 .02-1.5l.6-.3z"/></svg>
         </button>
       </div>
@@ -788,7 +773,7 @@
         </div>
         <div class="maint-input-icon-wrap">
           <svg class="maint-input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.3"/></svg>
-          <input type="text" id="repairLocationInput" placeholder="Where is it? e.g. Floor 2, Room 210" maxlength="60">
+          <input type="text" id="repairLocationInput" placeholder="Where is it?" maxlength="60">
         </div>
         <div class="repair-type-grid" id="repairTypeRow">
           <button type="button" class="repair-type-chip" data-issue="plumbing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2.5S6 9 6 13.5a6 6 0 0 0 12 0C18 9 12 2.5 12 2.5z"/></svg>Plumbing</button>
@@ -802,6 +787,7 @@
           <button type="button" class="repair-priority-chip" data-priority="problem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 5l6 7-6 7M5 5l6 7-6 7"/></svg>Soon</button>
           <button type="button" class="repair-priority-chip urgent-opt" data-priority="safety"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Urgent</button>
         </div>
+        <label class="repair-tag-checkbox"><input type="checkbox" id="repairGuestPresent"> Guest in room right now</label>
         <textarea id="repairTagDesc" class="repair-tag-desc" placeholder="What's wrong?" rows="2"></textarea>
         <button type="button" class="repair-tag-send" id="repairTagSend">
           <span>Send repair request</span>
@@ -845,10 +831,6 @@
       </div>
 
       <div class="thread-quick-row" id="threadQuickRow">
-        <button type="button" class="thread-quick-btn" id="qaReportBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg>
-          <span>Report issue</span>
-        </button>
         <button type="button" class="thread-quick-btn" id="qaTaskBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 13l2 2 4-4"/></svg>
           <span>Task</span>

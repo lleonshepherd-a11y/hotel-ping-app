@@ -1232,8 +1232,10 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .repair-tag-head-title{flex:1;font-size:14px;font-weight:700;color:var(--text)}
 .repair-tag-close{flex:none;border:none;background:none;color:var(--text-faint);cursor:pointer;padding:2px;display:flex;align-items:center}
 .repair-tag-close svg{width:17px;height:17px}
-.repair-tag-bar .maint-input-icon-wrap input[type=text]{font-size:14px;padding-top:9px;padding-bottom:9px}
+.repair-tag-bar .maint-input-icon-wrap input[type=text]{font-size:14px;padding-top:9px;padding-bottom:9px;padding-left:38px}
 .repair-tag-bar .maint-input-icon{top:10px}
+.repair-tag-checkbox{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-dim);font-weight:600;cursor:pointer}
+.repair-tag-checkbox input[type=checkbox]{width:15px;height:15px;accent-color:#d6493c;cursor:pointer}
 .repair-type-grid{display:flex;flex-wrap:wrap;gap:6px}
 .repair-type-grid .repair-type-chip{
   display:flex;align-items:center;gap:5px;border:none;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);
