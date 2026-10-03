@@ -1144,7 +1144,7 @@ function renderComposeToBarChips(){
   });
 }
 function renderHeader(){
-  if(spaceView) spaceView.hidden = true;
+  if(spaceView && !spaceView.hidden){ spaceView.hidden = true; threadHead.hidden = false; }
   if(composeMode){
     spacesPillRow.hidden = true;
     composeToBar.hidden = false;
@@ -6777,14 +6777,17 @@ function renderSpaceView(){
     spaceViewSub.textContent = "2 members";
   }
 }
+var threadHead = document.getElementById("threadHead");
 function openSpaceView(){
   renderSpaceView();
   spaceView.hidden = false;
   spacesPillRow.hidden = true;
+  threadHead.hidden = true;
 }
 function closeSpaceView(){
   spaceView.hidden = true;
   spacesPillRow.hidden = false;
+  threadHead.hidden = false;
 }
 spacesPillBtn.addEventListener("click", openSpaceView);
 spaceViewClose.addEventListener("click", closeSpaceView);
