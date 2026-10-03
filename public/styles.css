@@ -1219,10 +1219,12 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    keyboard open there isn't much room left, and the composer has to
    stay reachable no matter what. ---- */
 .repair-tag-bar{
-  display:flex;flex-direction:column;gap:8px;max-width:640px;margin:0 auto 16px;
-  background:#fff;border-radius:18px;padding:10px 14px 12px;
-  box-shadow:0 10px 26px -10px rgba(20,20,15,.22), inset 0 0 0 1px var(--border);
-  max-height:38vh;overflow-y:auto;
+  position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:20;
+  display:flex;flex-direction:column;gap:8px;
+  width:calc(100% - 56px);max-width:380px;
+  background:#fff;border-radius:18px;padding:14px 16px 16px;
+  box-shadow:0 24px 60px -14px rgba(20,20,15,.4), inset 0 0 0 1px var(--border);
+  max-height:70vh;overflow-y:auto;
 }
 .repair-tag-head{display:flex;align-items:center;gap:8px}
 .repair-tag-head-ic{width:24px;height:24px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:#8a6d3b;flex:none}
