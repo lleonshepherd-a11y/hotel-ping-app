@@ -1144,6 +1144,7 @@ function renderComposeToBarChips(){
   });
 }
 function renderHeader(){
+  if(spaceView) spaceView.hidden = true;
   if(composeMode){
     spacesPillRow.hidden = true;
     composeToBar.hidden = false;
@@ -6758,8 +6759,40 @@ function addDeptToCurrentThread(deptId){
     })
     .catch(function(){ showToast("Couldn't create that space"); });
 }
-spacesPillBtn.addEventListener("click", function(){
+var spaceView = document.getElementById("spaceView");
+var spaceViewName = document.getElementById("spaceViewName");
+var spaceViewSub = document.getElementById("spaceViewSub");
+var spaceViewClose = document.getElementById("spaceViewClose");
+var spaceViewInviteBtn = document.getElementById("spaceViewInviteBtn");
+var spaceViewTaskBtn = document.getElementById("spaceViewTaskBtn");
+function renderSpaceView(){
+  if(STATE.activeGroupId){
+    var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
+    spaceViewName.textContent = g ? g.name : "Space";
+    var count = g ? g.members.length : 0;
+    spaceViewSub.textContent = count + (count === 1 ? " member" : " members");
+  } else {
+    var d = DEPTS[STATE.active];
+    spaceViewName.textContent = d ? d.name : "Space";
+    spaceViewSub.textContent = "2 members";
+  }
+}
+function openSpaceView(){
+  renderSpaceView();
+  spaceView.hidden = false;
+}
+function closeSpaceView(){
+  spaceView.hidden = true;
+}
+spacesPillBtn.addEventListener("click", openSpaceView);
+spaceViewClose.addEventListener("click", closeSpaceView);
+spaceViewInviteBtn.addEventListener("click", function(){
+  closeSpaceView();
   openDirectoryPicker("addToThread", { title: "Add to this conversation" });
+});
+spaceViewTaskBtn.addEventListener("click", function(){
+  closeSpaceView();
+  setTaskActive(true);
 });
 directoryClose.addEventListener("click", closeDirectoryOverlay);
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) closeDirectoryOverlay(); });
