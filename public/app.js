@@ -6780,9 +6780,11 @@ function renderSpaceView(){
 function openSpaceView(){
   renderSpaceView();
   spaceView.hidden = false;
+  spacesPillRow.hidden = true;
 }
 function closeSpaceView(){
   spaceView.hidden = true;
+  spacesPillRow.hidden = false;
 }
 spacesPillBtn.addEventListener("click", openSpaceView);
 spaceViewClose.addEventListener("click", closeSpaceView);
