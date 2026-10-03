@@ -1613,6 +1613,21 @@ roomTagInput.addEventListener("keydown", function(e){
   if(e.key === "Enter"){ e.preventDefault(); msgInput.focus(); }
 });
 
+var threadQuickRow = document.getElementById("threadQuickRow");
+// While any of these forms is open, the quick-action row and the real
+// message box hide completely - the form is the only thing you can type
+// into or send from, so there's nothing left for it to visually overlap.
+function updateComposerAreaForForms(){
+  var anyFormActive = taskActive || reportActive || repairActive;
+  threadQuickRow.hidden = anyFormActive;
+  if(anyFormActive){
+    composer.hidden = true;
+    composerLocked.hidden = true;
+  } else {
+    updateComposerLock();
+  }
+}
+
 var taskTagBar = document.getElementById("taskTagBar");
 var taskTagClose = document.getElementById("taskTagClose");
 var taskTagDesc = document.getElementById("taskTagDesc");
@@ -1625,6 +1640,7 @@ function setTaskActive(on){
   taskTagBar.hidden = !on;
   if(!on) taskTagDesc.value = "";
   else setTimeout(function(){ taskTagDesc.focus(); }, 30);
+  updateComposerAreaForForms();
 }
 taskTagClose.addEventListener("click", function(){ setTaskActive(false); });
 taskTagSend.addEventListener("click", function(){
@@ -1656,6 +1672,7 @@ function setReportActive(on){
   reportTagBar.hidden = !on;
   if(!on) reportTagDesc.value = "";
   else setTimeout(function(){ reportTagDesc.focus(); }, 30);
+  updateComposerAreaForForms();
 }
 reportTagSend.addEventListener("click", function(){
   var text = reportTagDesc.value.trim();
@@ -1666,6 +1683,7 @@ reportTagSend.addEventListener("click", function(){
 var repairTagBar = document.getElementById("repairTagBar");
 var repairTagClose = document.getElementById("repairTagClose");
 var repairLocationInput = document.getElementById("repairLocationInput");
+var repairTagDesc = document.getElementById("repairTagDesc");
 var repairActive = false;
 var repairSelectedIssue = null;
 var repairSelectedPriority = "routine";
@@ -1676,13 +1694,15 @@ function setRepairActive(on){
   repairTagBar.hidden = !on;
   if(!on){
     repairLocationInput.value = "";
+    repairTagDesc.value = "";
     repairSelectedIssue = null;
     repairTypeChips.forEach(function(c){ c.classList.remove("active"); });
     repairSelectedPriority = "routine";
     repairPriorityChips.forEach(function(c){ c.classList.toggle("active", c.getAttribute("data-priority") === "routine"); });
   } else {
-    focusInput();
+    setTimeout(function(){ repairLocationInput.focus(); }, 30);
   }
+  updateComposerAreaForForms();
 }
 repairTagClose.addEventListener("click", function(){ setRepairActive(false); });
 var repairTypeChips = document.querySelectorAll("#repairTypeRow .repair-type-chip");
@@ -1702,12 +1722,13 @@ repairPriorityChips.forEach(function(chip){
 });
 var repairTagSend = document.getElementById("repairTagSend");
 repairTagSend.addEventListener("click", function(){
-  if(!msgInput.value.trim() && !STATE.attachment){
-    showToast("Describe the problem below first");
-    focusInput();
+  var text = repairTagDesc.value.trim();
+  if(!text){
+    showToast("Describe the problem first");
+    repairTagDesc.focus();
     return;
   }
-  doSend();
+  sendRepairReport(text, null);
 });
 
 var signoffTagBar = document.getElementById("signoffTagBar");
