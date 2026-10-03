@@ -684,7 +684,7 @@
           <span class="help-hold-ring" id="helpHoldRing"></span>
           <span class="help-hold-label" id="helpHoldLabel">SOS</span>
         </button>
-        <div class="header-menu-wrap">
+        <div class="header-menu-wrap" id="headerMenuWrap">
           <button class="mute-btn header-menu-btn" id="headerMenuBtn" type="button" aria-label="More options" aria-expanded="false">
             <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
           </button>
@@ -835,8 +835,8 @@
                 <button type="button" class="qr-chip qr-add-chip" id="qrAddChip">+ Add your own</button>
               </div>
             </div>
-          <button class="icon-btn compose-outer-btn" id="optCamera" type="button" aria-label="Take a photo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.2L10.3 4h3.4L15 6.2h3a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8.2a2 2 0 0 1 2-2h3z"/><circle cx="12" cy="13" r="3.4"/></svg>
+          <button class="icon-btn compose-outer-btn plus-btn" id="plusBtn" type="button" aria-label="Add attachment" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="plus-menu" id="plusMenu">
             <button class="plus-opt" id="optPhoto" type="button">
@@ -850,8 +850,8 @@
             <input type="file" id="pdfInput" accept="application/pdf" hidden>
           </div>
           <div class="composer-pill">
-            <button class="plus-btn" id="plusBtn" aria-label="Add attachment" aria-expanded="false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <button class="plus-btn" id="optCamera" aria-label="Take a photo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6.2L10.3 4h3.4L15 6.2h3a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8.2a2 2 0 0 1 2-2h3z"/><circle cx="12" cy="13" r="3.4"/></svg>
             </button>
             <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
             <div class="ptt-float" id="pttFloatBtn" aria-label="Push to talk">
