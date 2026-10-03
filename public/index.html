@@ -744,7 +744,7 @@
           <span>Task</span>
         </button>
         <button type="button" class="thread-quick-btn" id="qaMaintenanceBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.1 5.1L4 17v3h3l5.6-5.6a4 4 0 0 1 5.1-5.1l-2.3 2.3-2-2 2.3-2.3z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M22.7 19L13.6 9.9c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
           <span>Repair</span>
         </button>
       </div>
@@ -768,6 +768,17 @@
           <div class="reply-preview-bar-text">Type your message below and send to create it</div>
         </div>
         <button type="button" class="reply-preview-bar-close" id="taskTagClose" aria-label="Remove task tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <div class="reply-preview-bar" id="reportTagBar" hidden>
+        <span class="task-tag-bar-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 15H3l9-15z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></span>
+        <div class="reply-preview-bar-body">
+          <div class="reply-preview-bar-name">Reporting an issue</div>
+          <div class="reply-preview-bar-text">Type what's wrong below and send to report it</div>
+        </div>
+        <button type="button" class="reply-preview-bar-close" id="reportTagClose" aria-label="Remove report tag">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
@@ -1483,27 +1494,6 @@
     </div>
     <div class="forward-dept-list" id="forwardDeptList"></div>
     <div class="admin-add-error" id="forwardError"></div>
-  </div>
-</div>
-
-<div class="admin-overlay" id="quickReportOverlay" hidden>
-  <div class="admin-modal">
-    <div class="admin-modal-head">
-      <h2>Report an issue</h2>
-      <button class="admin-close" id="quickReportClose" type="button" aria-label="Close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-    </div>
-    <form class="admin-add-form" id="quickReportForm">
-      <textarea id="quickReportText" placeholder="What's the problem?" maxlength="500" rows="3" required></textarea>
-      <label class="maint-photo-btn" for="quickReportPhoto">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8a2 2 0 0 1 2-2h1.6l.9-1.5a1.2 1.2 0 0 1 1-.6h5a1.2 1.2 0 0 1 1 .6l.9 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8z" stroke-width="1.7"/><circle cx="12" cy="13.3" r="4" stroke-width="1.7"/></svg>
-        <span id="quickReportPhotoLabel">Add photo or video</span>
-      </label>
-      <input type="file" id="quickReportPhoto" accept="image/*,video/*" hidden>
-      <button type="submit" class="admin-add-btn">Send</button>
-    </form>
-    <div class="admin-add-error" id="quickReportError"></div>
   </div>
 </div>
 

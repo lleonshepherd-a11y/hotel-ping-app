@@ -1613,10 +1613,19 @@ var taskTagBar = document.getElementById("taskTagBar");
 var taskTagClose = document.getElementById("taskTagClose");
 function setTaskActive(on){
   taskActive = on;
+  if(on && reportActive) setReportActive(false);
   optTask.classList.toggle("active", on);
   taskTagBar.hidden = !on;
 }
 taskTagClose.addEventListener("click", function(){ setTaskActive(false); });
+
+var reportActive = false;
+function setReportActive(on){
+  reportActive = on;
+  if(on && taskActive) setTaskActive(false);
+  reportTagBar.hidden = !on;
+  if(on) focusInput();
+}
 
 var signoffTagBar = document.getElementById("signoffTagBar");
 var signoffTagText = document.getElementById("signoffTagText");
@@ -2826,14 +2835,8 @@ var optSignoff = document.getElementById("optSignoff");
 var qaReportBtn = document.getElementById("qaReportBtn");
 var qaTaskBtn = document.getElementById("qaTaskBtn");
 var qaMaintenanceBtn = document.getElementById("qaMaintenanceBtn");
-var quickReportOverlay = document.getElementById("quickReportOverlay");
-var quickReportClose = document.getElementById("quickReportClose");
-var quickReportForm = document.getElementById("quickReportForm");
-var quickReportText = document.getElementById("quickReportText");
-var quickReportError = document.getElementById("quickReportError");
-var quickReportPhoto = document.getElementById("quickReportPhoto");
-var quickReportPhotoLabel = document.getElementById("quickReportPhotoLabel");
-var quickReportPhotoFile = null;
+var reportTagBar = document.getElementById("reportTagBar");
+var reportTagClose = document.getElementById("reportTagClose");
 var fileInput = document.getElementById("fileInput");
 var pdfInput = document.getElementById("pdfInput");
 var cameraInput = document.getElementById("cameraInput");
@@ -3094,46 +3097,8 @@ optTask.addEventListener("click", function(){
 });
 qaTaskBtn.addEventListener("click", function(){ optTask.click(); });
 qaMaintenanceBtn.addEventListener("click", function(){ showTab("maintenance"); });
-qaReportBtn.addEventListener("click", function(){
-  quickReportError.textContent = "";
-  quickReportText.value = "";
-  quickReportPhotoFile = null;
-  quickReportPhoto.value = "";
-  quickReportPhotoLabel.textContent = "Add photo or video";
-  quickReportOverlay.hidden = false;
-  setTimeout(function(){ quickReportText.focus(); }, 30);
-});
-quickReportClose.addEventListener("click", function(){ quickReportOverlay.hidden = true; });
-quickReportOverlay.addEventListener("click", function(e){ if(e.target === quickReportOverlay) quickReportOverlay.hidden = true; });
-quickReportPhoto.addEventListener("change", function(){
-  var file = quickReportPhoto.files && quickReportPhoto.files[0];
-  if(!file) return;
-  quickReportPhotoFile = file;
-  quickReportPhotoLabel.textContent = file.name;
-});
-quickReportForm.addEventListener("submit", function(e){
-  e.preventDefault();
-  var description = quickReportText.value.trim();
-  if(!description) return;
-  var submitBtn = quickReportForm.querySelector(".admin-add-btn");
-  submitBtn.disabled = true;
-  quickReportError.textContent = "";
-  var payload = { description: description };
-  var photoFile = quickReportPhotoFile;
-  (photoFile
-    ? blobToBase64(photoFile).then(function(b64){
-        payload.photoBase64 = b64;
-        payload.photoMime = photoFile.type;
-      })
-    : Promise.resolve())
-    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); })
-    .then(function(){
-      quickReportOverlay.hidden = true;
-      showToast("Reported");
-    }).catch(function(err){
-      quickReportError.textContent = err.message || "Couldn't send that report.";
-    }).finally(function(){ submitBtn.disabled = false; });
-});
+qaReportBtn.addEventListener("click", function(){ setReportActive(!reportActive); });
+reportTagClose.addEventListener("click", function(){ setReportActive(false); });
 
 optSignoff.addEventListener("click", function(){
   closeHeaderMenu();
@@ -3714,6 +3679,7 @@ function doSendReal(){
   if(!text && !STATE.attachment) return;
   if(text && containsProfanity(text)){ blockForLanguage(); return; }
   mentionPopover.hidden = true;
+  if(reportActive) return sendQuickReport(text, STATE.attachment);
   var deptId = STATE.active;
   var groupId = STATE.activeGroupId;
   var attachment = STATE.attachment;
@@ -3786,6 +3752,37 @@ function doSendReal(){
       ? "Check your connection and try again."
       : (err && err.message ? err.message : "Server error"));
   });
+}
+function sendQuickReport(text, attachment){
+  msgInput.value = "";
+  autoGrow();
+  STATE.attachment = null;
+  renderAttachPreview();
+  refreshSendState();
+  setReportActive(false);
+  var payload = { description: text };
+  (attachment && attachment.type === "image"
+    ? blobToBase64(attachment.file).then(function(b64){
+        payload.photoBase64 = b64;
+        payload.photoMime = attachment.mime;
+      })
+    : Promise.resolve())
+    .then(function(){ return apiSend('/api/maintenance', 'POST', payload); })
+    .then(function(res){
+      if(canManageMaintenanceView()){
+        STATE.tickets = STATE.tickets || [];
+        if(res.merged){
+          var existingIdx = STATE.tickets.findIndex(function(x){ return x.id === res.ticket.id; });
+          if(existingIdx !== -1) STATE.tickets[existingIdx] = res.ticket; else STATE.tickets.unshift(res.ticket);
+        } else {
+          STATE.tickets.unshift(res.ticket);
+        }
+        renderMaintenanceBoard();
+      }
+      showToast("Reported");
+    }).catch(function(err){
+      showToast(err.message || "Couldn't send that report.");
+    });
 }
 sendBtn.addEventListener("click", doSend);
 
