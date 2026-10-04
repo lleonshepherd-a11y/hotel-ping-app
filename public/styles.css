@@ -1229,11 +1229,15 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 /* The real composer (camera, + menu, mic, message box, send) is moved
    into this page wholesale when it opens - see openSpaceOverlay/
    closeSpaceOverlay - rather than rebuilding a second, thinner one.
-   It's normally a grid-overlay child of .main (align-self/justify-self/
-   position:relative, pointer-events:none on the wrapper); none of that
-   applies inside this flex-column modal, so it's reset back to a plain
-   flex:none block that sits wherever it lands in the flow. */
-.compose-modal .composer-wrap{align-self:auto;justify-self:auto;position:static;z-index:auto;pointer-events:auto;flex:none;padding:12px 0 2px;min-width:0}
+   It's normally a grid-overlay child of .main, permanently pinned to
+   the bottom edge of the screen; inside this flex-column modal it's
+   just the last item in the flow instead, so with few messages it sat
+   right under the last one instead of at the bottom of the page like a
+   normal chat box. position:sticky keeps it part of the modal's normal
+   scrollable content (which is what gives the focused textarea a valid
+   scroll target - see the --vvoffset fix) while visually pinning it to
+   the bottom edge either way. */
+.compose-modal .composer-wrap{align-self:auto;justify-self:auto;position:sticky;bottom:0;z-index:5;pointer-events:auto;flex:none;padding:12px 0 2px;min-width:0;background:var(--surface)}
 /* Grid tracks defined as minmax(0,1fr) (how .main lays this out normally)
    give every descendant an effective min-width:0 for free; flexbox's
    default "automatic minimum size" on flex items is their min-content
