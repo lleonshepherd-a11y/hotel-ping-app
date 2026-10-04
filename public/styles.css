@@ -1206,15 +1206,32 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
 .spaces-pill:active{opacity:.6}
 
 .space-page-body{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 8px 8px;overflow-y:auto}
-.space-page-composer{flex:none;display:flex;align-items:flex-end;gap:10px;padding:12px 0 2px;margin-top:auto}
-.space-page-composer textarea{flex:1;resize:none;border:1px solid var(--border);background:var(--surface-2);border-radius:20px;padding:11px 16px;font-size:15px;font-family:inherit;color:var(--text);max-height:120px}
-.space-page-composer textarea:focus{outline:none}
-.space-page-send-btn{flex:none;width:40px;height:40px;border-radius:50%;border:none;background:var(--accent-2);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.space-page-send-btn svg{width:17px;height:17px}
-.space-page-send-btn:active{transform:scale(.92)}
+/* The real composer (camera, + menu, mic, message box, send) is moved
+   into this page wholesale when it opens - see openSpaceOverlay/
+   closeSpaceOverlay - rather than rebuilding a second, thinner one.
+   It's normally a grid-overlay child of .main (align-self/justify-self/
+   position:relative, pointer-events:none on the wrapper); none of that
+   applies inside this flex-column modal, so it's reset back to a plain
+   flex:none block that sits wherever it lands in the flow. */
+.compose-modal .composer-wrap{align-self:auto;justify-self:auto;position:static;z-index:auto;pointer-events:auto;flex:none;padding:12px 0 2px;min-width:0}
+/* Grid tracks defined as minmax(0,1fr) (how .main lays this out normally)
+   give every descendant an effective min-width:0 for free; flexbox's
+   default "automatic minimum size" on flex items is their min-content
+   size instead, so without this reset the message row's children refuse
+   to shrink to the modal's width and the send button runs off-screen. */
+.compose-modal .composer-wrap *{min-width:0}
+/* .composer's own margin:0 auto (for desktop centering under a max-width)
+   disables flex stretch on this axis per spec, so it shrink-to-fits its
+   content instead of being capped at the available width - which is the
+   actual reason it was overflowing even with min-width:0 above. */
+.compose-modal .composer{margin:0;max-width:none;width:100%}
 .space-page-ic{width:52px;height:52px;border-radius:15px;background:var(--surface-3);display:flex;align-items:center;justify-content:center;color:var(--text);margin-bottom:14px}
 .space-page-ic svg{width:23px;height:23px}
 .space-page-name{font-size:21px;font-weight:700;color:var(--text);margin-bottom:4px}
+.space-page-avatars{display:flex;justify-content:center;margin-bottom:8px}
+.space-page-avatars .group-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 0 0 2px var(--surface);margin-left:-9px}
+.space-page-avatars .group-avatar:first-child{margin-left:0}
+.space-page-avatars .group-avatar svg{width:15px;height:15px}
 .space-page-sub{font-size:13.5px;color:var(--text-dim);margin-bottom:22px}
 .space-page-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
 .space-page-btn{display:inline-flex;align-items:center;gap:7px;padding:12px 18px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;color:var(--text);cursor:pointer;white-space:nowrap}
@@ -2315,6 +2332,11 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   .sidebar.hide-mobile{transform:translateX(-100%)}
   .main{position:fixed;inset:0;height:100vh;height:100dvh;height:var(--vvh,100dvh);z-index:4;transition:transform .28s cubic-bezier(.3,1,.4,1);padding-top:env(safe-area-inset-top);transform:translateX(100%)}
   .main.show-mobile{transform:translateX(0)}
+  /* Same fix as .main/.sidebar above - without it, typing in a moved-in
+     composer (Spaces) opens the keyboard, the overlay's plain dvh height
+     doesn't shrink to match, and the real chat screen shows through the
+     gap left at the bottom. */
+  .admin-overlay{height:100vh;height:100dvh;height:var(--vvh,100dvh)}
   /* Absolutely positioned, so it floats over the header rather than
      taking a grid column - the old flex layout compensated with
      asymmetric padding-left, which is exactly what threw the centered

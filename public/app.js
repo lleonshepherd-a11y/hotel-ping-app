@@ -6766,28 +6766,47 @@ function addDeptToCurrentThread(deptId){
 // the top of that page, and closing it returns to the chat untouched.
 var spaceOverlay = document.getElementById("spaceOverlay");
 var spaceOverlayName = document.getElementById("spaceOverlayName");
+var spaceOverlayAvatars = document.getElementById("spaceOverlayAvatars");
 var spaceOverlaySub = document.getElementById("spaceOverlaySub");
 var spaceOverlayClose = document.getElementById("spaceOverlayClose");
 var spaceViewInviteBtn = document.getElementById("spaceViewInviteBtn");
 var spaceViewTaskBtn = document.getElementById("spaceViewTaskBtn");
+function renderSpaceOverlayAvatars(memberIds){
+  spaceOverlayAvatars.innerHTML = memberIds.map(function(deptId){
+    return '<span class="group-avatar" style="'+avatarStyleAttr(deptId)+'" title="'+esc(DEPTS[deptId] ? DEPTS[deptId].name : deptId)+'">'+avatarInnerHtml(deptId)+'</span>';
+  }).join("");
+}
 function renderSpaceOverlay(){
   if(STATE.activeGroupId){
     var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
     spaceOverlayName.textContent = g ? g.name : "Space";
-    var count = g ? g.members.length : 0;
-    spaceOverlaySub.textContent = count + (count === 1 ? " member" : " members");
+    var members = g ? g.members : [];
+    spaceOverlaySub.textContent = members.length + (members.length === 1 ? " member" : " members");
+    renderSpaceOverlayAvatars(members);
   } else {
     var d = DEPTS[STATE.active];
     spaceOverlayName.textContent = d ? d.name : "Space";
     spaceOverlaySub.textContent = "2 members";
+    renderSpaceOverlayAvatars([STATE.self, STATE.active].filter(Boolean));
   }
 }
+// The real composer (camera, + menu with Photo/PDF, mic, message box,
+// send) is a single DOM node normally living in .main as a grid-overlay
+// layer. Moving that exact node into the Spaces page and back, rather
+// than building a second composer, is what makes this "the same message
+// box" instead of a lookalike with fewer buttons.
+var spacePageBody = document.querySelector("#spaceOverlay .space-page-body");
+var realComposerWrap = document.querySelector(".composer-wrap");
+var composerWrapHome = realComposerWrap.parentNode;
+var composerWrapAnchor = realComposerWrap.nextSibling;
 function openSpaceOverlay(){
   renderSpaceOverlay();
   spaceOverlay.hidden = false;
+  spacePageBody.parentNode.appendChild(realComposerWrap);
 }
 function closeSpaceOverlay(){
   spaceOverlay.hidden = true;
+  composerWrapHome.insertBefore(realComposerWrap, composerWrapAnchor);
 }
 spacesPillBtn.addEventListener("click", openSpaceOverlay);
 spaceOverlayClose.addEventListener("click", closeSpaceOverlay);
@@ -6798,33 +6817,6 @@ spaceViewInviteBtn.addEventListener("click", function(){
 spaceViewTaskBtn.addEventListener("click", function(){
   closeSpaceOverlay();
   setTaskActive(true);
-});
-// A simple message box of its own, so inviting people and sending the
-// first message both happen on this page without bouncing back to the
-// chat screen in between. Routes through the real send pipeline
-// (msgInput/doSend) rather than reimplementing it.
-var spaceComposerInput = document.getElementById("spaceComposerInput");
-var spaceComposerSend = document.getElementById("spaceComposerSend");
-function sendFromSpaceOverlay(){
-  var text = spaceComposerInput.value.trim();
-  if(!text) return;
-  msgInput.value = text;
-  autoGrow();
-  refreshSendState();
-  doSend();
-  spaceComposerInput.value = "";
-  spaceComposerInput.style.height = "";
-}
-spaceComposerSend.addEventListener("click", sendFromSpaceOverlay);
-spaceComposerInput.addEventListener("input", function(){
-  spaceComposerInput.style.height = "auto";
-  spaceComposerInput.style.height = Math.min(spaceComposerInput.scrollHeight, 120) + "px";
-});
-spaceComposerInput.addEventListener("keydown", function(e){
-  if(e.key === "Enter" && !e.shiftKey){
-    e.preventDefault();
-    sendFromSpaceOverlay();
-  }
 });
 directoryClose.addEventListener("click", closeDirectoryOverlay);
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) closeDirectoryOverlay(); });
