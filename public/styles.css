@@ -2355,8 +2355,13 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
   /* Same fix as .main/.sidebar above - without it, typing in a moved-in
      composer (Spaces) opens the keyboard, the overlay's plain dvh height
      doesn't shrink to match, and the real chat screen shows through the
-     gap left at the bottom. */
-  .admin-overlay{height:100vh;height:100dvh;height:var(--vvh,100dvh)}
+     gap left at the bottom. The translateY compensates for iOS panning
+     the visual viewport on its own to bring a focused input near the
+     keyboard into view - a position:fixed element's CSS position never
+     changes when that happens, so without this it visibly drags up and
+     out of view along with the pan; see the comment on --vvoffset in
+     setupVisualViewportFix for the full explanation. */
+  .admin-overlay{height:100vh;height:100dvh;height:var(--vvh,100dvh);transform:translateY(var(--vvoffset,0px))}
   /* Absolutely positioned, so it floats over the header rather than
      taking a grid column - the old flex layout compensated with
      asymmetric padding-left, which is exactly what threw the centered

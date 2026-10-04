@@ -21,6 +21,16 @@ function perfLogAfterPaint(label, since){
   if(!window.visualViewport) return;
   function update(){
     document.documentElement.style.setProperty("--vvh", window.visualViewport.height + "px");
+    // iOS keeps position:fixed elements anchored to the layout viewport,
+    // but will still pan the visual viewport on its own (e.g. to bring a
+    // focused input near the keyboard into view) - when that happens a
+    // fixed overlay's content visibly drags up and out of view even
+    // though its CSS position never changed, because what's panning is
+    // the window onto the page, not the page itself. Tracking
+    // visualViewport.offsetTop and shifting fixed overlays down by that
+    // same amount cancels the pan out, keeping them visually pinned to
+    // the actual visible area regardless of why iOS decided to pan.
+    document.documentElement.style.setProperty("--vvoffset", window.visualViewport.offsetTop + "px");
   }
   window.visualViewport.addEventListener("resize", update);
   window.visualViewport.addEventListener("scroll", update);
