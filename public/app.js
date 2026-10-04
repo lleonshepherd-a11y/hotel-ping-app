@@ -1144,7 +1144,7 @@ function renderComposeToBarChips(){
   });
 }
 function renderHeader(){
-  if(spaceView && !spaceView.hidden){ spaceView.hidden = true; threadHead.hidden = false; }
+  if(spaceOverlay && !spaceOverlay.hidden) spaceOverlay.hidden = true;
   if(composeMode){
     spacesPillRow.hidden = true;
     composeToBar.hidden = false;
@@ -6759,44 +6759,44 @@ function addDeptToCurrentThread(deptId){
     })
     .catch(function(){ showToast("Couldn't create that space"); });
 }
-var spaceView = document.getElementById("spaceView");
-var spaceViewName = document.getElementById("spaceViewName");
-var spaceViewSub = document.getElementById("spaceViewSub");
-var spaceViewClose = document.getElementById("spaceViewClose");
+// "Spaces" is its own full-screen page (same admin-overlay/compose-overlay
+// pattern as "Add to this conversation" and New Event), not something
+// layered on top of the open chat - Invite people and New task live at
+// the top of that page, and closing it returns to the chat untouched.
+var spaceOverlay = document.getElementById("spaceOverlay");
+var spaceOverlayName = document.getElementById("spaceOverlayName");
+var spaceOverlaySub = document.getElementById("spaceOverlaySub");
+var spaceOverlayClose = document.getElementById("spaceOverlayClose");
 var spaceViewInviteBtn = document.getElementById("spaceViewInviteBtn");
 var spaceViewTaskBtn = document.getElementById("spaceViewTaskBtn");
-function renderSpaceView(){
+function renderSpaceOverlay(){
   if(STATE.activeGroupId){
     var g = STATE.groups.find(function(x){ return x.id === STATE.activeGroupId; });
-    spaceViewName.textContent = g ? g.name : "Space";
+    spaceOverlayName.textContent = g ? g.name : "Space";
     var count = g ? g.members.length : 0;
-    spaceViewSub.textContent = count + (count === 1 ? " member" : " members");
+    spaceOverlaySub.textContent = count + (count === 1 ? " member" : " members");
   } else {
     var d = DEPTS[STATE.active];
-    spaceViewName.textContent = d ? d.name : "Space";
-    spaceViewSub.textContent = "2 members";
+    spaceOverlayName.textContent = d ? d.name : "Space";
+    spaceOverlaySub.textContent = "2 members";
   }
 }
-var threadHead = document.getElementById("threadHead");
-function openSpaceView(){
-  renderSpaceView();
-  spaceView.hidden = false;
-  spacesPillRow.hidden = true;
-  threadHead.hidden = true;
+function openSpaceOverlay(){
+  renderSpaceOverlay();
+  spaceOverlay.hidden = false;
 }
-function closeSpaceView(){
-  spaceView.hidden = true;
-  spacesPillRow.hidden = false;
-  threadHead.hidden = false;
+function closeSpaceOverlay(){
+  spaceOverlay.hidden = true;
 }
-spacesPillBtn.addEventListener("click", openSpaceView);
-spaceViewClose.addEventListener("click", closeSpaceView);
+spacesPillBtn.addEventListener("click", openSpaceOverlay);
+spaceOverlayClose.addEventListener("click", closeSpaceOverlay);
+spaceOverlay.addEventListener("click", function(e){ if(e.target === spaceOverlay) closeSpaceOverlay(); });
 spaceViewInviteBtn.addEventListener("click", function(){
-  closeSpaceView();
+  closeSpaceOverlay();
   openDirectoryPicker("addToThread", { title: "Add to this conversation" });
 });
 spaceViewTaskBtn.addEventListener("click", function(){
-  closeSpaceView();
+  closeSpaceOverlay();
   setTaskActive(true);
 });
 directoryClose.addEventListener("click", closeDirectoryOverlay);

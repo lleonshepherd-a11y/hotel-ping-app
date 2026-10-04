@@ -713,35 +713,6 @@
       </button>
     </div>
 
-    <div class="space-view" id="spaceView" hidden>
-      <button type="button" class="space-view-back" id="spaceViewClose" aria-label="Back to chat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        <span>Back to chat</span>
-      </button>
-      <div class="space-view-card">
-        <div class="space-view-left">
-          <div class="space-view-ic">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-          </div>
-          <div>
-            <div class="space-view-eyebrow">Shared space</div>
-            <div class="space-view-name" id="spaceViewName"></div>
-            <div class="space-view-sub" id="spaceViewSub"></div>
-          </div>
-        </div>
-        <div class="space-view-actions">
-          <button type="button" class="space-view-btn" id="spaceViewInviteBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-            Invite people
-          </button>
-          <button type="button" class="space-view-btn space-view-btn-dark" id="spaceViewTaskBtn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            New task
-          </button>
-        </div>
-      </div>
-    </div>
-
     <div class="compose-to-bar" id="composeToBar" hidden>
       <span class="compose-to-bar-label">To:</span>
       <div class="compose-to-bar-chips" id="composeToBarChips"></div>
@@ -1104,6 +1075,34 @@
       <input type="text" id="directorySearchInput" placeholder="Search">
     </div>
     <div class="directory-list" id="directoryList"></div>
+  </div>
+</div>
+
+<div class="admin-overlay compose-overlay" id="spaceOverlay" hidden>
+  <div class="admin-modal compose-modal">
+    <div class="admin-modal-head">
+      <button class="tfeed-back-btn" id="spaceOverlayClose" type="button" aria-label="Back to chat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>Shared space</h2>
+    </div>
+    <div class="space-page-body">
+      <div class="space-page-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="space-page-name" id="spaceOverlayName"></div>
+      <div class="space-page-sub" id="spaceOverlaySub"></div>
+      <div class="space-page-actions">
+        <button type="button" class="space-page-btn" id="spaceViewInviteBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          Invite people
+        </button>
+        <button type="button" class="space-page-btn space-page-btn-dark" id="spaceViewTaskBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          New task
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
