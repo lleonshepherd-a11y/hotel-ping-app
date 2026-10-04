@@ -6806,16 +6806,37 @@ var composerWrapAnchor = realComposerWrap.nextSibling;
 var realThreadScroll = document.getElementById("threadScroll");
 var threadScrollHome = realThreadScroll.parentNode;
 var threadScrollAnchor = realThreadScroll.nextSibling;
+var spaceOverlayModal = spaceOverlay.querySelector(".admin-modal");
+// Keeps the composer in view - scrolled to the bottom of the page's one
+// scroll container (see the CSS note above .space-page-body) rather than
+// wherever the header card happened to leave it.
+function scrollSpaceOverlayDown(){
+  spaceOverlayModal.scrollTop = spaceOverlayModal.scrollHeight;
+}
+// Covers both sending from this page and a new message arriving while
+// it's open - either way the thread grows and the view should follow it
+// down, same as any chat screen.
+var spaceOverlayThreadObserver = new MutationObserver(function(){
+  requestAnimationFrame(scrollSpaceOverlayDown);
+});
 function openSpaceOverlay(){
   renderSpaceOverlay();
   spaceOverlay.hidden = false;
   spacePageBody.parentNode.appendChild(realThreadScroll);
   spacePageBody.parentNode.appendChild(realComposerWrap);
+  spaceOverlayThreadObserver.observe(realThreadScroll, { childList: true, subtree: true });
+  requestAnimationFrame(scrollSpaceOverlayDown);
 }
 function closeSpaceOverlay(){
   spaceOverlay.hidden = true;
+  spaceOverlayThreadObserver.disconnect();
   threadScrollHome.insertBefore(realThreadScroll, threadScrollAnchor);
   composerWrapHome.insertBefore(realComposerWrap, composerWrapAnchor);
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize", function(){
+    if(!spaceOverlay.hidden) requestAnimationFrame(scrollSpaceOverlayDown);
+  });
 }
 spacesPillBtn.addEventListener("click", openSpaceOverlay);
 spaceOverlayClose.addEventListener("click", closeSpaceOverlay);
