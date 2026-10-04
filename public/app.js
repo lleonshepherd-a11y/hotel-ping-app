@@ -1144,7 +1144,6 @@ function renderComposeToBarChips(){
   });
 }
 function renderHeader(){
-  if(spaceOverlay && !spaceOverlay.hidden) spaceOverlay.hidden = true;
   if(composeMode){
     spacesPillRow.hidden = true;
     composeToBar.hidden = false;
@@ -6745,6 +6744,7 @@ function addDeptToCurrentThread(deptId){
     }).then(function(){
       if(STATE.activeGroupId === groupId){ renderHeader(); }
       showToast(deptName + " added");
+      openSpaceOverlay();
     }).catch(function(){ showToast("Couldn't add them"); });
     return;
   }
@@ -6755,7 +6755,7 @@ function addDeptToCurrentThread(deptId){
     .filter(function(id, i, arr){ return arr.indexOf(id) === i; });
   apiSend('/api/groups', 'POST', { self: STATE.self, name: names.join(", "), memberDepartmentIds: memberDepartmentIds })
     .then(function(res){
-      return loadGroups().then(function(){ openGroupThread(res.group.id); });
+      return loadGroups().then(function(){ openGroupThread(res.group.id); openSpaceOverlay(); });
     })
     .catch(function(){ showToast("Couldn't create that space"); });
 }
@@ -6792,12 +6792,38 @@ spacesPillBtn.addEventListener("click", openSpaceOverlay);
 spaceOverlayClose.addEventListener("click", closeSpaceOverlay);
 spaceOverlay.addEventListener("click", function(e){ if(e.target === spaceOverlay) closeSpaceOverlay(); });
 spaceViewInviteBtn.addEventListener("click", function(){
-  closeSpaceOverlay();
-  openDirectoryPicker("addToThread", { title: "Add to this conversation" });
+  openDirectoryPicker("addToThread", { title: "Add to this conversation", returnOverlay: spaceOverlay });
 });
 spaceViewTaskBtn.addEventListener("click", function(){
   closeSpaceOverlay();
   setTaskActive(true);
+});
+// A simple message box of its own, so inviting people and sending the
+// first message both happen on this page without bouncing back to the
+// chat screen in between. Routes through the real send pipeline
+// (msgInput/doSend) rather than reimplementing it.
+var spaceComposerInput = document.getElementById("spaceComposerInput");
+var spaceComposerSend = document.getElementById("spaceComposerSend");
+function sendFromSpaceOverlay(){
+  var text = spaceComposerInput.value.trim();
+  if(!text) return;
+  msgInput.value = text;
+  autoGrow();
+  refreshSendState();
+  doSend();
+  spaceComposerInput.value = "";
+  spaceComposerInput.style.height = "";
+}
+spaceComposerSend.addEventListener("click", sendFromSpaceOverlay);
+spaceComposerInput.addEventListener("input", function(){
+  spaceComposerInput.style.height = "auto";
+  spaceComposerInput.style.height = Math.min(spaceComposerInput.scrollHeight, 120) + "px";
+});
+spaceComposerInput.addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    sendFromSpaceOverlay();
+  }
 });
 directoryClose.addEventListener("click", closeDirectoryOverlay);
 directoryOverlay.addEventListener("click", function(e){ if(e.target === directoryOverlay) closeDirectoryOverlay(); });
