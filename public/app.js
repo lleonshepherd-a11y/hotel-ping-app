@@ -6829,13 +6829,23 @@ function scrollSpaceOverlayDown(){
 var spaceOverlayThreadObserver = new MutationObserver(function(){
   requestAnimationFrame(scrollSpaceOverlayDown);
 });
+// Pressing Spaces always starts a brand-new conversation - whatever
+// thread was open stays exactly as it was, untouched, rather than this
+// page reusing or extending it.
 function openSpaceOverlay(){
-  renderSpaceOverlay();
-  spaceOverlay.hidden = false;
-  spacePageBody.parentNode.appendChild(realThreadScroll);
-  spacePageBody.parentNode.appendChild(realComposerWrap);
-  spaceOverlayThreadObserver.observe(realThreadScroll, { childList: true, subtree: true });
-  requestAnimationFrame(scrollSpaceOverlayDown);
+  apiSend('/api/groups', 'POST', { self: STATE.self, name: "New Space", memberDepartmentIds: [] })
+    .then(function(res){
+      return loadGroups().then(function(){
+        openGroupThread(res.group.id);
+        renderSpaceOverlay();
+        spaceOverlay.hidden = false;
+        spacePageBody.parentNode.appendChild(realThreadScroll);
+        spacePageBody.parentNode.appendChild(realComposerWrap);
+        spaceOverlayThreadObserver.observe(realThreadScroll, { childList: true, subtree: true });
+        requestAnimationFrame(scrollSpaceOverlayDown);
+      });
+    })
+    .catch(function(){ showToast("Couldn't start a new space"); });
 }
 function closeSpaceOverlay(){
   spaceOverlay.hidden = true;
