@@ -6739,7 +6739,8 @@ function addDeptToCurrentThread(deptId){
   var deptName = DEPTS[deptId] ? DEPTS[deptId].name : deptId;
   if(STATE.activeGroupId){
     var groupId = STATE.activeGroupId;
-    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/join', 'POST', { self: deptId }).then(function(){
+    var realDeptId = headRealDeptId(deptId) || deptId;
+    apiSend('/api/groups/' + encodeURIComponent(groupId) + '/join', 'POST', { self: realDeptId }).then(function(){
       return loadGroups();
     }).then(function(){
       if(STATE.activeGroupId === groupId){ renderHeader(); }
