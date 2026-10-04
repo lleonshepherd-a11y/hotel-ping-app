@@ -6791,21 +6791,30 @@ function renderSpaceOverlay(){
   }
 }
 // The real composer (camera, + menu with Photo/PDF, mic, message box,
-// send) is a single DOM node normally living in .main as a grid-overlay
-// layer. Moving that exact node into the Spaces page and back, rather
-// than building a second composer, is what makes this "the same message
-// box" instead of a lookalike with fewer buttons.
+// send) AND the real message thread are single DOM nodes normally
+// living in .main as grid-overlay layers. Moving those exact nodes into
+// the Spaces page and back, rather than building a second composer and
+// a second message feed, is what makes sending from this page actually
+// show up here - a lookalike feed would need its own render logic kept
+// in sync with the real one, and previously there was no feed here at
+// all, so a message you sent from this page only ever showed up back
+// on the normal thread screen.
 var spacePageBody = document.querySelector("#spaceOverlay .space-page-body");
 var realComposerWrap = document.querySelector(".composer-wrap");
 var composerWrapHome = realComposerWrap.parentNode;
 var composerWrapAnchor = realComposerWrap.nextSibling;
+var realThreadScroll = document.getElementById("threadScroll");
+var threadScrollHome = realThreadScroll.parentNode;
+var threadScrollAnchor = realThreadScroll.nextSibling;
 function openSpaceOverlay(){
   renderSpaceOverlay();
   spaceOverlay.hidden = false;
+  spacePageBody.parentNode.appendChild(realThreadScroll);
   spacePageBody.parentNode.appendChild(realComposerWrap);
 }
 function closeSpaceOverlay(){
   spaceOverlay.hidden = true;
+  threadScrollHome.insertBefore(realThreadScroll, threadScrollAnchor);
   composerWrapHome.insertBefore(realComposerWrap, composerWrapAnchor);
 }
 spacesPillBtn.addEventListener("click", openSpaceOverlay);

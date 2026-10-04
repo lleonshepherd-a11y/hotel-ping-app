@@ -1211,7 +1211,21 @@ textarea,input,select,button{-webkit-tap-highlight-color:transparent}
    scrolled-to-top and pushing the composer below the fold until the
    user manually scrolls down to find it. */
 #spaceOverlay .admin-modal{overflow:hidden;display:flex;flex-direction:column}
-.space-page-body{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 8px 8px;overflow-y:auto}
+/* Compact header card - the real message thread (moved in below it, see
+   openSpaceOverlay) is what takes the flexible middle space now, not
+   this. */
+.space-page-body{flex:none;display:flex;flex-direction:column;align-items:center;text-align:center;padding:24px 8px 16px}
+/* The real message thread is moved into this page the same way the
+   composer is (see openSpaceOverlay/closeSpaceOverlay) - without it,
+   sending a message from this page's composer had nowhere on this page
+   to show up, so it looked like sending silently failed until you went
+   back to the normal thread screen to find it. It's normally a
+   grid-overlay layer filling the whole .main cell, padded top/bottom to
+   clear the header and composer that overlay it there; neither applies
+   once it's an in-flow flex sibling here; sized to fill the space
+   between the header card and the composer. */
+.compose-modal .thread-scroll{align-self:auto;justify-self:auto;position:static;z-index:auto;flex:1;min-height:0;padding:12px 16px}
+.compose-modal .thread-scroll *{min-width:0}
 /* The real composer (camera, + menu, mic, message box, send) is moved
    into this page wholesale when it opens - see openSpaceOverlay/
    closeSpaceOverlay - rather than rebuilding a second, thinner one.
